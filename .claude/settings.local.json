@@ -10,7 +10,8 @@
       "Bash(npx create-next-app@latest:*)",
       "mcp__supabase__apply_migration",
       "Bash(cat:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(npm run lint)"
     ]
   },
   "enableAllProjectMcpServers": true,

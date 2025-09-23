@@ -19,13 +19,13 @@ export default async function DemoPage() {
         </div>
 
         <div className="space-y-4">
-          <h2 className="font-bold text-xl">Sample Data from 'todos' table:</h2>
+          <h2 className="font-bold text-xl">Sample Data from &apos;todos&apos; table:</h2>
 
           {error ? (
             <div className="bg-destructive/10 border border-destructive text-destructive p-4 rounded-md">
               <strong>Error:</strong> {error.message}
               <p className="mt-2 text-sm">
-                The 'todos' table might not exist yet. You can create it in your Supabase dashboard
+                The &apos;todos&apos; table might not exist yet. You can create it in your Supabase dashboard
                 or run this SQL command in the SQL editor:
               </p>
               <pre className="mt-2 p-2 bg-muted rounded text-xs overflow-x-auto">
@@ -54,7 +54,7 @@ INSERT INTO todos (task) VALUES
                 </div>
               ) : (
                 <div className="bg-muted p-4 rounded-md text-muted-foreground">
-                  No data found in the 'todos' table. The table exists but is empty.
+                  No data found in the &apos;todos&apos; table. The table exists but is empty.
                 </div>
               )}
             </div>
