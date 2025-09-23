@@ -3,11 +3,12 @@ import { AuthButton } from '@/components/auth-button'
 
 // Mock the Supabase client
 vi.mock('@/lib/supabase/server', () => ({
-  createClient: () => ({
+  createClient: vi.fn(() => Promise.resolve({
     auth: {
-      getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null }))
+      getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
+      getClaims: vi.fn(() => Promise.resolve({ data: { claims: null }, error: null }))
     }
-  })
+  }))
 }))
 
 // Mock Next.js navigation

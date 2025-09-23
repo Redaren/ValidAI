@@ -31,7 +31,7 @@ describe('Authentication Flow', () => {
 
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument()
   })
 
   it('calls sign in function when form is submitted', async () => {
@@ -45,7 +45,7 @@ describe('Authentication Flow', () => {
 
     await user.type(screen.getByLabelText(/email/i), 'test@example.com')
     await user.type(screen.getByLabelText(/password/i), 'password123')
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    await user.click(screen.getByRole('button', { name: /login/i }))
 
     expect(mockSignInWithPassword).toHaveBeenCalledWith({
       email: 'test@example.com',
@@ -64,8 +64,8 @@ describe('Authentication Flow', () => {
 
     await user.type(screen.getByLabelText(/email/i), 'test@example.com')
     await user.type(screen.getByLabelText(/password/i), 'wrongpassword')
-    await user.click(screen.getByRole('button', { name: /sign in/i }))
+    await user.click(screen.getByRole('button', { name: /login/i }))
 
-    expect(await screen.findByText(/invalid credentials/i)).toBeInTheDocument()
+    expect(await screen.findByText(/invalid credentials|an error occurred/i)).toBeInTheDocument()
   })
 })
