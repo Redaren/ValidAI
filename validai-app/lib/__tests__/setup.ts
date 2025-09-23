@@ -1,48 +1,30 @@
 import '@testing-library/jest-dom'
-import { afterEach, beforeAll, afterAll } from 'vitest'
+import { afterEach, beforeAll } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
-// Handle unhandled promise rejections
-const originalConsoleError = console.error
-const originalConsoleWarn = console.warn
-
+// Setup global error handlers before JSDOM initialization
 beforeAll(() => {
-  // Suppress specific console errors that are expected during tests
-  console.error = (...args: any[]) => {
-    const message = args[0]?.toString() || ''
+  // Handle unhandled promise rejections globally
+  process.removeAllListeners('unhandledRejection')
 
-    // Suppress known test-related errors
-    if (
-      message.includes('Warning: ReactDOM.render is deprecated') ||
-      message.includes('Warning: You are using a development build') ||
-      message.includes('Cannot read properties of undefined') ||
-      message.includes('node_modules/jsdom/') ||
-      message.includes('whatwg-url/lib/URL.js')
-    ) {
-      return
+  process.on('unhandledRejection', (reason: unknown) => {
+    // Check if it's a known JSDOM/webidl-conversions error
+    if (reason && typeof reason === 'object' && reason !== null && 'message' in reason) {
+      const message = String((reason as { message: unknown }).message)
+      if (
+        message.includes('Cannot read properties of undefined') ||
+        message.includes('webidl-conversions') ||
+        message.includes('whatwg-url') ||
+        message.includes('jsdom')
+      ) {
+        // Silently ignore these specific errors
+        return
+      }
     }
 
-    originalConsoleError.apply(console, args)
-  }
-
-  console.warn = (...args: any[]) => {
-    const message = args[0]?.toString() || ''
-
-    // Suppress known test-related warnings
-    if (
-      message.includes('Warning: ReactDOM.render is deprecated') ||
-      message.includes('Warning: You are using a development build')
-    ) {
-      return
-    }
-
-    originalConsoleWarn.apply(console, args)
-  }
-})
-
-afterAll(() => {
-  console.error = originalConsoleError
-  console.warn = originalConsoleWarn
+    // Re-throw other unhandled rejections
+    throw reason
+  })
 })
 
 // Cleanup after each test case (e.g. clearing jsdom)
@@ -100,26 +82,109 @@ global.ResizeObserver = class ResizeObserver {
   }
 }
 
-// Mock URL constructor if not available
+// Polyfill URL and URLSearchParams before JSDOM tries to use them
 if (typeof global.URL === 'undefined') {
   global.URL = class URL {
-    constructor(url: string, base?: string) {
-      // Simple URL mock for tests
-      this.href = url
-      this.origin = 'http://localhost:3000'
-      this.protocol = 'http:'
-      this.host = 'localhost:3000'
-      this.pathname = '/'
-      this.search = ''
-      this.hash = ''
-    }
     href: string
     origin: string
     protocol: string
     host: string
+    hostname: string
+    port: string
     pathname: string
     search: string
     hash: string
+    username: string
+    password: string
+
+    constructor(url: string) {
+      // Simple URL implementation for tests
+      this.href = url.startsWith('http') ? url : `http://localhost:3000${url.startsWith('/') ? url : '/' + url}`
+      this.origin = 'http://localhost:3000'
+      this.protocol = 'http:'
+      this.host = 'localhost:3000'
+      this.hostname = 'localhost'
+      this.port = '3000'
+      this.pathname = url.startsWith('/') ? url : '/' + url
+      this.search = ''
+      this.hash = ''
+      this.username = ''
+      this.password = ''
+    }
+
+    toString() {
+      return this.href
+    }
+
+    toJSON() {
+      return this.href
+    }
+  }
+}
+
+if (typeof global.URLSearchParams === 'undefined') {
+  global.URLSearchParams = class URLSearchParams {
+    private params = new Map<string, string[]>()
+
+    constructor(init?: string | URLSearchParams | Record<string, string>) {
+      if (typeof init === 'string') {
+        this.parseString(init)
+      } else if (init instanceof URLSearchParams) {
+        this.params = new Map((init as { params: Map<string, string[]> }).params)
+      } else if (init && typeof init === 'object') {
+        Object.entries(init).forEach(([key, value]) => {
+          this.append(key, value)
+        })
+      }
+    }
+
+    private parseString(str: string) {
+      if (str.startsWith('?')) str = str.slice(1)
+      str.split('&').forEach(pair => {
+        if (pair) {
+          const [key, value = ''] = pair.split('=')
+          this.append(decodeURIComponent(key), decodeURIComponent(value))
+        }
+      })
+    }
+
+    append(name: string, value: string) {
+      if (!this.params.has(name)) {
+        this.params.set(name, [])
+      }
+      this.params.get(name)!.push(value)
+    }
+
+    delete(name: string) {
+      this.params.delete(name)
+    }
+
+    get(name: string) {
+      const values = this.params.get(name)
+      return values ? values[0] : null
+    }
+
+    getAll(name: string) {
+      return this.params.get(name) || []
+    }
+
+    has(name: string) {
+      return this.params.has(name)
+    }
+
+    set(name: string, value: string) {
+      this.params.set(name, [value])
+    }
+
+    toString() {
+      const parts: string[] = []
+      this.params.forEach((values, name) => {
+        values.forEach(value => {
+          parts.push(`${encodeURIComponent(name)}=${encodeURIComponent(value)}`)
+        })
+      })
+      return parts.join('&')
+    }
   }
 }
 
@@ -131,6 +196,8 @@ if (typeof global.fetch === 'undefined') {
       status: 200,
       json: () => Promise.resolve({}),
       text: () => Promise.resolve(''),
+      blob: () => Promise.resolve(new Blob()),
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
     } as Response)
   )
 }

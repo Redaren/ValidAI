@@ -11,34 +11,11 @@ export default defineConfig({
     globals: true,
     css: true,
     exclude: ['**/node_modules/**', '**/e2e/**'],
-    onConsoleLog: (log, type) => {
-      // Suppress noisy logs during tests
-      if (log.includes('Warning: ReactDOM.render is deprecated')) return false
-      if (log.includes('Warning: You are using a development build')) return false
-      if (log.includes('Cannot read properties of undefined')) return false
-      if (log.includes('whatwg-url/lib/URL.js')) return false
-      return true
-    },
-    silent: false,
-    pool: 'forks',
+    pool: 'threads',
     poolOptions: {
-      forks: {
-        singleFork: true,
+      threads: {
+        singleThread: true,
       },
-    },
-    onUnhandledRejection: (reason, promise) => {
-      // Ignore specific unhandled rejections from JSDOM/testing environment
-      if (reason && typeof reason === 'object' && 'message' in reason) {
-        const message = reason.message
-        if (
-          message.includes('Cannot read properties of undefined') ||
-          message.includes('whatwg-url') ||
-          message.includes('jsdom')
-        ) {
-          return
-        }
-      }
-      throw reason
     },
   },
   resolve: {
