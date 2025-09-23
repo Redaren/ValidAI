@@ -2,6 +2,12 @@ import '@testing-library/jest-dom'
 import { afterEach, beforeAll } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
+// Type declaration to help TypeScript understand our polyfills
+declare global {
+  var URL: typeof globalThis.URL
+  var URLSearchParams: typeof globalThis.URLSearchParams
+}
+
 // Setup global error handlers before JSDOM initialization
 beforeAll(() => {
   // Handle unhandled promise rejections globally
@@ -84,7 +90,7 @@ global.ResizeObserver = class ResizeObserver {
 
 // Polyfill URL and URLSearchParams before JSDOM tries to use them
 if (typeof global.URL === 'undefined') {
-  global.URL = class URL {
+  (global as any).URL = class URL {
     href: string
     origin: string
     protocol: string
@@ -96,20 +102,25 @@ if (typeof global.URL === 'undefined') {
     hash: string
     username: string
     password: string
+    searchParams: URLSearchParams
 
-    constructor(url: string) {
+    constructor(url: string | URL, base?: string | URL) {
+      const urlString = typeof url === 'string' ? url : url.href
+      const baseString = typeof base === 'string' ? base : base?.href
+
       // Simple URL implementation for tests
-      this.href = url.startsWith('http') ? url : `http://localhost:3000${url.startsWith('/') ? url : '/' + url}`
+      this.href = urlString.startsWith('http') ? urlString : `http://localhost:3000${urlString.startsWith('/') ? urlString : '/' + urlString}`
       this.origin = 'http://localhost:3000'
       this.protocol = 'http:'
       this.host = 'localhost:3000'
       this.hostname = 'localhost'
       this.port = '3000'
-      this.pathname = url.startsWith('/') ? url : '/' + url
+      this.pathname = urlString.startsWith('/') ? urlString : '/' + urlString
       this.search = ''
       this.hash = ''
       this.username = ''
       this.password = ''
+      this.searchParams = new URLSearchParams()
     }
 
     toString() {
@@ -119,18 +130,51 @@ if (typeof global.URL === 'undefined') {
     toJSON() {
       return this.href
     }
+
+    static canParse(url: string | URL, base?: string | URL): boolean {
+      try {
+        new URL(url, base)
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    static createObjectURL(obj: Blob | MediaSource): string {
+      return 'blob:http://localhost:3000/mock-object-url'
+    }
+
+    static parse(url: string | URL, base?: string | URL): URL | null {
+      try {
+        return new URL(url, base)
+      } catch {
+        return null
+      }
+    }
+
+    static revokeObjectURL(url: string): void {
+      // Mock implementation - no-op
+    }
   }
 }
 
 if (typeof global.URLSearchParams === 'undefined') {
-  global.URLSearchParams = class URLSearchParams {
+  (global as any).URLSearchParams = class URLSearchParams {
     private params = new Map<string, string[]>()
 
-    constructor(init?: string | URLSearchParams | Record<string, string>) {
+    constructor(init?: string | URLSearchParams | string[][] | Record<string, string>) {
       if (typeof init === 'string') {
         this.parseString(init)
       } else if (init instanceof URLSearchParams) {
-        this.params = new Map((init as { params: Map<string, string[]> }).params)
+        // Copy entries from the existing URLSearchParams
+        for (const [key, value] of init.entries()) {
+          this.append(key, value)
+        }
+      } else if (Array.isArray(init)) {
+        // Handle string[][] case
+        init.forEach(([key, value]) => {
+          this.append(key, value)
+        })
       } else if (init && typeof init === 'object') {
         Object.entries(init).forEach(([key, value]) => {
           this.append(key, value)
@@ -174,6 +218,54 @@ if (typeof global.URLSearchParams === 'undefined') {
 
     set(name: string, value: string) {
       this.params.set(name, [value])
+    }
+
+    get size() {
+      let count = 0
+      this.params.forEach(values => {
+        count += values.length
+      })
+      return count
+    }
+
+    sort() {
+      const sortedEntries = Array.from(this.params.entries()).sort(([a], [b]) => a.localeCompare(b))
+      this.params.clear()
+      sortedEntries.forEach(([key, values]) => {
+        this.params.set(key, values)
+      })
+    }
+
+    forEach(callback: (value: string, key: string, parent: URLSearchParams) => void) {
+      this.params.forEach((values, name) => {
+        values.forEach(value => {
+          callback(value, name, this)
+        })
+      })
+    }
+
+    *entries(): IterableIterator<[string, string]> {
+      for (const [name, values] of this.params) {
+        for (const value of values) {
+          yield [name, value]
+        }
+      }
+    }
+
+    *keys(): IterableIterator<string> {
+      for (const [name] of this.entries()) {
+        yield name
+      }
+    }
+
+    *values(): IterableIterator<string> {
+      for (const [, value] of this.entries()) {
+        yield value
+      }
+    }
+
+    *[Symbol.iterator](): IterableIterator<[string, string]> {
+      yield* this.entries()
     }
 
     toString() {
