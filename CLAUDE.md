@@ -14,9 +14,23 @@ npm run dev          # Start development server with Turbopack
 npm run build        # Build production version
 npm run start        # Start production server
 npm run lint         # Run ESLint checks
+npm run typecheck    # Run TypeScript checks
 ```
 
-Note: No test suite is currently configured. TypeScript checking can be done with `npx tsc --noEmit`.
+### Testing Commands
+```bash
+npm run test         # Run unit tests with Vitest
+npm run test:watch   # Run tests in watch mode
+npm run test:coverage # Run tests with coverage report
+npm run test:e2e     # Run E2E tests with Playwright
+npm run test:all     # Run all tests (unit + E2E)
+```
+
+### Code Quality
+```bash
+npm run format       # Format code with Prettier
+npm run lint:fix     # Fix ESLint issues automatically
+```
 
 ## Architecture
 
@@ -27,6 +41,8 @@ Note: No test suite is currently configured. TypeScript checking can be done wit
 - **State Management**: TanStack Query + Zustand architecture
 - **UI Components**: shadcn/ui with Radix primitives
 - **Styling**: Tailwind CSS with theme support
+- **Testing**: Vitest + React Testing Library + Playwright
+- **Quality**: ESLint + Prettier + Husky hooks + GitHub Actions
 
 ### Key Files
 - `middleware.ts`: Handles session management across all routes
@@ -35,7 +51,9 @@ Note: No test suite is currently configured. TypeScript checking can be done wit
 - `app/queries/`: Database query functions and TanStack Query hooks
 - `stores/`: Zustand state stores (ALL stores must be here)
 - `components/`: Reusable UI components and forms
-- `/docs/`: Comprehensive architecture documentation
+- `__tests__/`: Unit and integration tests
+- `e2e/`: End-to-end tests with Playwright
+- `/docs/`: Comprehensive architecture and quality documentation
 
 ### Supabase Integration
 - **MCP Server**: Configured with project ref `xczippkxxdqlvaacjexj`
@@ -83,18 +101,41 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - `/instruments` - Legacy pattern (for comparison)
 - `/demo` - Original Supabase demo
 
+## Quality Standards
+
+### Testing Requirements
+- Write tests for all new components and features
+- Maintain 80%+ code coverage
+- Use React Testing Library for component tests
+- Add E2E tests for critical user journeys
+
+### Code Quality
+- ESLint must pass (auto-fixed on commit)
+- Code formatted with Prettier (auto-formatted on commit)
+- TypeScript strict mode enforced
+- Conventional commit messages required
+
+### Development Workflow
+- Pre-commit hooks automatically run linting and formatting
+- CI pipeline runs all tests on pull requests
+- All PRs require code review and passing tests
+
 ## Important Notes
-that 
+
 - **Authentication**: Never modify middleware.ts, auth routes, or session management
 - **Data Fetching**: Use TanStack Query for all server data, Zustand for UI state
 - **Type Safety**: Always use TypedSupabaseClient for database operations
-- **Documentation**: Comprehensive guides available in `/docs` directory
-- Protected routes use layout-based authentication checks
-- Theme switching supported via next-themes
+- **Testing**: Write tests before or alongside feature development
+- **Quality**: All code must pass automated quality checks
 
 ## Quick Reference
 
-For detailed documentation on architecture patterns, see:
+### Architecture Documentation
 - `/docs/architecture/` - Technical architecture decisions
 - `/docs/guides/` - Step-by-step implementation guides
 - `/docs/examples/` - Code patterns and examples
+
+### Quality Documentation
+- `/docs/quality/quick-start.md` - 5-minute setup guide
+- `/docs/quality/testing-guide.md` - How to write and run tests
+- `/docs/quality/code-standards.md` - Coding conventions and best practices
