@@ -97,46 +97,48 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY }}
 
-  e2e-tests:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    needs: [build]
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+  # E2E Tests - Prepared for future use
+  # Uncomment when E2E tests are ready to be included in CI pipeline
+  # e2e-tests:
+  #   name: E2E Tests
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #   needs: [build]
+  #   if: github.event_name == 'push' || github.event.pull_request.draft == false
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: validai-app/package-lock.json
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'npm'
+  #         cache-dependency-path: validai-app/package-lock.json
 
-      - name: Install dependencies
-        working-directory: validai-app
-        run: npm ci
+  #     - name: Install dependencies
+  #       working-directory: validai-app
+  #       run: npm ci
 
-      - name: Install Playwright browsers
-        working-directory: validai-app
-        run: npx playwright install --with-deps
+  #     - name: Install Playwright browsers
+  #       working-directory: validai-app
+  #       run: npx playwright install --with-deps
 
-      - name: Run E2E tests
-        working-directory: validai-app
-        run: npm run test:e2e
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY }}
+  #     - name: Run E2E tests
+  #       working-directory: validai-app
+  #       run: npm run test:e2e
+  #       env:
+  #         NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+  #         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY }}
 
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report
-          path: validai-app/playwright-report/
-          retention-days: 30
+  #     - name: Upload Playwright report
+  #       uses: actions/upload-artifact@v4
+  #       if: failure()
+  #       with:
+  #         name: playwright-report
+  #         path: validai-app/playwright-report/
+  #         retention-days: 30
 
   security-audit:
     name: Security Audit

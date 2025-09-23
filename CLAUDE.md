@@ -22,8 +22,8 @@ npm run typecheck    # Run TypeScript checks
 npm run test         # Run unit tests with Vitest
 npm run test:watch   # Run tests in watch mode
 npm run test:coverage # Run tests with coverage report
-npm run test:e2e     # Run E2E tests with Playwright
-npm run test:all     # Run all tests (unit + E2E)
+# npm run test:e2e     # Run E2E tests with Playwright (prepared for future use)
+npm run test:all     # Run all tests (currently unit tests only)
 ```
 
 ### Code Quality
@@ -52,7 +52,7 @@ npm run lint:fix     # Fix ESLint issues automatically
 - `stores/`: Zustand state stores (ALL stores must be here)
 - `components/`: Reusable UI components and forms
 - `__tests__/`: Unit and integration tests
-- `e2e/`: End-to-end tests with Playwright
+- `e2e/`: End-to-end tests with Playwright (prepared for future use)
 - `/docs/`: Comprehensive architecture and quality documentation
 
 ### Supabase Integration
@@ -107,7 +107,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - Write tests for all new components and features
 - Maintain 80%+ code coverage
 - Use React Testing Library for component tests
-- Add E2E tests for critical user journeys
+- Add E2E tests for critical user journeys (framework prepared for future use)
 
 ### Code Quality
 - ESLint must pass (auto-fixed on commit)
