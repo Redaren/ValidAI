@@ -25,7 +25,7 @@ Note: No test suite is currently configured. TypeScript checking can be done wit
 - **Authentication**: Cookie-based auth via Supabase middleware
 - **Database**: Supabase PostgreSQL with MCP server integration
 - **State Management**: TanStack Query + Zustand architecture
-- **UI Components**: shadcn/ui ONLY (do not use other component libraries)
+- **UI Components**: shadcn/ui with Radix primitives
 - **Styling**: Tailwind CSS with theme support
 
 ### Key Files
@@ -84,11 +84,10 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - `/demo` - Original Supabase demo
 
 ## Important Notes
-
+that 
 - **Authentication**: Never modify middleware.ts, auth routes, or session management
 - **Data Fetching**: Use TanStack Query for all server data, Zustand for UI state
 - **Type Safety**: Always use TypedSupabaseClient for database operations
-- **UI Components**: ONLY use shadcn/ui components - do not install or use other component libraries
 - **Documentation**: Comprehensive guides available in `/docs` directory
 - Protected routes use layout-based authentication checks
 - Theme switching supported via next-themes
