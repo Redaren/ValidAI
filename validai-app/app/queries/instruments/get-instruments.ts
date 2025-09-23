@@ -10,7 +10,7 @@ export async function getInstruments(supabase: TypedSupabaseClient) {
   return data
 }
 
-export async function getInstrument(supabase: TypedSupabaseClient, id: string) {
+export async function getInstrument(supabase: TypedSupabaseClient, id: number) {
   const { data, error } = await supabase
     .from('instruments')
     .select('*')

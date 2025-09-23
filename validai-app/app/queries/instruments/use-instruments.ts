@@ -13,7 +13,7 @@ export function useInstruments() {
   })
 }
 
-export function useInstrument(id: string) {
+export function useInstrument(id: number) {
   const supabase = createTypedBrowserClient()
 
   return useQuery({
