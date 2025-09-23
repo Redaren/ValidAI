@@ -90,7 +90,7 @@ global.ResizeObserver = class ResizeObserver {
 
 // Polyfill URL and URLSearchParams before JSDOM tries to use them
 if (typeof global.URL === 'undefined') {
-  (global as any).URL = class URL {
+  ;(global as typeof globalThis).URL = class URL {
     href: string
     origin: string
     protocol: string
@@ -104,9 +104,9 @@ if (typeof global.URL === 'undefined') {
     password: string
     searchParams: URLSearchParams
 
-    constructor(url: string | URL, base?: string | URL) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    constructor(url: string | URL, _base?: string | URL) {
       const urlString = typeof url === 'string' ? url : url.href
-      const baseString = typeof base === 'string' ? base : base?.href
 
       // Simple URL implementation for tests
       this.href = urlString.startsWith('http') ? urlString : `http://localhost:3000${urlString.startsWith('/') ? urlString : '/' + urlString}`
@@ -140,7 +140,8 @@ if (typeof global.URL === 'undefined') {
       }
     }
 
-    static createObjectURL(obj: Blob | MediaSource): string {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    static createObjectURL(_obj: Blob | MediaSource): string {
       return 'blob:http://localhost:3000/mock-object-url'
     }
 
@@ -152,14 +153,16 @@ if (typeof global.URL === 'undefined') {
       }
     }
 
-    static revokeObjectURL(url: string): void {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    static revokeObjectURL(_url: string): void {
       // Mock implementation - no-op
     }
   }
 }
 
 if (typeof global.URLSearchParams === 'undefined') {
-  (global as any).URLSearchParams = class URLSearchParams {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(global as any).URLSearchParams = class URLSearchParams {
     private params = new Map<string, string[]>()
 
     constructor(init?: string | URLSearchParams | string[][] | Record<string, string>) {

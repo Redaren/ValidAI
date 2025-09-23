@@ -1,6 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import { TypedSupabaseClient } from './types'
 
 // NEW typed versions alongside existing createClient functions
@@ -12,6 +11,7 @@ export function createTypedBrowserClient(): TypedSupabaseClient {
 }
 
 export async function createTypedServerClient(): Promise<TypedSupabaseClient> {
+  const { cookies } = await import('next/headers')
   const cookieStore = await cookies()
 
   return createServerClient(
