@@ -1,3 +1,5 @@
+import { SessionInfoCard } from "@/components/session-info-card"
+
 export default function DashboardPage() {
   return (
     <>
@@ -12,15 +14,18 @@ export default function DashboardPage() {
           <span className="text-muted-foreground">Dashboard Card 3</span>
         </div>
       </div>
-      <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-muted-foreground mb-2">
-            Welcome to ValidAI
-          </h1>
-          <p className="text-muted-foreground">
-            Your dashboard is ready for content
-          </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="bg-muted/50 min-h-[50vh] rounded-xl flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-muted-foreground mb-2">
+              Welcome to ValidAI
+            </h1>
+            <p className="text-muted-foreground">
+              Your dashboard is ready for content
+            </p>
+          </div>
         </div>
+        <SessionInfoCard />
       </div>
     </>
   )
