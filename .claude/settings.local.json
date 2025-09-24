@@ -14,7 +14,11 @@
       "Bash(npm run lint)",
       "Bash(npm run typecheck:*)",
       "Bash(npm run test:coverage:*)",
-      "Bash(npm run test:*)"
+      "Bash(npm run test:*)",
+      "mcp__shadcn__get_add_command_for_items",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(gh issue view:*)",
+      "mcp__supabase__generate_typescript_types"
     ]
   },
   "enableAllProjectMcpServers": true,

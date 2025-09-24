@@ -72,7 +72,6 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 ```
 
 ### Database Schema
-- **instruments**: Custom table for financial instruments
 - **todos**: Demo table for basic CRUD operations
 
 ### Path Aliases
@@ -97,8 +96,6 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - **ALWAYS** export stores through `stores/index.ts`
 
 ### Example Routes
-- `/examples/instruments` - Modern TanStack Query + Zustand example
-- `/instruments` - Legacy pattern (for comparison)
 - `/demo` - Original Supabase demo
 
 ## Quality Standards

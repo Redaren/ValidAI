@@ -14,18 +14,86 @@ export type Database = {
   }
   public: {
     Tables: {
-      instruments: {
+      organization_members: {
         Row: {
-          id: number
-          name: string
+          joined_at: string | null
+          organization_id: string
+          role: string
+          user_id: string
         }
         Insert: {
-          id?: never
-          name: string
+          joined_at?: string | null
+          organization_id: string
+          role: string
+          user_id: string
         }
         Update: {
-          id?: never
+          joined_at?: string | null
+          organization_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          id: string
+          name: string
+          plan_type: string | null
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          id?: string
+          name: string
+          plan_type?: string | null
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          id?: string
           name?: string
+          plan_type?: string | null
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id: string
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -34,7 +102,32 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_unique_org_slug: {
+        Args: { base_name: string }
+        Returns: string
+      }
+      get_current_organization_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_user_organizations_safe: {
+        Args: { user_uuid: string }
+        Returns: {
+          created_at: string
+          created_by: string
+          joined_at: string
+          organization_id: string
+          organization_name: string
+          organization_slug: string
+          plan_type: string
+          updated_at: string
+          user_role: string
+        }[]
+      }
+      user_can_view_org_members: {
+        Args: { org_id: string; user_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
