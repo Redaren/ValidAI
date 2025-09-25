@@ -154,6 +154,7 @@ npm run lint:fix     # Fix ESLint issues automatically
   - `lib/supabase/typed-clients.ts`: TypeScript-enhanced clients
   - `lib/supabase/middleware.ts`: Session refresh logic
 - **Generated Types**: `lib/database.types.ts` (auto-generated from schema)
+- **JWT Metadata**: Contains user identity and current organization details in `app_metadata`
 
 ### Environment Variables
 Required in `.env.local`:

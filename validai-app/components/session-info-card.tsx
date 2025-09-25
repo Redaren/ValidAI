@@ -9,13 +9,24 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, User as UserIcon, Shield, Clock, Building, Key } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-// Remove server-side imports - we'll fetch organizations via client-side API calls
+
+interface Organization {
+  id: string
+  name: string
+  slug: string
+  plan_type: string
+}
+
+interface CurrentOrganization {
+  organization: Organization
+  role: string
+}
 
 interface SessionData {
   user: User | null
   session: Session | null
-  organizations: any[] | null
-  currentOrg: any | null
+  organizations: Organization[] | null
+  currentOrg: CurrentOrganization | null
 }
 
 interface CollapsibleSectionProps {
@@ -51,7 +62,7 @@ function formatTimestamp(timestamp: string | undefined) {
   return new Date(timestamp).toLocaleString()
 }
 
-function JsonDisplay({ data, title }: { data: any, title: string }) {
+function JsonDisplay({ data, title }: { data: Record<string, unknown>, title: string }) {
   if (!data || Object.keys(data).length === 0) {
     return <p className="text-sm text-muted-foreground">No {title.toLowerCase()}</p>
   }
@@ -95,39 +106,34 @@ export function SessionInfoCard() {
         const user = userResponse.data?.user || null
         const session = sessionResponse.data?.session || null
 
-        // Get organizations if user exists
-        let organizations = null
+        // Get current organization from JWT metadata
         let currentOrg = null
 
-        if (user) {
-          try {
-            // Fetch organizations via API endpoint
-            const orgResponse = await fetch('/api/organizations')
-            if (orgResponse.ok) {
-              const orgData = await orgResponse.json()
-              organizations = orgData.organizations || []
+        if (user && user.app_metadata?.organization_id) {
+          // Extract organization details from JWT app_metadata
+          const orgId = user.app_metadata.organization_id
+          const orgName = user.app_metadata.organization_name
+          const orgSlug = user.app_metadata.organization_slug
+          const orgPlanType = user.app_metadata.organization_plan_type
+          const userRole = user.app_metadata.organization_role
 
-              // Get current org from user app_metadata
-              const currentOrgId = user.app_metadata?.organization_id
-              if (currentOrgId && organizations) {
-                const currentOrgMatch = organizations.find((org: any) => org.id === currentOrgId)
-                if (currentOrgMatch) {
-                  currentOrg = {
-                    organization: currentOrgMatch,
-                    role: 'member' // We don't have role info from client side, could be fetched separately if needed
-                  }
-                }
-              }
+          if (orgName) {
+            currentOrg = {
+              organization: {
+                id: orgId,
+                name: orgName,
+                slug: orgSlug,
+                plan_type: orgPlanType || 'free'
+              },
+              role: userRole || 'member'
             }
-          } catch (error) {
-            console.log('Organizations not available:', error)
           }
         }
 
         setSessionData({
           user,
           session,
-          organizations,
+          organizations: null,
           currentOrg
         })
       } catch (error) {
@@ -159,7 +165,7 @@ export function SessionInfoCard() {
     )
   }
 
-  const { user, session, organizations, currentOrg } = sessionData
+  const { user, session, currentOrg } = sessionData
 
   if (!user || !session) {
     return (
@@ -246,47 +252,28 @@ export function SessionInfoCard() {
 
         <Separator />
 
-        {/* Organizations */}
-        {organizations && (
+        {/* Current Organization */}
+        {currentOrg && (
           <>
             <CollapsibleSection
-              title="Organizations"
+              title="Current Organization"
               icon={<Building className="h-4 w-4" />}
             >
               <div className="space-y-4">
-                {currentOrg && (
-                  <div>
-                    <h4 className="font-medium text-sm mb-2">Current Organization</h4>
-                    <div className="bg-muted/50 p-3 rounded-md">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">{currentOrg.organization?.name}</span>
-                        <Badge variant="outline">{currentOrg.role}</Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1">
-                        Plan: {currentOrg.organization?.plan_type || 'Free'}
-                      </div>
+                <div>
+                  <div className="bg-muted/50 p-3 rounded-md">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{currentOrg.organization?.name}</span>
+                      <Badge variant="outline">{currentOrg.role}</Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Plan: {currentOrg.organization?.plan_type || 'Free'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Slug: {currentOrg.organization?.slug}
                     </div>
                   </div>
-                )}
-
-                {organizations.length > 0 && (
-                  <div>
-                    <h4 className="font-medium text-sm mb-2">All Organizations ({organizations.length})</h4>
-                    <div className="space-y-2">
-                      {organizations.map((org) => (
-                        <div key={org.id} className="bg-muted/50 p-2 rounded-md text-sm">
-                          <div className="flex items-center justify-between">
-                            <span>{org.name}</span>
-                            <Badge variant="outline" className="text-xs">{org.plan_type}</Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {org.slug} • Created {formatTimestamp(org.created_at)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </CollapsibleSection>
             <Separator />
