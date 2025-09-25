@@ -8,13 +8,14 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     * Feel free to modify this pattern to include more paths.
+     * Apply auth middleware only to:
+     * - /dashboard routes (authenticated app routes)
+     * Exclude:
+     * - Public routes (homepage, etc.)
+     * - Payload admin (/admin)
+     * - All /api routes (handled by Payload CMS)
+     * - Static files and assets
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/dashboard/:path*",
   ],
 };

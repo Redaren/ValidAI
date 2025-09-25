@@ -1,5 +1,4 @@
 import { SessionInfoCard } from "@/components/session-info-card"
-import { APP_NAME } from "@/lib/constants/app"
 
 export default function DashboardPage() {
   return (
