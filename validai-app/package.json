@@ -1,4 +1,5 @@
 {
+  "name": "validai-app",
   "private": true,
   "engines": {
     "node": ">=22.0.0",

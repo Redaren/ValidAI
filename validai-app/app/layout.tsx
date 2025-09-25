@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { NotificationDisplay } from "@/components/notifications";
+import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants/app";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -11,8 +12,8 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata: Metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Next.js and Supabase Starter Kit",
-  description: "The fastest way to build apps with Next.js and Supabase",
+  title: APP_NAME,
+  description: APP_DESCRIPTION,
 };
 
 const geistSans = Geist({

@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test'
+import { APP_NAME } from '../lib/constants/app'
 
 test.describe('Navigation', () => {
   test('home page loads correctly', async ({ page }) => {
     await page.goto('/')
 
-    await expect(page).toHaveTitle(/ValidAI/)
+    await expect(page).toHaveTitle(APP_NAME)
     await expect(page.getByText('Built with')).toBeVisible()
     await expect(page.getByText('Next.js')).toBeVisible()
     await expect(page.getByText('Supabase')).toBeVisible()

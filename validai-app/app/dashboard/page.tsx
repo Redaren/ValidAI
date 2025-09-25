@@ -1,4 +1,5 @@
 import { SessionInfoCard } from "@/components/session-info-card"
+import { APP_NAME } from "@/lib/constants/app"
 
 export default function DashboardPage() {
   return (
@@ -18,7 +19,7 @@ export default function DashboardPage() {
         <div className="bg-muted/50 min-h-[50vh] rounded-xl flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-muted-foreground mb-2">
-              Welcome to ValidAI
+              Welcome
             </h1>
             <p className="text-muted-foreground">
               Your dashboard is ready for content
