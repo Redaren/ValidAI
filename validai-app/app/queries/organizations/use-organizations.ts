@@ -18,8 +18,28 @@ export function useUserOrganizations() {
 
         if (error) throw error
 
-        setUserOrganizations(data || [])
-        return data
+        const organizations = (data || []).map((org: {
+          organization_id: string
+          organization_name: string
+          organization_slug: string
+          plan_type: string
+          created_at: string
+          updated_at: string
+          created_by: string
+        }) => ({
+          id: org.organization_id,
+          name: org.organization_name,
+          slug: org.organization_slug,
+          plan_type: org.plan_type,
+          created_at: org.created_at,
+          updated_at: org.updated_at,
+          created_by: org.created_by
+        }))
+
+        setUserOrganizations(organizations)
+
+        // Return the structure expected by OrganizationSwitcher
+        return { organizations }
       } finally {
         setIsLoading(false)
       }
@@ -43,7 +63,7 @@ export function useCurrentOrganization() {
 
         if (data && data.length > 0) {
           const org = data[0]
-          setCurrentOrganization({
+          const organizationData = {
             id: org.organization_id,
             name: org.organization_name,
             slug: org.organization_slug,
@@ -51,13 +71,25 @@ export function useCurrentOrganization() {
             created_at: org.created_at,
             updated_at: org.updated_at,
             created_by: org.created_by
-          })
+          }
+
+          setCurrentOrganization(organizationData)
           setCurrentUserRole(org.user_role)
+
+          // Return the structure expected by OrganizationSwitcher
+          return {
+            organization: organizationData,
+            role: org.user_role
+          }
         } else {
           setCurrentOrganization(null)
           setCurrentUserRole(null)
+
+          return {
+            organization: null,
+            role: null
+          }
         }
-        return data
       } finally {
         setIsLoading(false)
       }
