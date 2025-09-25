@@ -6,6 +6,97 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ValidAI is a Next.js application with Supabase backend integration, built as a starter template for authentication and database operations. The project uses the App Router architecture with TypeScript and Tailwind CSS.
 
+## 🚨 CRITICAL: Supabase Platform Best Practices
+
+**ValidAI uses Supabase as a complete Backend-as-a-Service (BaaS) platform, NOT just a database.**
+
+Read the Supabase Architecture Guide first: https://supabase.com/docs/guides/getting-started/architecture
+
+### Platform Capabilities We MUST Use
+
+Supabase provides these features out-of-the-box that you MUST use instead of building custom solutions:
+
+1. **PostgREST** - Automatic REST API from your database schema
+2. **Database Functions** - SQL/plpgsql functions for complex business logic
+3. **Row Level Security (RLS)** - Authorization at the database level
+4. **Edge Functions** - Deno-based serverless functions for service-role operations
+5. **Real-time Subscriptions** - WebSocket connections for live data
+6. **Authentication** - Built-in auth with JWT and user management
+7. **Storage** - File uploads and serving with RLS policies
+
+### ✅ DO - ALWAYS
+
+1. **Use PostgREST directly** for all database operations
+   - Simple CRUD: Direct table queries via `supabase.from('table')`
+   - Complex queries: Database functions via `supabase.rpc('function_name')`
+
+2. **Create database functions** (not API routes) when you need:
+   - Multi-table operations in a single transaction
+   - Complex business logic that belongs near the data
+   - Computed aggregations or analytics
+   - Return type: ALWAYS use `RETURNS TABLE` format, not JSON
+
+3. **Use Edge Functions ONLY** when you need:
+   - Service-role operations (JWT metadata updates, admin operations)
+   - External API integrations (payment processors, email services)
+   - File processing or transformations
+   - Operations that MUST bypass RLS with proper validation
+
+4. **Leverage RLS policies** for all authorization
+   - Let the database handle data access control
+   - Use `auth.uid()` and `auth.jwt()` in policies
+
+5. **Use real-time subscriptions** for live data
+   - Replace polling with `supabase.channel().on('postgres_changes')`
+
+### ❌ DON'T - NEVER
+
+1. **NEVER create Next.js API routes** for:
+   - Database CRUD operations (use PostgREST)
+   - Simple data fetching (use PostgREST)
+   - Complex queries (use database functions)
+   - Authorization logic (use RLS policies)
+
+2. **NEVER use Edge Functions** for:
+   - Simple database queries (use PostgREST)
+   - Operations that RLS can handle (use RLS policies)
+   - Client-accessible CRUD (use PostgREST with RLS)
+
+3. **NEVER build custom solutions** for:
+   - Authentication (use Supabase Auth)
+   - File uploads (use Supabase Storage)
+   - Real-time updates (use Supabase Realtime)
+   - API generation (use PostgREST)
+
+### Decision Tree for Data Operations
+
+```
+Need to fetch/modify data?
+├─ Simple CRUD on single table?
+│  └─ ✅ Use PostgREST directly: supabase.from('table')
+│
+├─ Complex query with joins/aggregations?
+│  └─ ✅ Create database function: supabase.rpc('function_name')
+│
+├─ Need service-role permissions?
+│  └─ ✅ Create Edge Function: supabase.functions.invoke('function-name')
+│
+└─ Need real-time updates?
+   └─ ✅ Use subscriptions: supabase.channel().on('postgres_changes')
+```
+
+### Exceptions (The ONLY Times to Create API Routes)
+
+1. **Authentication callback routes** (OAuth flows, email confirmations)
+2. **Admin-only migration tools** (one-time data migrations)
+3. **Third-party webhooks** that require specific Next.js middleware
+
+If you're about to create an API route, STOP and ask:
+- Can PostgREST handle this? (90% yes)
+- Can a database function handle this? (9% yes)
+- Can an Edge Function handle this? (0.9% yes)
+- Is this truly an exception? (0.1% maybe)
+
 ## Development Commands
 
 ```bash
@@ -85,8 +176,10 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - **TypedSupabaseClient**: Generated types for all Supabase operations
 
 ### Query Patterns
-- Reusable query functions in `app/queries/[table]/get-[table].ts`
-- Custom hooks in `app/queries/[table]/use-[table].ts`
+- Direct PostgREST queries in hooks: `supabase.from('table').select()`
+- Database function calls: `supabase.rpc('function_name', params)`
+- Edge Function invocations: `supabase.functions.invoke('name', { body })`
+- NO separate get-*.ts files needed for PostgREST operations
 - Server-side prefetching with HydrationBoundary
 
 ### Store Management Rules
@@ -120,7 +213,7 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 ## Important Notes
 
 - **Authentication**: Never modify middleware.ts, auth routes, or session management
-- **Data Fetching**: Use TanStack Query for all server data, Zustand for UI state
+- **Data Fetching**: Use PostgREST/RPC for all database operations, Edge Functions for service-role operations, TanStack Query for caching
 - **Type Safety**: Always use TypedSupabaseClient for database operations
 - **Testing**: Write tests before or alongside feature development
 - **Quality**: All code must pass automated quality checks

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useOrganizationStore } from '@/stores'
 
 export function useUserOrganizations() {
+  const supabase = createClient()
   const { setUserOrganizations, setIsLoading } = useOrganizationStore()
 
   return useQuery({
@@ -12,13 +13,13 @@ export function useUserOrganizations() {
     queryFn: async () => {
       setIsLoading(true)
       try {
-        const response = await fetch('/api/organizations')
-        if (!response.ok) {
-          throw new Error('Failed to fetch user organizations')
-        }
-        const result = await response.json()
-        setUserOrganizations(result.organizations)
-        return result
+        // Call database function for complex query
+        const { data, error } = await supabase.rpc('get_user_organizations')
+
+        if (error) throw error
+
+        setUserOrganizations(data || [])
+        return data
       } finally {
         setIsLoading(false)
       }
@@ -28,6 +29,7 @@ export function useUserOrganizations() {
 }
 
 export function useCurrentOrganization() {
+  const supabase = createClient()
   const { setCurrentOrganization, setCurrentUserRole, setIsLoading } = useOrganizationStore()
 
   return useQuery({
@@ -35,19 +37,27 @@ export function useCurrentOrganization() {
     queryFn: async () => {
       setIsLoading(true)
       try {
-        const response = await fetch('/api/organizations/current')
-        if (!response.ok) {
-          throw new Error('Failed to fetch current organization')
-        }
-        const result = await response.json()
-        if (result) {
-          setCurrentOrganization(result.organization)
-          setCurrentUserRole(result.role)
+        const { data, error } = await supabase.rpc('get_current_organization')
+
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          const org = data[0]
+          setCurrentOrganization({
+            id: org.organization_id,
+            name: org.organization_name,
+            slug: org.organization_slug,
+            plan_type: org.plan_type,
+            created_at: org.created_at,
+            updated_at: org.updated_at,
+            created_by: org.created_by
+          })
+          setCurrentUserRole(org.user_role)
         } else {
           setCurrentOrganization(null)
           setCurrentUserRole(null)
         }
-        return result
+        return data
       } finally {
         setIsLoading(false)
       }
@@ -57,16 +67,20 @@ export function useCurrentOrganization() {
 }
 
 export function useOrganizationMembers(organizationId: string | null) {
+  const supabase = createClient()
+
   return useQuery({
     queryKey: ['organization-members', organizationId],
     queryFn: async () => {
       if (!organizationId) return []
 
-      const response = await fetch(`/api/organizations/${organizationId}/members`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch organization members')
-      }
-      return response.json()
+      const { data, error } = await supabase.rpc(
+        'get_organization_members',
+        { org_id: organizationId }
+      )
+
+      if (error) throw error
+      return data
     },
     enabled: !!organizationId,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -75,35 +89,25 @@ export function useOrganizationMembers(organizationId: string | null) {
 
 export function useSwitchOrganization() {
   const queryClient = useQueryClient()
+  const supabase = createClient()
   const { setIsSwitching } = useOrganizationStore()
 
   return useMutation({
     mutationFn: async (organizationId: string) => {
       setIsSwitching(true)
 
-      // Call the switch organization API
-      const response = await fetch('/api/organizations/switch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ organizationId }),
+      // Call Edge Function for org switching
+      const { data, error } = await supabase.functions.invoke('switch-organization', {
+        body: { organizationId },
       })
 
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error || 'Failed to switch organization')
-      }
+      if (error) throw error
 
-      // Refresh the user session to get new JWT with updated org_id
-      const supabase = createClient()
+      // Refresh session to get new JWT
       const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) throw refreshError
 
-      if (refreshError) {
-        throw refreshError
-      }
-
-      return response.json()
+      return data
     },
     onSuccess: () => {
       // Invalidate and refetch organization queries
@@ -112,13 +116,12 @@ export function useSwitchOrganization() {
 
       setIsSwitching(false)
 
-      // Optionally reload the page to ensure all components get the new context
+      // Reload page to ensure all components get new context
       if (typeof window !== 'undefined') {
         window.location.reload()
       }
     },
-    onError: (error) => {
-      console.error('Error switching organization:', error)
+    onError: () => {
       setIsSwitching(false)
     },
   })
@@ -126,23 +129,20 @@ export function useSwitchOrganization() {
 
 export function useCreateOrganization() {
   const queryClient = useQueryClient()
+  const supabase = createClient()
 
   return useMutation({
     mutationFn: async (data: { name: string; slug?: string }) => {
-      const response = await fetch('/api/organizations/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      })
+      const { data: result, error } = await supabase.rpc(
+        'create_organization',
+        {
+          org_name: data.name,
+          org_slug: data.slug
+        }
+      )
 
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error || 'Failed to create organization')
-      }
-
-      return response.json()
+      if (error) throw error
+      return result
     },
     onSuccess: () => {
       // Refresh organization queries
@@ -154,6 +154,7 @@ export function useCreateOrganization() {
 
 export function useInviteUser() {
   const queryClient = useQueryClient()
+  const supabase = createClient()
 
   return useMutation({
     mutationFn: async (data: {
@@ -161,20 +162,12 @@ export function useInviteUser() {
       organizationId: string
       role: 'admin' | 'member' | 'viewer'
     }) => {
-      const response = await fetch('/api/organizations/invite', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
+      const { data: result, error } = await supabase.functions.invoke('invite-user', {
+        body: data,
       })
 
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error || 'Failed to send invitation')
-      }
-
-      return response.json()
+      if (error) throw error
+      return result
     },
     onSuccess: (_, variables) => {
       // Refresh organization members query

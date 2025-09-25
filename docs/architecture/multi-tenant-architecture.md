@@ -111,50 +111,79 @@ END;
 $$;
 ```
 
-## API Endpoints
+## PostgREST Database Functions
 
-### Organization Management
+ValidAI uses database functions for complex operations involving multiple tables:
 
-```typescript
-// Get current organization context
-GET /api/organizations/current
-// Returns: { organization, role }
+### Organization Query Functions
 
-// Get user's organizations
-GET /api/organizations
-// Returns: { organizations, memberships }
+```sql
+-- Get current organization with user role
+CREATE OR REPLACE FUNCTION get_current_organization()
+RETURNS TABLE(
+  organization_id uuid,
+  organization_name text,
+  organization_slug text,
+  plan_type text,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  created_by uuid,
+  user_role text
+)
+-- Function implementation...
 
-// Switch organization context
-POST /api/organizations/switch
-Body: { organizationId: string }
-// Updates user's JWT app_metadata
+-- Get user's organizations with roles
+CREATE OR REPLACE FUNCTION get_user_organizations()
+RETURNS TABLE(
+  organization_id uuid,
+  organization_name text,
+  organization_slug text,
+  plan_type text,
+  user_role text,
+  joined_at timestamp with time zone
+)
+-- Function implementation...
 
-// Create new organization
-POST /api/organizations/create
-Body: { name: string }
-
-// Get organization members
-GET /api/organizations/[id]/members
+-- Create organization (atomic operation)
+CREATE OR REPLACE FUNCTION create_organization(
+  org_name TEXT,
+  org_slug TEXT DEFAULT NULL
+)
+RETURNS json
+-- Function implementation...
 ```
 
-### Organization Switching Process
+### Edge Functions for Service-Role Operations
+
+**Switch Organization**: Updates JWT metadata (requires service-role key)
 
 ```typescript
-// 1. Verify user has access to target organization
-const membership = await supabase
-  .from('organization_members')
-  .select('role')
-  .eq('organization_id', organizationId)
-  .eq('user_id', user.id)
-  .single()
+// supabase/functions/switch-organization/index.ts
+const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
+  user.id,
+  {
+    app_metadata: {
+      ...user.app_metadata,
+      organization_id: organizationId,
+    },
+  }
+)
+```
 
-// 2. Update JWT metadata using admin client
-await supabaseAdmin.auth.admin.updateUserById(user.id, {
-  app_metadata: {
-    ...user.app_metadata,
-    organization_id: organizationId,
-  },
-})
+**Invite User**: Sends email invitations with organization context
+
+```typescript
+// supabase/functions/invite-user/index.ts
+const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+  email,
+  {
+    redirectTo: `${Deno.env.get('SITE_URL')}/auth/accept-invite`,
+    data: {
+      invited_to_org: organizationId,
+      invited_role: role,
+    },
+  }
+)
 ```
 
 ## Frontend Implementation
@@ -171,13 +200,60 @@ interface OrganizationState {
 }
 ```
 
-### Data Fetching
+### Data Fetching with PostgREST
 
 ```typescript
-// TanStack Query hooks
-useCurrentOrganization() // Fetches current org from JWT context
-useUserOrganizations()   // Fetches all user's organizations
-useSwitchOrganization()  // Mutation for switching context
+// TanStack Query hooks using PostgREST
+export function useCurrentOrganization() {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: ['current-organization'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_current_organization')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+export function useUserOrganizations() {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: ['user-organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_user_organizations')
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+// Edge Function for organization switching
+export function useSwitchOrganization() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async (organizationId: string) => {
+      const { data, error } = await supabase.functions.invoke('switch-organization', {
+        body: { organizationId },
+      })
+      if (error) throw error
+
+      // Refresh session to get new JWT
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) throw refreshError
+
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-organization'] })
+      queryClient.invalidateQueries({ queryKey: ['user-organizations'] })
+    },
+  })
+}
 ```
 
 ### UI Components
@@ -202,13 +278,28 @@ useSwitchOrganization()  // Mutation for switching context
 - **Member**: Standard access to organization resources
 - **Viewer**: Read-only access
 
-### Organization Switching
+### Organization Switching Process
 
 1. User selects organization from switcher
-2. API verifies user has access
-3. JWT `app_metadata.organization_id` updated
-4. Client refetches data with new context
-5. RLS policies filter data for new organization
+2. Edge Function verifies user has access via PostgREST query
+3. Edge Function updates JWT `app_metadata.organization_id` using service-role client
+4. Client refreshes session to get updated JWT
+5. Client invalidates and refetches queries with new organization context
+6. RLS policies automatically filter data for new organization
+
+**Complete Flow**:
+```typescript
+// 1. Client calls Edge Function
+const { data } = await supabase.functions.invoke('switch-organization', {
+  body: { organizationId }
+})
+
+// 2. Edge Function validates and updates JWT metadata
+// 3. Client refreshes session
+const { error } = await supabase.auth.refreshSession()
+
+// 4. All subsequent PostgREST calls use new organization context
+```
 
 ## Security Considerations
 
@@ -235,9 +326,10 @@ useSwitchOrganization()  // Mutation for switching context
 
 ### Known Limitations
 
-- **Admin Management**: Organization admins cannot directly manage members (application-level only)
 - **Cross-Organization Queries**: Users cannot access data across organizations simultaneously
-- **JWT Size**: Organization context stored in JWT (size limitations for many orgs)
+- **JWT Size**: Organization context stored in JWT (size limitations for many organizations)
+- **Edge Function Latency**: Organization switching has slight latency due to JWT refresh requirement
+- **Service-Role Security**: Edge Functions require careful input validation to prevent privilege escalation
 
 ## Troubleshooting
 

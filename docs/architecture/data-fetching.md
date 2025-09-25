@@ -2,18 +2,26 @@
 
 ## Overview
 
-ValidAI uses TanStack Query for all server data fetching, caching, and synchronization. This provides automatic background updates, optimistic updates, and intelligent caching.
+ValidAI leverages Supabase's PostgREST for direct database access and TanStack Query for client-side data management. This architecture eliminates the need for custom API routes and provides automatic background updates, optimistic updates, and intelligent caching.
+
+**Core Philosophy**: Use Supabase as a complete Backend-as-a-Service (BaaS), not just a database. Direct PostgREST access + Edge Functions + Real-time subscriptions.
 
 ## Core Architecture
 
-### 1. Query Functions (`app/queries/[table]/get-*.ts`)
+### 1. Direct PostgREST Queries
 
-Pure functions that accept a typed Supabase client and return data:
+ValidAI uses three approaches for data access, depending on complexity:
+
+#### A. Simple Table Queries
+
+Direct table access for basic CRUD operations:
 
 ```typescript
-import { TypedSupabaseClient } from '@/lib/supabase/types'
+import { createClient } from '@/lib/supabase/client'
 
-export async function getInstruments(supabase: TypedSupabaseClient) {
+export async function getInstruments() {
+  const supabase = createClient()
+
   const { data, error } = await supabase
     .from('instruments')
     .select('*')
@@ -24,46 +32,145 @@ export async function getInstruments(supabase: TypedSupabaseClient) {
 }
 ```
 
-### 2. Custom Hooks (`app/queries/[table]/use-*.ts`)
+#### B. Database Functions (RPC)
 
-React hooks that wrap TanStack Query functionality:
+For complex queries involving multiple tables or business logic:
+
+```typescript
+export async function getUserOrganizations() {
+  const supabase = createClient()
+
+  const { data, error } = await supabase.rpc('get_user_organizations')
+
+  if (error) throw error
+  return data
+}
+```
+
+#### C. Edge Functions
+
+For service-role operations requiring elevated permissions:
+
+```typescript
+export async function switchOrganization(organizationId: string) {
+  const supabase = createClient()
+
+  const { data, error } = await supabase.functions.invoke('switch-organization', {
+    body: { organizationId }
+  })
+
+  if (error) throw error
+  return data
+}
+```
+
+### 2. TanStack Query Hooks
+
+React hooks integrate PostgREST with TanStack Query:
 
 ```typescript
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
-import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
-import { getInstruments } from './get-instruments'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 
+// Simple table query
 export function useInstruments() {
-  const supabase = createTypedBrowserClient()
+  const supabase = createClient()
 
   return useQuery({
     queryKey: ['instruments'],
-    queryFn: () => getInstruments(supabase),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('instruments')
+        .select('*')
+        .order('name')
+
+      if (error) throw error
+      return data
+    },
+  })
+}
+
+// Database function query
+export function useUserOrganizations() {
+  const supabase = createClient()
+
+  return useQuery({
+    queryKey: ['user-organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_user_organizations')
+
+      if (error) throw error
+      return data
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  })
+}
+
+// Edge Function mutation
+export function useSwitchOrganization() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async (organizationId: string) => {
+      const { data, error } = await supabase.functions.invoke('switch-organization', {
+        body: { organizationId },
+      })
+
+      if (error) throw error
+
+      // Refresh session to get new JWT
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) throw refreshError
+
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['current-organization'] })
+      queryClient.invalidateQueries({ queryKey: ['user-organizations'] })
+    },
   })
 }
 ```
 
 ### 3. Server-Side Prefetching
 
-For optimal performance, prefetch data on the server:
+Prefetch PostgREST data on the server for optimal performance:
 
 ```typescript
 // Server Component
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
-import { createTypedServerClient } from '@/lib/supabase/typed-clients'
-import { getInstruments } from '@/app/queries/instruments/get-instruments'
+import { createClient } from '@/lib/supabase/server'
 import { createQueryClient } from '@/lib/query-client'
 
 export default async function InstrumentsPage() {
   const queryClient = createQueryClient()
-  const supabase = await createTypedServerClient()
+  const supabase = await createClient()
 
-  // Prefetch on server
+  // Prefetch direct PostgREST query
   await queryClient.prefetchQuery({
     queryKey: ['instruments'],
-    queryFn: () => getInstruments(supabase),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('instruments')
+        .select('*')
+        .order('name')
+
+      if (error) throw error
+      return data
+    },
+  })
+
+  // Prefetch database function
+  await queryClient.prefetchQuery({
+    queryKey: ['user-organizations'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_user_organizations')
+      if (error) throw error
+      return data
+    },
   })
 
   return (
@@ -78,49 +185,102 @@ export default async function InstrumentsPage() {
 
 ```
 app/queries/
-├── instruments/
-│   ├── get-instruments.ts    # Query functions
-│   └── use-instruments.ts    # React hooks
-├── users/
-│   ├── get-users.ts
-│   └── use-users.ts
+├── organizations/           # PostgREST + Edge Functions
+│   └── use-organizations.ts # Combined hooks for RPC + Edge Functions
+├── instruments/            # Simple table queries
+│   └── use-instruments.ts  # Direct PostgREST hooks
 └── [feature]/
-    ├── get-[feature].ts
-    └── use-[feature].ts
+    └── use-[feature].ts    # Feature-specific data hooks
 ```
 
-## TypeScript Integration
+## PostgREST Function Patterns
 
-### Typed Supabase Clients
+### Database Function Creation
 
-All query functions use the `TypedSupabaseClient` for full type safety:
+Database functions return TABLE format for optimal PostgREST integration:
 
-```typescript
-// lib/supabase/types.ts
-export type TypedSupabaseClient = SupabaseClient<Database>
+```sql
+-- Example: Get user's organizations with roles
+CREATE OR REPLACE FUNCTION get_user_organizations()
+RETURNS TABLE(
+  organization_id uuid,
+  organization_name text,
+  organization_slug text,
+  plan_type text,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  created_by uuid,
+  user_role text,
+  joined_at timestamp with time zone
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    o.id,
+    o.name,
+    o.slug,
+    o.plan_type,
+    o.created_at,
+    o.updated_at,
+    o.created_by,
+    om.role,
+    om.joined_at
+  FROM organizations o
+  JOIN organization_members om ON om.organization_id = o.id
+  WHERE om.user_id = auth.uid();
+END;
+$$;
 
-// lib/supabase/typed-clients.ts
-export function createTypedBrowserClient(): TypedSupabaseClient
-export async function createTypedServerClient(): Promise<TypedSupabaseClient>
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION get_user_organizations() TO authenticated;
 ```
 
-### Generated Database Types
+### Edge Functions for Service-Role Operations
 
-Database types are generated from Supabase schema:
+Use Edge Functions for operations requiring elevated permissions:
 
 ```typescript
-// lib/database.types.ts (auto-generated)
-export interface Database {
-  public: {
-    Tables: {
-      instruments: {
-        Row: { id: number; name: string }
-        Insert: { name: string }
-        Update: { name?: string }
+// supabase/functions/switch-organization/index.ts
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+
+Deno.serve(async (req) => {
+  const { organizationId } = await req.json()
+
+  // Create admin client for JWT updates
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  )
+
+  // Verify user has access and update JWT
+  // ... validation logic ...
+
+  const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+    user.id,
+    {
+      app_metadata: {
+        ...user.app_metadata,
+        organization_id: organizationId,
+      },
+    }
+  )
+
+  return new Response(
+    JSON.stringify({ success: !updateError }),
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, content-type'
       }
     }
-  }
-}
+  )
+})
 ```
 
 ## Query Configuration
@@ -159,23 +319,92 @@ Consistent query key patterns for cache management:
 ['instruments', id, 'parts']
 ```
 
-## Mutations
+## Real-time Subscriptions
 
-For data modifications, use TanStack Query mutations:
+Leverage Supabase's real-time capabilities:
 
 ```typescript
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { createClient } from '@/lib/supabase/client'
 
+export function useOrganizationSubscription() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('organizations')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'organizations',
+        },
+        () => {
+          // Invalidate queries when data changes
+          queryClient.invalidateQueries({ queryKey: ['user-organizations'] })
+          queryClient.invalidateQueries({ queryKey: ['current-organization'] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [queryClient, supabase])
+}
+```
+
+## Mutations with PostgREST
+
+Use appropriate method based on operation complexity:
+
+```typescript
+// Simple table mutation
 export function useCreateInstrument() {
   const queryClient = useQueryClient()
-  const supabase = createTypedBrowserClient()
+  const supabase = createClient()
 
   return useMutation({
-    mutationFn: (data: InstrumentInsert) =>
-      createInstrument(supabase, data),
+    mutationFn: async (data: { name: string; type: string }) => {
+      const { data: result, error } = await supabase
+        .from('instruments')
+        .insert(data)
+        .select()
+        .single()
+
+      if (error) throw error
+      return result
+    },
     onSuccess: () => {
-      // Invalidate and refetch
-      queryClient.invalidateQueries(['instruments'])
+      queryClient.invalidateQueries({ queryKey: ['instruments'] })
+    },
+  })
+}
+
+// Complex operation using database function
+export function useCreateOrganization() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async (data: { name: string; slug?: string }) => {
+      const { data: result, error } = await supabase.rpc(
+        'create_organization',
+        {
+          org_name: data.name,
+          org_slug: data.slug
+        }
+      )
+
+      if (error) throw error
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-organizations'] })
+      queryClient.invalidateQueries({ queryKey: ['current-organization'] })
     },
   })
 }
@@ -227,43 +456,60 @@ useQuery({
 })
 ```
 
-### Optimistic Updates
+### Optimistic Updates with PostgREST
 
-For better UX, implement optimistic updates:
+Implement optimistic updates for better UX:
 
 ```typescript
 const updateInstrument = useMutation({
-  mutationFn: (data) => updateInstrumentAPI(data),
-  onMutate: async (newData) => {
-    await queryClient.cancelQueries(['instruments', id])
+  mutationFn: async ({ id, updates }) => {
+    const supabase = createClient()
+    const { data, error } = await supabase
+      .from('instruments')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  },
+  onMutate: async ({ id, updates }) => {
+    await queryClient.cancelQueries({ queryKey: ['instruments', id] })
 
     const previousData = queryClient.getQueryData(['instruments', id])
-    queryClient.setQueryData(['instruments', id], newData)
+    queryClient.setQueryData(['instruments', id], {
+      ...previousData,
+      ...updates,
+    })
 
     return { previousData }
   },
-  onError: (err, newData, context) => {
+  onError: (err, { id }, context) => {
     queryClient.setQueryData(['instruments', id], context.previousData)
   },
-  onSettled: () => {
-    queryClient.invalidateQueries(['instruments', id])
+  onSettled: ({ id }) => {
+    queryClient.invalidateQueries({ queryKey: ['instruments', id] })
   },
-})
-```
+})```
 
 ## Best Practices
 
 ### ✅ DO
-- Always use TypedSupabaseClient in query functions
-- Organize queries by feature/table in `app/queries/`
-- Use consistent query key patterns
-- Implement server-side prefetching for initial loads
-- Use mutations for data modifications
-- Invalidate relevant queries after mutations
+- Use PostgREST directly - eliminate API routes for database operations
+- Create database functions for complex multi-table operations
+- Use Edge Functions only for service-role operations
+- Implement real-time subscriptions for live data
+- Use TABLE return types in database functions for PostgREST optimization
+- Organize queries by feature in `app/queries/`
+- Include CORS headers in Edge Functions
+- Use server-side prefetching for initial loads
 
 ### ❌ DON'T
-- Call Supabase directly in components
-- Store server state in Zustand
-- Forget to handle loading and error states
-- Use overly complex query keys
-- Skip TypeScript types
+- Create API routes for simple CRUD operations
+- Use JSON return types in database functions (use TABLE)
+- Call Supabase directly in components (use hooks)
+- Store server state in Zustand (use TanStack Query)
+- Use Edge Functions for operations that can be done with RLS
+- Skip error handling in query functions
+- Forget to refresh JWT after Edge Function calls that update metadata

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines the complete migration strategy from custom Next.js API routes to direct Supabase PostgREST access. The migration will reduce our codebase by ~70%, improve performance by ~2x, and unlock Supabase's full feature set including real-time subscriptions, automatic caching, and built-in optimizations.
+This document outlines the migration strategy from custom Next.js API routes to direct Supabase PostgREST access for the ValidAI boilerplate. This migration establishes the correct architecture from the beginning, reducing codebase by ~70% and unlocking Supabase's full feature set for developers building upon this foundation.
 
 ## Current Architecture Problems
 
@@ -17,7 +17,7 @@ Client → PostgREST → Postgres (with RLS)
 ```
 
 ### The Issue
-We're using Supabase as an expensive hosted Postgres database rather than leveraging it as a complete Backend-as-a-Service platform. We've essentially rebuilt what Supabase already provides through PostgREST.
+The current boilerplate uses Supabase as an expensive hosted Postgres database rather than leveraging it as a complete Backend-as-a-Service platform. This teaches developers the wrong architectural patterns from the start.
 
 ## Current State Analysis
 
@@ -68,70 +68,7 @@ We're using Supabase as an expensive hosted Postgres database rather than levera
 
 ## Migration Phases
 
-## Phase 1: Database Layer Preparation
-
-### 1.1 Fix RLS Policies
-
-**Current Issue**: `organization_members` has overly permissive policy
-**Solution**: Replace with granular, role-based policies
-
-```sql
--- Drop generic policy
-DROP POLICY IF EXISTS "Users can manage their own membership" ON organization_members;
-
--- CREATE GRANULAR POLICIES
-
--- SELECT: Users can view members of organizations they belong to
-CREATE POLICY "View organization members" ON organization_members
-FOR SELECT USING (
-  organization_id IN (
-    SELECT organization_id FROM organization_members
-    WHERE user_id = auth.uid()
-  )
-);
-
--- INSERT: Only owners/admins can add members
-CREATE POLICY "Admins can add members" ON organization_members
-FOR INSERT WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM organization_members existing
-    WHERE existing.organization_id = organization_members.organization_id
-    AND existing.user_id = auth.uid()
-    AND existing.role IN ('owner', 'admin')
-  )
-);
-
--- UPDATE: Only owners/admins can update member roles
-CREATE POLICY "Admins can update members" ON organization_members
-FOR UPDATE USING (
-  EXISTS (
-    SELECT 1 FROM organization_members existing
-    WHERE existing.organization_id = organization_members.organization_id
-    AND existing.user_id = auth.uid()
-    AND existing.role IN ('owner', 'admin')
-  )
-) WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM organization_members existing
-    WHERE existing.organization_id = organization_members.organization_id
-    AND existing.user_id = auth.uid()
-    AND existing.role IN ('owner', 'admin')
-  )
-);
-
--- DELETE: Only owners can remove members
-CREATE POLICY "Owners can remove members" ON organization_members
-FOR DELETE USING (
-  EXISTS (
-    SELECT 1 FROM organization_members existing
-    WHERE existing.organization_id = organization_members.organization_id
-    AND existing.user_id = auth.uid()
-    AND existing.role = 'owner'
-  )
-);
-```
-
-### 1.2 Create Database Functions for Complex Operations
+## Phase 1: Database Functions for Complex Operations
 
 **Purpose**: Replace API routes that handle multi-table operations
 
@@ -156,24 +93,17 @@ BEGIN
     RAISE EXCEPTION 'User not authenticated';
   END IF;
 
-  -- Generate slug if not provided
+  -- Generate unique slug using existing function
   IF org_slug IS NULL THEN
-    final_slug := lower(regexp_replace(org_name, '[^a-z0-9]+', '-', 'g'));
-    final_slug := trim(both '-' from final_slug);
+    final_slug := generate_unique_org_slug(org_name);
   ELSE
-    final_slug := org_slug;
+    -- Validate provided slug is unique
+    IF EXISTS (SELECT 1 FROM organizations WHERE slug = org_slug) THEN
+      final_slug := generate_unique_org_slug(org_slug);
+    ELSE
+      final_slug := org_slug;
+    END IF;
   END IF;
-
-  -- Ensure unique slug
-  DECLARE
-    counter INTEGER := 0;
-    base_slug TEXT := final_slug;
-  BEGIN
-    WHILE EXISTS (SELECT 1 FROM organizations WHERE slug = final_slug) LOOP
-      counter := counter + 1;
-      final_slug := base_slug || '-' || counter;
-    END LOOP;
-  END;
 
   -- Create organization
   INSERT INTO organizations (name, slug, created_by)
@@ -195,78 +125,100 @@ $$;
 
 -- FUNCTION: Get current organization with user role
 CREATE OR REPLACE FUNCTION get_current_organization()
-RETURNS json
+RETURNS TABLE(
+  organization_id uuid,
+  organization_name text,
+  organization_slug text,
+  plan_type text,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  created_by uuid,
+  user_role text
+)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   org_id UUID;
-  result json;
 BEGIN
   -- Get org_id from JWT metadata
   org_id := (auth.jwt() -> 'app_metadata' ->> 'organization_id')::UUID;
 
   IF org_id IS NULL THEN
-    RETURN NULL;
+    RETURN;
   END IF;
 
   -- Get organization with user's role
-  SELECT json_build_object(
-    'organization', row_to_json(o.*),
-    'role', om.role
-  ) INTO result
+  RETURN QUERY
+  SELECT
+    o.id,
+    o.name,
+    o.slug,
+    o.plan_type,
+    o.created_at,
+    o.updated_at,
+    o.created_by,
+    om.role
   FROM organizations o
   JOIN organization_members om ON om.organization_id = o.id
   WHERE o.id = org_id
   AND om.user_id = auth.uid();
-
-  RETURN result;
 END;
 $$;
 
 -- FUNCTION: Get user's organizations with roles
 CREATE OR REPLACE FUNCTION get_user_organizations()
-RETURNS json
+RETURNS TABLE(
+  organization_id uuid,
+  organization_name text,
+  organization_slug text,
+  plan_type text,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  created_by uuid,
+  user_role text,
+  joined_at timestamp with time zone
+)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
-DECLARE
-  result json;
 BEGIN
-  SELECT json_build_object(
-    'organizations', COALESCE(json_agg(
-      json_build_object(
-        'id', o.id,
-        'name', o.name,
-        'slug', o.slug,
-        'plan_type', o.plan_type,
-        'created_at', o.created_at,
-        'updated_at', o.updated_at,
-        'created_by', o.created_by,
-        'role', om.role,
-        'joined_at', om.joined_at
-      )
-    ), '[]'::json)
-  ) INTO result
+  RETURN QUERY
+  SELECT
+    o.id,
+    o.name,
+    o.slug,
+    o.plan_type,
+    o.created_at,
+    o.updated_at,
+    o.created_by,
+    om.role,
+    om.joined_at
   FROM organizations o
   JOIN organization_members om ON om.organization_id = o.id
   WHERE om.user_id = auth.uid();
-
-  RETURN result;
 END;
 $$;
 
 -- FUNCTION: Get organization members with profiles
 CREATE OR REPLACE FUNCTION get_organization_members(org_id UUID)
-RETURNS json
+RETURNS TABLE(
+  organization_id uuid,
+  user_id uuid,
+  role text,
+  joined_at timestamp with time zone,
+  full_name text,
+  avatar_url text
+)
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
+SET search_path = public
 AS $$
-DECLARE
-  result json;
 BEGIN
   -- Verify user has access to this organization
   IF NOT EXISTS (
@@ -276,29 +228,22 @@ BEGIN
     RAISE EXCEPTION 'Access denied to organization';
   END IF;
 
-  SELECT COALESCE(json_agg(
-    json_build_object(
-      'organization_id', om.organization_id,
-      'user_id', om.user_id,
-      'role', om.role,
-      'joined_at', om.joined_at,
-      'profile', json_build_object(
-        'id', p.id,
-        'full_name', p.full_name,
-        'avatar_url', p.avatar_url
-      )
-    )
-  ), '[]'::json) INTO result
+  RETURN QUERY
+  SELECT
+    om.organization_id,
+    om.user_id,
+    om.role,
+    om.joined_at,
+    p.full_name,
+    p.avatar_url
   FROM organization_members om
   JOIN profiles p ON p.id = om.user_id
   WHERE om.organization_id = org_id;
-
-  RETURN result;
 END;
 $$;
 ```
 
-### 1.3 Grant Appropriate Permissions
+### Grant Appropriate Permissions
 
 ```sql
 -- Grant execute permissions to authenticated users
@@ -315,7 +260,7 @@ GRANT EXECUTE ON FUNCTION get_organization_members(UUID) TO authenticated;
 **File**: `supabase/functions/switch-organization/index.ts`
 
 ```typescript
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 Deno.serve(async (req) => {
   try {
@@ -343,7 +288,14 @@ Deno.serve(async (req) => {
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'User not authenticated' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -358,7 +310,14 @@ Deno.serve(async (req) => {
     if (membershipError || !membership) {
       return new Response(
         JSON.stringify({ error: 'No access to this organization' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -376,7 +335,14 @@ Deno.serve(async (req) => {
     if (updateError) {
       return new Response(
         JSON.stringify({ error: 'Failed to switch organization' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -386,12 +352,25 @@ Deno.serve(async (req) => {
         organizationId,
         role: membership.role,
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, content-type'
+        }
+      }
     )
   } catch (error) {
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, content-type'
+        }
+      }
     )
   }
 })
@@ -402,7 +381,7 @@ Deno.serve(async (req) => {
 **File**: `supabase/functions/invite-user/index.ts`
 
 ```typescript
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 Deno.serve(async (req) => {
   try {
@@ -413,7 +392,14 @@ Deno.serve(async (req) => {
     if (!email || !organizationId || !validRoles.includes(role)) {
       return new Response(
         JSON.stringify({ error: 'Invalid input' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -438,7 +424,14 @@ Deno.serve(async (req) => {
     if (userError || !user) {
       return new Response(
         JSON.stringify({ error: 'User not authenticated' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 401,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -453,7 +446,14 @@ Deno.serve(async (req) => {
     if (!membership || !['owner', 'admin'].includes(membership.role)) {
       return new Response(
         JSON.stringify({ error: 'Insufficient permissions' }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 403,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -467,7 +467,14 @@ Deno.serve(async (req) => {
     if (!organization) {
       return new Response(
         JSON.stringify({ error: 'Organization not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 404,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -488,7 +495,14 @@ Deno.serve(async (req) => {
     if (inviteError) {
       return new Response(
         JSON.stringify({ error: 'Failed to send invitation' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+        {
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization, content-type'
+          }
+        }
       )
     }
 
@@ -502,12 +516,25 @@ Deno.serve(async (req) => {
           organizationName: organization.name,
         },
       }),
-      { headers: { 'Content-Type': 'application/json' } }
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, content-type'
+        }
+      }
     )
   } catch (error) {
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, content-type'
+        }
+      }
     )
   }
 })
@@ -758,75 +785,24 @@ export function useOrganizationSubscription() {
 }
 ```
 
-## Phase 4: Testing Strategy
+## Architecture Setup Timeline
 
-### 4.1 Unit Tests
-- Mock Supabase client instead of fetch
-- Test RLS policies with different user roles
-- Validate database functions
+### Phase 1: Database Functions
+- [ ] Create database functions for complex operations
+- [ ] Grant appropriate permissions
+- [ ] Test functions work correctly
 
-### 4.2 Integration Tests
-- Test complete user flows with new architecture
-- Verify Edge Functions work correctly
-- Test real-time subscriptions
-
-### 4.3 Migration Testing
-- Run both old and new approaches in parallel
-- Compare results for consistency
-- Performance benchmarking
-
-## Phase 5: Deployment Strategy
-
-### 5.1 Feature Flags
-Use environment variables to gradually roll out new architecture:
-
-```typescript
-const USE_POSTGREST = process.env.NEXT_PUBLIC_USE_POSTGREST === 'true'
-
-export function useUserOrganizations() {
-  if (USE_POSTGREST) {
-    return useUserOrganizationsPostgREST()
-  } else {
-    return useUserOrganizationsAPI()
-  }
-}
-```
-
-### 5.2 Rollback Plan
-- Keep API routes until migration is complete and tested
-- Use feature flags to quickly switch back if issues arise
-- Monitor error rates and performance metrics
-
-## Implementation Timeline
-
-### Week 1: Database Foundation
-- [ ] Deploy new RLS policies
-- [ ] Create and test database functions
-- [ ] Validate policies with different user scenarios
-
-### Week 2: Edge Functions
+### Phase 2: Edge Functions
 - [ ] Create switch-organization Edge Function
 - [ ] Create invite-user Edge Function
 - [ ] Create accept-invite Edge Function
-- [ ] Test Edge Functions thoroughly
+- [ ] Deploy Edge Functions
 
-### Week 3: Client Migration (Read Operations)
-- [ ] Update organization listing
-- [ ] Update current organization fetching
-- [ ] Update member listing
-- [ ] Enable feature flags for gradual rollout
-
-### Week 4: Client Migration (Write Operations)
-- [ ] Update organization creation
-- [ ] Update organization switching
-- [ ] Update user invitations
-- [ ] Test complete user workflows
-
-### Week 5: Testing & Cleanup
-- [ ] Comprehensive testing of all flows
-- [ ] Performance benchmarking
-- [ ] Remove old API routes
-- [ ] Update documentation
+### Phase 3: Client Migration
+- [ ] Update organization queries to use PostgREST
+- [ ] Update mutations to use database functions
+- [ ] Update service-role operations to use Edge Functions
+- [ ] Remove obsolete API routes
 
 ## Expected Benefits
 
@@ -852,39 +828,29 @@ export function useUserOrganizations() {
 - Leveraging Supabase's full feature set
 - Better TypeScript integration
 
-## Risk Mitigation
+## Boilerplate Benefits
 
-### Security Considerations
-- ✅ Comprehensive RLS policies prevent unauthorized access
-- ✅ Edge Functions handle service-role operations securely
-- ✅ No direct service key exposure to frontend
+### For Developers Using This Template
+- **Correct architecture from day 1** - No need to refactor later
+- **Best practices built-in** - Follows Supabase recommended patterns
+- **Reduced learning curve** - See how PostgREST should be used
+- **Performance by default** - 2x faster than API-heavy patterns
+- **Real-time ready** - Architecture supports subscriptions out of the box
 
-### Data Integrity
-- ✅ Database functions ensure atomic operations
-- ✅ RLS policies prevent data corruption
-- ✅ Transactions handle multi-table operations
-
-### Backwards Compatibility
-- ✅ Feature flags allow gradual rollout
-- ✅ API routes remain until migration complete
-- ✅ Rollback plan if issues arise
-
-## Success Metrics
-
-### Technical Metrics
-- [ ] Response time improvement: Target 2x faster
-- [ ] Code reduction: Target 70% less backend code
-- [ ] Bundle size: Target 20% reduction
-- [ ] Error rate: Maintain < 0.1%
-
-### User Experience
-- [ ] Real-time updates working
-- [ ] No regression in functionality
-- [ ] Improved perceived performance
-- [ ] Successful migration of all user workflows
+### For Development Teams
+- **Less backend code to maintain** - 70% reduction in server logic
+- **Faster feature development** - Direct database operations
+- **Better TypeScript integration** - Generated types work seamlessly
+- **Simplified deployment** - Fewer moving parts
 
 ## Conclusion
 
-This migration will transform ValidAI from a traditional backend-heavy architecture to a modern, Supabase-native application that fully leverages PostgREST, RLS, and real-time capabilities. The result will be a more maintainable, performant, and scalable application that truly utilizes Supabase as intended.
+This migration establishes the ValidAI boilerplate with the correct Supabase architecture from the beginning. Rather than teaching developers to build unnecessary API layers, the boilerplate will demonstrate the proper use of PostgREST, database functions, and Edge Functions.
 
-The phased approach ensures minimal risk while delivering significant benefits in terms of performance, maintainability, and developer experience.
+Developers using this template will start with:
+- **Direct PostgREST access** for all database operations
+- **Database functions** for complex business logic
+- **Edge Functions** for service-role operations
+- **Real-time capabilities** built-in
+
+This creates a foundation that scales properly and follows Supabase best practices from day one.
