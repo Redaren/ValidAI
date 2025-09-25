@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ValidAI is a Next.js application with Supabase backend integration, built as a starter template for authentication and database operations. The project uses the App Router architecture with TypeScript and Tailwind CSS.
 
+**Note**: During MVP phase, Payload CMS is integrated for content management. This is a temporary solution that will be extracted to a separate microservice. All new application features must follow Supabase best practices.
+
 ## 🚨 CRITICAL: Supabase Platform Best Practices
 
 **ValidAI uses Supabase as a complete Backend-as-a-Service (BaaS) platform, NOT just a database.**
@@ -90,12 +92,62 @@ Need to fetch/modify data?
 1. **Authentication callback routes** (OAuth flows, email confirmations)
 2. **Admin-only migration tools** (one-time data migrations)
 3. **Third-party webhooks** that require specific Next.js middleware
+4. **Payload CMS routes** (temporary MVP solution at `/api/*` - will be extracted)
+
+**⚠️ IMPORTANT**: Payload CMS uses traditional API routes as a temporary MVP solution. This is the ONLY exception to our PostgREST-first approach. Never use CMS patterns for new application features.
 
 If you're about to create an API route, STOP and ask:
 - Can PostgREST handle this? (90% yes)
 - Can a database function handle this? (9% yes)
 - Can an Edge Function handle this? (0.9% yes)
-- Is this truly an exception? (0.1% maybe)
+- Is this Payload CMS content management? (0.09% temporary exception)
+- Is this truly an exception? (0.01% maybe)
+
+## Payload CMS Integration (MVP Phase Only)
+
+**🚨 CRITICAL**: This is a temporary MVP solution. All new application features MUST follow Supabase best practices above.
+
+### CMS Architecture Overview
+- **Purpose**: Content management during MVP phase only
+- **Extraction Plan**: Will be moved to separate microservice post-MVP
+- **Schema**: Uses separate `payload` schema in same Supabase database
+- **Routes**: Uses traditional API routes at `/api/*` (exception to our rules)
+
+### Route Group Separation
+```
+app/
+├── (app)/          # Main application - FOLLOWS Supabase patterns
+├── (payload)/      # CMS routes - Exception using traditional APIs
+└── (public)/       # Public content consumption
+```
+
+### CMS vs App Development Patterns
+
+| Aspect | Application (Follow This) | CMS (Don't Copy This) |
+|--------|---------------------------|----------------------|
+| **Data Access** | PostgREST via `supabase.from()` | Traditional API routes |
+| **Authentication** | Supabase Auth + RLS | Payload Auth system |
+| **Database** | `public` schema + RLS | `payload` schema |
+| **API Pattern** | Direct client queries | REST endpoints |
+| **Real-time** | Supabase subscriptions | Not implemented |
+
+### Critical Rules for CMS
+
+1. **NEVER mix patterns**: Don't use CMS API patterns in app development
+2. **NEVER bypass Supabase**: Always use PostgREST for new app features
+3. **Content consumption**: Fetch CMS content via `/api/pages` etc. in app
+4. **Schema separation**: CMS data stays in `payload` schema
+5. **Temporary solution**: This will be extracted post-MVP
+
+### When to Use Each System
+
+- **Use CMS**: Only for content management (admin at `/admin`)
+- **Use App patterns**: For ALL new application features
+- **Content display**: App fetches CMS content via API for public display
+
+### Documentation
+- Full CMS architecture: `docs/architecture/cms-architecture.md`
+- CMS admin interface: `http://localhost:3000/admin`
 
 ## Development Commands
 
@@ -126,9 +178,10 @@ npm run lint:fix     # Fix ESLint issues automatically
 ## Architecture
 
 ### Project Structure
-- **App Router**: Uses Next.js 15 App Router pattern
-- **Authentication**: Cookie-based auth via Supabase middleware
-- **Database**: Supabase PostgreSQL with MCP server integration
+- **App Router**: Uses Next.js 15 App Router pattern with route groups
+- **Route Groups**: `(app)` for main app, `(payload)` for CMS, `(public)` for content
+- **Authentication**: Cookie-based auth via Supabase middleware (app routes only)
+- **Database**: Supabase PostgreSQL with schema separation (`public` vs `payload`)
 - **State Management**: TanStack Query + Zustand architecture
 - **UI Components**: shadcn/ui with Radix primitives
 - **Styling**: Tailwind CSS with theme support
@@ -136,12 +189,15 @@ npm run lint:fix     # Fix ESLint issues automatically
 - **Quality**: ESLint + Prettier + Husky hooks + GitHub Actions
 
 ### Key Files
-- `middleware.ts`: Handles session management across all routes
+- `middleware.ts`: Handles session management for `/dashboard/*` routes only
 - `lib/supabase/`: Contains server, client, and middleware configurations
-- `app/protected/`: Routes requiring authentication
+- `app/(app)/`: Main application routes using Supabase patterns
+- `app/(payload)/`: CMS admin and API routes (temporary)
+- `app/(public)/`: Public content display routes
 - `app/queries/`: Database query functions and TanStack Query hooks
 - `stores/`: Zustand state stores (ALL stores must be here)
 - `components/`: Reusable UI components and forms
+- `payload.config.ts`: Payload CMS configuration (temporary)
 - `__tests__/`: Unit and integration tests
 - `e2e/`: End-to-end tests with Playwright (prepared for future use)
 - `/docs/`: Comprehensive architecture and quality documentation
@@ -158,13 +214,21 @@ npm run lint:fix     # Fix ESLint issues automatically
 
 ### Environment Variables
 Required in `.env.local`:
-```
+```bash
+# Supabase (Application)
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+DATABASE_URL=
+
+# Payload CMS (Temporary MVP)
+PAYLOAD_SECRET=
+PAYLOAD_DATABASE_URI=
 ```
 
 ### Database Schema
-- **todos**: Demo table for basic CRUD operations
+- **public schema**: App tables (todos, profiles, etc.) - Use PostgREST
+- **payload schema**: CMS tables (users, pages, media) - Temporary MVP only
 
 ### Path Aliases
 - `@/*`: Maps to project root (configured in tsconfig.json)
@@ -218,6 +282,14 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - **Type Safety**: Always use TypedSupabaseClient for database operations
 - **Testing**: Write tests before or alongside feature development
 - **Quality**: All code must pass automated quality checks
+
+### 🚨 CRITICAL CMS vs App Development
+
+- **CMS is temporary**: Payload CMS will be extracted to microservice post-MVP
+- **Never mix patterns**: Don't use CMS API patterns (`/api/*`) for new app features
+- **Always use Supabase**: For ALL new application functionality, follow PostgREST patterns
+- **Content consumption**: App can fetch CMS content, but use app patterns for everything else
+- **Schema boundaries**: App uses `public` schema, CMS uses `payload` schema - never mix
 
 ## Quick Reference
 
