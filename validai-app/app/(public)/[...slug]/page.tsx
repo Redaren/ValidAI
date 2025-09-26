@@ -3,9 +3,9 @@ import { notFound } from 'next/navigation'
 import { BlockRenderer } from '../components/BlockRenderer'
 
 interface PageProps {
-  params: {
+  params: Promise<{
     slug: string[]
-  }
+  }>
 }
 
 async function getPageBySlug(slug: string) {
@@ -44,7 +44,8 @@ async function getPageBySlug(slug: string) {
 }
 
 export async function generateMetadata({ params }: PageProps) {
-  const slug = params.slug?.join('/') || 'home'
+  const { slug: slugArray } = await params
+  const slug = slugArray?.join('/') || 'home'
   const page = await getPageBySlug(slug)
 
   if (!page) {
@@ -60,9 +61,11 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export default async function DynamicPage({ params }: PageProps) {
+  // Await params to get the slug array (Next.js 15 requirement)
+  const { slug: slugArray } = await params
   // Join slug array to create the full slug
   // e.g., ['products', 'item-1'] becomes 'products/item-1'
-  const slug = params.slug?.join('/') || 'home'
+  const slug = slugArray?.join('/') || 'home'
 
   const page = await getPageBySlug(slug)
 
