@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import {
+  FileText,
   LifeBuoy,
   Send,
   Settings2,
@@ -27,6 +28,13 @@ const data = {
       url: "/dashboard",
       icon: SquareTerminal,
       isActive: true,
+      items: [],
+    },
+    {
+      title: "Processors",
+      url: "/proc",
+      icon: FileText,
+      isActive: false,
       items: [],
     },
   ],
