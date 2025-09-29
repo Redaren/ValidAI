@@ -14,6 +14,121 @@ export type Database = {
   }
   public: {
     Tables: {
+      documents: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          document_type: string | null
+          id: string
+          metadata: Json | null
+          mime_type: string
+          name: string
+          organization_id: string
+          original_filename: string
+          size_bytes: number
+          storage_path: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          document_type?: string | null
+          id?: string
+          metadata?: Json | null
+          mime_type: string
+          name: string
+          organization_id: string
+          original_filename: string
+          size_bytes: number
+          storage_path: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          document_type?: string | null
+          id?: string
+          metadata?: Json | null
+          mime_type?: string
+          name?: string
+          organization_id?: string
+          original_filename?: string
+          size_bytes?: number
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operations: {
+        Row: {
+          area: string
+          configuration: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          operation_type: Database["public"]["Enums"]["operation_type"]
+          output_schema: Json | null
+          position: number
+          processor_id: string
+          prompt: string
+          required: boolean
+          updated_at: string
+          validation_rules: Json | null
+        }
+        Insert: {
+          area?: string
+          configuration?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          operation_type: Database["public"]["Enums"]["operation_type"]
+          output_schema?: Json | null
+          position: number
+          processor_id: string
+          prompt: string
+          required?: boolean
+          updated_at?: string
+          validation_rules?: Json | null
+        }
+        Update: {
+          area?: string
+          configuration?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          operation_type?: Database["public"]["Enums"]["operation_type"]
+          output_schema?: Json | null
+          position?: number
+          processor_id?: string
+          prompt?: string
+          required?: boolean
+          updated_at?: string
+          validation_rules?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operations_processor_id_fkey"
+            columns: ["processor_id"]
+            isOneToOne: false
+            referencedRelation: "processors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organization_members: {
         Row: {
           joined_at: string | null
@@ -73,6 +188,71 @@ export type Database = {
         }
         Relationships: []
       }
+      processors: {
+        Row: {
+          area_configuration: Json | null
+          configuration: Json | null
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string | null
+          document_type: string | null
+          id: string
+          name: string
+          organization_id: string
+          published_at: string | null
+          status: Database["public"]["Enums"]["processor_status"]
+          system_prompt: string | null
+          tags: string[] | null
+          updated_at: string
+          visibility: Database["public"]["Enums"]["processor_visibility"]
+        }
+        Insert: {
+          area_configuration?: Json | null
+          configuration?: Json | null
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          description?: string | null
+          document_type?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          published_at?: string | null
+          status?: Database["public"]["Enums"]["processor_status"]
+          system_prompt?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["processor_visibility"]
+        }
+        Update: {
+          area_configuration?: Json | null
+          configuration?: Json | null
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          description?: string | null
+          document_type?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          published_at?: string | null
+          status?: Database["public"]["Enums"]["processor_status"]
+          system_prompt?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["processor_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "processors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -102,13 +282,92 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_organization: {
+        Args: { org_name: string; org_slug?: string }
+        Returns: Json
+      }
+      create_processor_with_operations: {
+        Args: {
+          p_area_configuration?: Json
+          p_configuration?: Json
+          p_description?: string
+          p_document_type?: string
+          p_name: string
+          p_operations?: Json
+          p_status?: Database["public"]["Enums"]["processor_status"]
+          p_system_prompt?: string
+          p_tags?: string[]
+          p_visibility?: Database["public"]["Enums"]["processor_visibility"]
+        }
+        Returns: {
+          operations_created: number
+          processor_id: string
+          processor_name: string
+          processor_status: Database["public"]["Enums"]["processor_status"]
+        }[]
+      }
       generate_unique_org_slug: {
         Args: { base_name: string }
         Returns: string
       }
+      get_current_organization: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          created_by: string
+          organization_id: string
+          organization_name: string
+          organization_slug: string
+          plan_type: string
+          updated_at: string
+          user_role: string
+        }[]
+      }
       get_current_organization_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_ordered_operations: {
+        Args: { p_processor_id: string }
+        Returns: {
+          area: string
+          configuration: Json
+          display_order: number
+          operation_description: string
+          operation_id: string
+          operation_name: string
+          operation_type: Database["public"]["Enums"]["operation_type"]
+          output_schema: Json
+          position: number
+          prompt: string
+          required: boolean
+          validation_rules: Json
+        }[]
+      }
+      get_organization_members: {
+        Args: { org_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          joined_at: string
+          organization_id: string
+          role: string
+          user_id: string
+        }[]
+      }
+      get_user_organizations: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          created_at: string
+          created_by: string
+          joined_at: string
+          organization_id: string
+          organization_name: string
+          organization_slug: string
+          plan_type: string
+          updated_at: string
+          user_role: string
+        }[]
       }
       get_user_organizations_safe: {
         Args: { user_uuid: string }
@@ -124,13 +383,47 @@ export type Database = {
           user_role: string
         }[]
       }
+      get_user_processors: {
+        Args: { p_include_archived?: boolean }
+        Returns: {
+          created_at: string
+          created_by: string
+          created_by_name: string
+          document_type: string
+          is_owner: boolean
+          operation_count: number
+          processor_description: string
+          processor_id: string
+          processor_name: string
+          published_at: string
+          status: Database["public"]["Enums"]["processor_status"]
+          tags: string[]
+          updated_at: string
+          visibility: Database["public"]["Enums"]["processor_visibility"]
+        }[]
+      }
+      storage_check_document_access: {
+        Args: { file_path: string }
+        Returns: boolean
+      }
       user_can_view_org_members: {
         Args: { org_id: string; user_uuid: string }
         Returns: boolean
       }
+      validate_processor_ownership: {
+        Args: { p_processor_id: string; p_require_owner?: boolean }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      operation_type:
+        | "extraction"
+        | "validation"
+        | "rating"
+        | "classification"
+        | "analysis"
+      processor_status: "draft" | "published" | "archived"
+      processor_visibility: "personal" | "organization"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -257,6 +550,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      operation_type: [
+        "extraction",
+        "validation",
+        "rating",
+        "classification",
+        "analysis",
+      ],
+      processor_status: ["draft", "published", "archived"],
+      processor_visibility: ["personal", "organization"],
+    },
   },
 } as const

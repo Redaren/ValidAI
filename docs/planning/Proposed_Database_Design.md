@@ -335,9 +335,27 @@ CREATE POLICY "Users can view processors based on visibility"
 
 ### Storage Integration
 Documents stored in Supabase Storage with RLS:
-- Bucket: `organization-documents`
-- Path structure: `{organization_id}/{document_id}/{filename}`
-- RLS policies matching database policies
+- Bucket: `documents` (single shared bucket)
+- Path structure: `{document_id}/{filename}`
+- Organization isolation via RLS policies on the bucket
+- Document UUID provides uniqueness without exposing organization structure
+
+**Security Note**: Using document_id as the primary path component prevents information leakage about organization structure while maintaining clean URLs. The organization_id relationship is enforced through database RLS policies and Storage RLS policies that reference the documents table.
+
+**Storage RLS Example**:
+```sql
+-- Storage policy checks organization via documents table
+CREATE POLICY "Users can access their organization's documents"
+ON storage.objects FOR SELECT
+USING (
+  bucket_id = 'documents' AND
+  EXISTS (
+    SELECT 1 FROM public.documents
+    WHERE documents.storage_path = storage.objects.name
+    AND documents.organization_id = auth.jwt() -> 'app_metadata' ->> 'organization_id'
+  )
+);
+```
 
 ## Drag-and-Drop Ordering System
 
@@ -452,13 +470,20 @@ For operations requiring elevated privileges:
 
 ## Migration Strategy
 
-1. **Phase 1**: Create core tables (documents, processors, operations)
+1. **Phase 1**: ✅ **COMPLETED** - Create core tables (documents, processors, operations)
+   - Created all three core tables with exact field specifications
+   - Implemented complete RLS policies for all CRUD operations
+   - Set up storage bucket configuration with security functions
+   - Created essential database functions (get_ordered_operations, create_processor_with_operations, etc.)
+   - Generated TypeScript types
+   - *Completed on: 2025-09-29*
+
 2. **Phase 1.5**: Create UI for creation and management of Processors and operations.
 3. **Phase 2**: Create execution tables (runs, operation_results)
-4. **Phase 3**: Implement RLS policies
-5. **Phase 4**: Create database functions for complex operations
-6. **Phase 5**: Set up Storage buckets with RLS
-7. **Phase 6**: Generate TypeScript types
+4. **Phase 3**: Implement RLS policies for execution tables
+5. **Phase 4**: Create database functions for run execution
+6. **Phase 5**: Enhance Storage integration with direct upload
+7. **Phase 6**: Add performance optimizations and monitoring
 
 ## Success Criteria
 
