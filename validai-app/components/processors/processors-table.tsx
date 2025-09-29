@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table"
 import { Lock, Users, Eye, MoreHorizontal } from "lucide-react"
 import { formatDistanceToNow } from "@/lib/utils"
+import { useRouter } from "next/navigation"
 
 import {
   Table,
@@ -40,6 +41,7 @@ interface ProcessorsTableProps {
 }
 
 export function ProcessorsTable({ data }: ProcessorsTableProps) {
+  const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "updated_at", desc: true }
   ])
@@ -59,6 +61,13 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         },
       },
       {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => {
+          return <ProcessorStatusBadge status={row.getValue("status")} />
+        },
+      },
+      {
         accessorKey: "processor_description",
         header: "Description",
         cell: ({ row }) => {
@@ -74,13 +83,6 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
               {truncated}
             </span>
           )
-        },
-      },
-      {
-        accessorKey: "status",
-        header: "Status",
-        cell: ({ row }) => {
-          return <ProcessorStatusBadge status={row.getValue("status")} />
         },
       },
       {
@@ -103,10 +105,10 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         accessorKey: "updated_at",
         header: "Last Updated",
         cell: ({ row }) => {
-          const date = row.getValue("updated_at") as string
+          const updatedAt = row.getValue("updated_at") as string
           return (
             <span className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(date))} ago
+              {formatDistanceToNow(new Date(updatedAt))}
             </span>
           )
         },
@@ -122,8 +124,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => {
-                  // TODO: Navigate to processor view
-                  console.log("View processor:", processor.processor_id)
+                  router.push(`/proc/${processor.processor_id}`)
                 }}
               >
                 <Eye className="h-4 w-4" />
@@ -140,7 +141,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 <DropdownMenuContent align="end">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
                   <DropdownMenuItem
-                    onClick={() => console.log("View:", processor.processor_id)}
+                    onClick={() => router.push(`/proc/${processor.processor_id}`)}
                   >
                     View details
                   </DropdownMenuItem>
@@ -164,7 +165,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         },
       },
     ],
-    []
+    [router]
   )
 
   const table = useReactTable({
