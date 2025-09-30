@@ -176,3 +176,123 @@ export function useUpdateAreaConfiguration() {
     },
   })
 }
+
+export function useRenameArea() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({
+      processorId,
+      oldName,
+      newName,
+    }: {
+      processorId: string
+      oldName: string
+      newName: string
+    }) => {
+      // Use a database function to atomically rename the area in both
+      // area_configuration and all related operations
+      const { error } = await supabase.rpc('rename_processor_area', {
+        p_processor_id: processorId,
+        p_old_name: oldName,
+        p_new_name: newName,
+      })
+
+      if (error) throw error
+    },
+    onSuccess: (_, { processorId }) => {
+      queryClient.invalidateQueries({ queryKey: ['processor', processorId] })
+    },
+  })
+}
+
+export function useCreateArea() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({
+      processorId,
+      areaName,
+    }: {
+      processorId: string
+      areaName: string
+    }) => {
+      // Get current processor to access area_configuration
+      const { data: processor, error: fetchError } = await supabase
+        .from('processors')
+        .select('area_configuration')
+        .eq('id', processorId)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      const currentAreas = processor?.area_configuration?.areas || []
+
+      // Check if area already exists
+      if (currentAreas.some((area: { name: string }) => area.name === areaName)) {
+        throw new Error(`Area "${areaName}" already exists`)
+      }
+
+      // Calculate next display_order
+      const maxOrder = currentAreas.reduce(
+        (max: number, area: { display_order: number }) =>
+          Math.max(max, area.display_order),
+        0
+      )
+
+      // Add new area
+      const updatedAreas = [
+        ...currentAreas,
+        {
+          name: areaName,
+          display_order: maxOrder + 1,
+        },
+      ]
+
+      // Update processor
+      const { error: updateError } = await supabase
+        .from('processors')
+        .update({
+          area_configuration: { areas: updatedAreas },
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', processorId)
+
+      if (updateError) throw updateError
+    },
+    onSuccess: (_, { processorId }) => {
+      queryClient.invalidateQueries({ queryKey: ['processor', processorId] })
+    },
+  })
+}
+
+export function useDeleteArea() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({
+      processorId,
+      areaName,
+      targetArea,
+    }: {
+      processorId: string
+      areaName: string
+      targetArea?: string
+    }) => {
+      // Use database function for atomic delete with optional move
+      const { error } = await supabase.rpc('delete_processor_area', {
+        p_processor_id: processorId,
+        p_area_name: areaName,
+        p_target_area: targetArea || null,
+      })
+
+      if (error) throw error
+    },
+    onSuccess: (_, { processorId }) => {
+      queryClient.invalidateQueries({ queryKey: ['processor', processorId] })
+    },
+  })
+}

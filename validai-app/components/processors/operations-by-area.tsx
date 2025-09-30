@@ -5,6 +5,8 @@ import {
   ProcessorDetail,
   useUpdateOperationPosition,
   useUpdateAreaConfiguration,
+  useRenameArea,
+  useDeleteArea,
 } from "@/app/queries/processors/use-processor-detail"
 import {
   DndContext,
@@ -20,23 +22,107 @@ import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { AreaColumn } from "./area-column"
 import { OperationCard } from "./operation-card"
 
+/**
+ * Props for the OperationsByArea component.
+ */
 interface OperationsByAreaProps {
+  /** The processor containing operations to display and organize */
   processor: ProcessorDetail
 }
 
+/**
+ * Operations By Area Component - Drag-and-Drop Orchestrator
+ *
+ * This is the core component that manages the drag-and-drop interface for organizing
+ * operations within areas and reordering areas themselves. It uses @dnd-kit for a
+ * flexible, accessible drag-and-drop experience.
+ *
+ * ## Drag-and-Drop Architecture
+ *
+ * ### Two-Level Drag System
+ * The component supports TWO types of draggable items:
+ * 1. **Areas** - Containers that can be reordered
+ * 2. **Operations** - Items that can be moved within/between areas
+ *
+ * ### ID Format Convention (Critical for understanding the code)
+ * - **Area IDs**: `"area-{areaName}"` (e.g., "area-Extraction")
+ *   - Used by SortableContext to identify area drag operations
+ *   - Prefix distinguishes area drags from operation drags
+ * - **Operation IDs**: `operation.id` (UUID)
+ *   - Direct operation UUID without prefix
+ *   - Used by SortableContext within each area
+ * - **Droppable IDs**: `areaName` (e.g., "Extraction")
+ *   - Used by useDroppable to identify drop targets
+ *
+ * ### Library Integration
+ * - **@dnd-kit/core** - Provides DndContext, sensors, and event handling
+ * - **@dnd-kit/sortable** - Provides SortableContext and useSortable hook
+ * - **PointerSensor** - Requires 8px movement before drag starts (prevents accidental drags)
+ *
+ * ## Drag Event Flow
+ *
+ * ### 1. handleDragStart
+ * - Captures the ID of the item being dragged
+ * - Stores in `activeId` state for overlay rendering
+ *
+ * ### 2. handleDragOver (during drag)
+ * - Auto-expands collapsed areas when dragging over them
+ * - Only applies to operation drags (not area reordering)
+ * - Detects target area from multiple ID formats
+ *
+ * ### 3. handleDragEnd (on drop)
+ * - **Area Reordering**: If activeId starts with "area-"
+ *   - Swaps display_order of areas
+ *   - Updates area_configuration in database
+ * - **Operation Movement**: Otherwise
+ *   - Calculates new position using fractional positioning
+ *   - Updates operation's area and position
+ *   - Handles both area drops and operation-to-operation drops
+ *
+ * ## Position Calculation Algorithm
+ *
+ * Operations use **fractional positioning** for efficient reordering:
+ * - Position is a numeric value, not strictly sequential
+ * - Inserting between positions 5 and 6 → position 5.5
+ * - No need to update all subsequent items
+ * - Database stores as NUMERIC type for precision
+ *
+ * **Example:**
+ * ```
+ * Before: [Op1: 1, Op2: 2, Op3: 3]
+ * Drag Op3 between Op1 and Op2
+ * After: [Op1: 1, Op3: 1.5, Op2: 2]
+ * ```
+ *
+ * ## SSR/Hydration Handling
+ *
+ * The component renders a static version during SSR and only enables
+ * drag-and-drop after client-side hydration to prevent mismatches.
+ *
+ * @param processor - The processor containing operations and area configuration
+ * @returns The interactive operations-by-area interface with drag-and-drop
+ */
 export function OperationsByArea({ processor }: OperationsByAreaProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
   const [openAreas, setOpenAreas] = useState<Map<string, boolean>>(new Map())
   const updatePosition = useUpdateOperationPosition()
   const updateAreaConfig = useUpdateAreaConfiguration()
+  const renameArea = useRenameArea()
+  const deleteArea = useDeleteArea()
 
-  // Prevent hydration mismatch by only enabling DnD after mount
+  /**
+   * Prevent hydration mismatch by only enabling DnD after mount.
+   * This ensures drag-and-drop features are only active on the client.
+   */
   useEffect(() => {
     setIsMounted(true)
   }, [])
 
-  // Configure sensors for better drag experience
+  /**
+   * Configure drag sensors with an 8px activation distance.
+   * This prevents accidental drags when clicking buttons or text.
+   */
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
@@ -45,7 +131,12 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     })
   )
 
-  // Group operations by area
+  /**
+   * Groups operations by their area, sorted by position within each area.
+   * Initializes all areas from configuration even if they're empty.
+   *
+   * @returns Map of area names to their operations, sorted by position
+   */
   const groupedOperations = useMemo(() => {
     const groups = new Map<string, typeof processor.operations>()
 
@@ -74,7 +165,12 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     return groups
   }, [processor.operations, processor.area_configuration])
 
-  // Get sorted area names based on display_order
+  /**
+   * Get area names sorted by their display_order.
+   * This determines the visual order of areas in the UI.
+   *
+   * @returns Array of area names in display order
+   */
   const sortedAreaNames = useMemo(() => {
     if (processor.area_configuration?.areas) {
       return [...processor.area_configuration.areas]
@@ -84,7 +180,10 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     return Array.from(groupedOperations.keys())
   }, [processor.area_configuration, groupedOperations])
 
-  // Initialize all areas as open when areas change
+  /**
+   * Initialize collapse/expand state for areas.
+   * Preserves existing state when areas change, defaults new areas to collapsed.
+   */
   useEffect(() => {
     setOpenAreas((prevOpenAreas) => {
       const newOpenAreas = new Map<string, boolean>()
@@ -118,10 +217,52 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     })
   }
 
+  const handleRenameArea = (oldName: string, newName: string) => {
+    renameArea.mutate({
+      processorId: processor.processor_id,
+      oldName,
+      newName,
+    })
+  }
+
+  const handleDeleteArea = (areaName: string, targetArea?: string) => {
+    deleteArea.mutate({
+      processorId: processor.processor_id,
+      areaName,
+      targetArea,
+    })
+  }
+
+  /**
+   * Drag Start Handler
+   *
+   * Captures the ID of the item being dragged (area or operation).
+   * This ID is used to render the drag overlay and determine drag type.
+   *
+   * @param event - DragStartEvent containing the active draggable item
+   */
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }
 
+  /**
+   * Drag Over Handler
+   *
+   * Handles auto-expansion of collapsed areas when dragging operations over them.
+   * This improves UX by allowing users to see the drop target contents.
+   *
+   * **Logic:**
+   * 1. Skip if dragging an area (area reordering doesn't need auto-expand)
+   * 2. Detect which area is being hovered over (supports multiple ID formats)
+   * 3. Auto-expand the target area if it's currently collapsed
+   *
+   * **ID Format Detection:**
+   * - Direct match: `overId === areaName`
+   * - Sortable format: `overId === "area-{areaName}"`
+   * - Operation format: Find operation's area via lookup
+   *
+   * @param event - DragOverEvent containing active and over items
+   */
   const handleDragOver = (event: DragOverEvent) => {
     const { over, active } = event
     if (!over) return
@@ -165,6 +306,41 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     }
   }
 
+  /**
+   * Drag End Handler - The Main Drag-and-Drop Logic
+   *
+   * This is where the magic happens. Determines if we're reordering areas
+   * or moving operations, then updates the database accordingly.
+   *
+   * ## Two Drag Modes
+   *
+   * ### Mode 1: Area Reordering (activeId starts with "area-")
+   * - Swaps the display_order of two areas
+   * - Updates area_configuration.areas array
+   * - Maintains all operations within their areas
+   *
+   * ### Mode 2: Operation Movement (default)
+   * - Moves an operation to a new area and/or position
+   * - Uses fractional positioning for precise placement
+   * - Handles two drop scenarios:
+   *   a) Dropped on an area → appends to end
+   *   b) Dropped on another operation → inserts at that position
+   *
+   * ## Position Calculation Details
+   *
+   * When dropping between operations:
+   * ```
+   * Moving DOWN (within same area):
+   *   targetPos = (overOp.position + nextOp.position) / 2
+   *   If no nextOp: targetPos = overOp.position + 1
+   *
+   * Moving UP (or from different area):
+   *   targetPos = (prevOp.position + overOp.position) / 2
+   *   If no prevOp: targetPos = overOp.position / 2
+   * ```
+   *
+   * @param event - DragEndEvent containing active and over items
+   */
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     setActiveId(null)
@@ -298,6 +474,8 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
       <div className="flex flex-col gap-4">
         {sortedAreaNames.map((areaName) => {
           const operations = groupedOperations.get(areaName) || []
+          // Exclude current area name from validation list for rename
+          const otherAreaNames = sortedAreaNames.filter(name => name !== areaName)
           return (
             <AreaColumn
               key={areaName}
@@ -305,6 +483,12 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
               operations={operations}
               isOpen={openAreas.get(areaName) ?? false}
               onToggle={() => toggleArea(areaName)}
+              existingAreaNames={otherAreaNames}
+              onRename={handleRenameArea}
+              onDelete={handleDeleteArea}
+              isRenaming={renameArea.isPending}
+              isDeleting={deleteArea.isPending}
+              isLastArea={sortedAreaNames.length === 1}
             />
           )
         })}
@@ -326,6 +510,8 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
         <div className="flex flex-col gap-4">
           {sortedAreaNames.map((areaName) => {
             const operations = groupedOperations.get(areaName) || []
+            // Exclude current area name from validation list for rename
+            const otherAreaNames = sortedAreaNames.filter(name => name !== areaName)
             return (
               <AreaColumn
                 key={areaName}
@@ -333,6 +519,12 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
                 operations={operations}
                 isOpen={openAreas.get(areaName) ?? false}
                 onToggle={() => toggleArea(areaName)}
+                existingAreaNames={otherAreaNames}
+                onRename={handleRenameArea}
+                onDelete={handleDeleteArea}
+                isRenaming={renameArea.isPending}
+                isDeleting={deleteArea.isPending}
+                isLastArea={sortedAreaNames.length === 1}
               />
             )
           })}

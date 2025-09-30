@@ -4,12 +4,41 @@ import { createQueryClient } from '@/lib/query-client'
 import { ProcessorDetailClient } from './processor-detail-client'
 import { notFound } from 'next/navigation'
 
+/**
+ * Props for the ProcessorDetailPage component.
+ */
 interface ProcessorDetailPageProps {
+  /** Dynamic route parameters containing the processor ID */
   params: Promise<{
+    /** The processor UUID from the URL path */
     id: string
   }>
 }
 
+/**
+ * Server Component: Processor Detail Page
+ *
+ * This is the main server component for the `/proc/[id]` route. It implements
+ * server-side data prefetching to improve initial page load performance.
+ *
+ * **Architecture Pattern:**
+ * - Server Component (RSC) - Handles data prefetching
+ * - Uses TanStack Query for cache hydration
+ * - Delegates interactivity to ProcessorDetailClient (client component)
+ *
+ * **Data Flow:**
+ * 1. Server prefetches processor data via Supabase RPC
+ * 2. Data is dehydrated into HydrationBoundary state
+ * 3. Client component rehydrates the cache immediately
+ * 4. No loading state flicker on initial render
+ *
+ * **Error Handling:**
+ * - Returns 404 if processor doesn't exist
+ * - Returns 404 if user lacks access permissions
+ *
+ * @param params - Route parameters containing processor ID
+ * @returns Server-rendered processor detail page with prefetched data
+ */
 export default async function ProcessorDetailPage({
   params,
 }: ProcessorDetailPageProps) {

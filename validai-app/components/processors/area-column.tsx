@@ -1,24 +1,115 @@
 "use client"
 
+import { useState } from "react"
 import { Operation } from "@/app/queries/processors/use-processor-detail"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { useDroppable } from "@dnd-kit/core"
 import { OperationCard } from "./operation-card"
-import { Plus, GripVertical, ChevronDown, ChevronRight } from "lucide-react"
+import { RenameAreaDialog } from "./rename-area-dialog"
+import { DeleteAreaDialog } from "./delete-area-dialog"
+import { Plus, GripVertical, ChevronDown, ChevronRight, Pencil, Trash2, MoreHorizontal } from "lucide-react"
 
+/**
+ * Props for the AreaColumn component.
+ */
 interface AreaColumnProps {
+  /** Name of the area (must be unique within processor) */
   areaName: string
+  /** Operations within this area, pre-sorted by position */
   operations: Operation[]
+  /** Whether the area is expanded or collapsed */
   isOpen: boolean
+  /** Callback to toggle expand/collapse state */
   onToggle: () => void
+  /** Names of OTHER areas (for rename validation) */
+  existingAreaNames: string[]
+  /** Callback to rename this area */
+  onRename: (oldName: string, newName: string) => void
+  /** Callback to delete this area */
+  onDelete: (areaName: string, targetArea?: string) => void
+  /** Whether a rename operation is in progress */
+  isRenaming?: boolean
+  /** Whether a delete operation is in progress */
+  isDeleting?: boolean
+  /** Whether this is the last remaining area (prevents deletion) */
+  isLastArea?: boolean
 }
 
-export function AreaColumn({ areaName, operations, isOpen, onToggle }: AreaColumnProps) {
-  // Make the area itself sortable
+/**
+ * Area Column Component - Dual-Mode Draggable Container
+ *
+ * This component represents an organizational area that contains operations.
+ * It implements a sophisticated dual-mode drag-and-drop pattern:
+ *
+ * ## Dual Drag-and-Drop Modes
+ *
+ * ### Mode 1: Sortable (Area Reordering)
+ * - The ENTIRE area card can be dragged via the GripVertical handle
+ * - Uses `useSortable` with ID format `"area-{areaName}"`
+ * - Allows reordering areas within the processor
+ *
+ * ### Mode 2: Droppable (Operation Target)
+ * - The area acts as a DROP TARGET for operations
+ * - Uses `useDroppable` with ID format `areaName`
+ * - Operations can be dropped into this area from other areas
+ *
+ * ## Combining Sortable + Droppable
+ *
+ * The component needs TWO refs (one for each behavior):
+ * - `setSortableRef` - From useSortable
+ * - `setDroppableRef` - From useDroppable
+ *
+ * These are combined using the `setRefs` function which calls both.
+ * This allows the area to be BOTH draggable AND a drop target.
+ *
+ * ## Visual Feedback
+ *
+ * - **isOver**: Shows ring when operations are dragged over
+ * - **isAreaDragging**: Reduces opacity when area is being dragged
+ * - **transform/transition**: Smooth animations during drag
+ *
+ * ## Area Management
+ *
+ * The component provides a dropdown menu with:
+ * - **Rename**: Opens RenameAreaDialog
+ * - **Delete**: Opens DeleteAreaDialog (disabled if last area)
+ *
+ * ## Collapsible Content
+ *
+ * Areas can be collapsed to reduce visual clutter. Operations within
+ * use SortableContext for their own drag-and-drop.
+ *
+ * @returns A draggable area card containing sortable operations
+ */
+export function AreaColumn({
+  areaName,
+  operations,
+  isOpen,
+  onToggle,
+  existingAreaNames,
+  onRename,
+  onDelete,
+  isRenaming = false,
+  isDeleting = false,
+  isLastArea = false,
+}: AreaColumnProps) {
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+
+  /**
+   * Make the area itself sortable for reordering.
+   * ID format: "area-{areaName}" distinguishes from operation drags.
+   */
   const {
     attributes: sortableAttributes,
     listeners: sortableListeners,
@@ -34,21 +125,40 @@ export function AreaColumn({ areaName, operations, isOpen, onToggle }: AreaColum
     }
   })
 
-  // Keep droppable for operations
+  /**
+   * Make the area droppable for operations.
+   * ID format: areaName (no prefix) for drop target identification.
+   */
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: areaName,
   })
 
+  /**
+   * Visual style combining drag transform and opacity feedback.
+   */
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isAreaDragging ? 0.5 : 1,
   }
 
-  // Combine refs
+  /**
+   * Combines both refs (sortable + droppable) into a single ref callback.
+   * This is the key technique that allows dual drag-and-drop behavior.
+   */
   const setRefs = (node: HTMLDivElement | null) => {
     setSortableRef(node)
     setDroppableRef(node)
+  }
+
+  const handleRename = (newName: string) => {
+    onRename(areaName, newName)
+    setIsRenameDialogOpen(false)
+  }
+
+  const handleDelete = (targetArea?: string) => {
+    onDelete(areaName, targetArea)
+    setIsDeleteDialogOpen(false)
   }
 
   return (
@@ -82,9 +192,37 @@ export function AreaColumn({ areaName, operations, isOpen, onToggle }: AreaColum
                 <span className="font-semibold">{areaName}</span>
               </CollapsibleTrigger>
             </div>
-            <span className="text-sm font-normal text-muted-foreground">
-              {operations.length} {operations.length === 1 ? "operation" : "operations"}
-            </span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={isRenaming || isDeleting}
+                  title="Area options"
+                >
+                  <span className="sr-only">Open area menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setIsRenameDialogOpen(true)}
+                  disabled={isRenaming}
+                >
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={isDeleting || isLastArea}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </CardTitle>
         </CardHeader>
 
@@ -113,6 +251,25 @@ export function AreaColumn({ areaName, operations, isOpen, onToggle }: AreaColum
           </CardContent>
         </CollapsibleContent>
       </Card>
+
+      <RenameAreaDialog
+        open={isRenameDialogOpen}
+        onOpenChange={setIsRenameDialogOpen}
+        currentName={areaName}
+        existingNames={existingAreaNames}
+        onRename={handleRename}
+        isLoading={isRenaming}
+      />
+
+      <DeleteAreaDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        areaName={areaName}
+        operationCount={operations.length}
+        otherAreaNames={existingAreaNames}
+        onDelete={handleDelete}
+        isLoading={isDeleting}
+      />
     </Collapsible>
   )
 }

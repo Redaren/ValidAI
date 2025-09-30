@@ -7,11 +7,51 @@ import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Pencil } from "lucide-react"
 
+/**
+ * Props for the OperationCard component.
+ */
 interface OperationCardProps {
+  /** The operation to display */
   operation: Operation
 }
 
+/**
+ * Operation Card Component - Sortable Operation Item
+ *
+ * Displays a single operation with drag-and-drop functionality.
+ * Operations can be dragged within their area or moved to other areas.
+ *
+ * ## Drag-and-Drop Behavior
+ *
+ * - Uses `useSortable` with the operation's UUID as the ID
+ * - Can be dragged via the GripVertical handle
+ * - Visual feedback: opacity reduces to 0.5 while dragging
+ * - Smooth animations using CSS transforms
+ *
+ * ## Visual Design
+ *
+ * - **Type Badge**: Color-coded by operation type (extraction, validation, etc.)
+ * - **Name**: Operation name (truncated if too long)
+ * - **Description**: Optional description text (truncated)
+ * - **Edit Button**: Appears on hover (currently disabled)
+ *
+ * ## Operation Types & Colors
+ *
+ * - **extraction**: Blue
+ * - **validation**: Green
+ * - **rating**: Purple
+ * - **classification**: Orange
+ * - **analysis**: Pink
+ * - **default**: Gray
+ *
+ * @param operation - The operation data to display
+ * @returns A draggable operation card
+ */
 export function OperationCard({ operation }: OperationCardProps) {
+  /**
+   * Makes the operation sortable within its area.
+   * Uses operation UUID as the unique drag identifier.
+   */
   const {
     attributes,
     listeners,
@@ -21,12 +61,21 @@ export function OperationCard({ operation }: OperationCardProps) {
     isDragging,
   } = useSortable({ id: operation.id })
 
+  /**
+   * Visual style with drag transform and opacity feedback.
+   */
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
   }
 
+  /**
+   * Returns Tailwind color classes based on operation type.
+   *
+   * @param type - The operation type
+   * @returns CSS classes for background and text color
+   */
   const getOperationTypeColor = (type: string) => {
     switch (type) {
       case "extraction":
