@@ -2,10 +2,10 @@
 
 import { Operation } from "@/app/queries/processors/use-processor-detail"
 import { Badge } from "@/components/ui/badge"
-import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical } from "lucide-react"
+import { GripVertical, Pencil } from "lucide-react"
 
 interface OperationCardProps {
   operation: Operation
@@ -45,45 +45,46 @@ export function OperationCard({ operation }: OperationCardProps) {
   }
 
   return (
-    <Card
+    <div
       ref={setNodeRef}
       style={style}
-      className="relative flex items-start gap-3 border-l-4 border-l-primary/40 p-3 hover:border-l-primary"
+      className="group flex items-center gap-3 rounded-md border bg-card px-3 py-2 hover:bg-accent/50 transition-colors"
     >
       {/* Drag Handle */}
       <button
-        className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
+        className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing flex-shrink-0"
         {...attributes}
         {...listeners}
       >
-        <GripVertical className="h-5 w-5" />
+        <GripVertical className="h-4 w-4" />
       </button>
 
-      {/* Content */}
-      <div className="flex-1 space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1">
-            <h4 className="font-medium">{operation.name}</h4>
-            {operation.description && (
-              <p className="text-sm text-muted-foreground">
-                {operation.description}
-              </p>
-            )}
-          </div>
-          <Badge className={getOperationTypeColor(operation.operation_type)}>
-            {operation.operation_type}
-          </Badge>
-        </div>
+      {/* Type Badge */}
+      <Badge className={`${getOperationTypeColor(operation.operation_type)} text-xs flex-shrink-0`}>
+        {operation.operation_type}
+      </Badge>
 
-        {/* Optional badges */}
-        <div className="flex gap-2">
-          {operation.required && (
-            <Badge variant="outline" className="text-xs">
-              Required
-            </Badge>
-          )}
-        </div>
-      </div>
-    </Card>
+      {/* Name */}
+      <span className="font-medium text-sm truncate flex-shrink-0 min-w-0">
+        {operation.name}
+      </span>
+
+      {/* Description */}
+      {operation.description && (
+        <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+          {operation.description}
+        </span>
+      )}
+
+      {/* Edit Icon */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+        disabled
+      >
+        <Pencil className="h-4 w-4" />
+      </Button>
+    </div>
   )
 }

@@ -16,7 +16,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core"
-import { SortableContext, horizontalListSortingStrategy } from "@dnd-kit/sortable"
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { AreaColumn } from "./area-column"
 import { OperationCard } from "./operation-card"
 
@@ -27,6 +27,7 @@ interface OperationsByAreaProps {
 export function OperationsByArea({ processor }: OperationsByAreaProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isMounted, setIsMounted] = useState(false)
+  const [openAreas, setOpenAreas] = useState<Map<string, boolean>>(new Map())
   const updatePosition = useUpdateOperationPosition()
   const updateAreaConfig = useUpdateAreaConfiguration()
 
@@ -83,12 +84,85 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     return Array.from(groupedOperations.keys())
   }, [processor.area_configuration, groupedOperations])
 
+  // Initialize all areas as open when areas change
+  useEffect(() => {
+    setOpenAreas((prevOpenAreas) => {
+      const newOpenAreas = new Map<string, boolean>()
+      let hasChanges = false
+
+      sortedAreaNames.forEach((areaName) => {
+        // Keep existing state if it exists, otherwise default to collapsed
+        const isOpen = prevOpenAreas.get(areaName) ?? false
+        newOpenAreas.set(areaName, isOpen)
+
+        // Check if this is a new area
+        if (!prevOpenAreas.has(areaName)) {
+          hasChanges = true
+        }
+      })
+
+      // Only update state if areas actually changed
+      if (hasChanges || prevOpenAreas.size !== newOpenAreas.size) {
+        return newOpenAreas
+      }
+
+      return prevOpenAreas
+    })
+  }, [sortedAreaNames])
+
+  const toggleArea = (areaName: string) => {
+    setOpenAreas((prev) => {
+      const next = new Map(prev)
+      next.set(areaName, !prev.get(areaName))
+      return next
+    })
+  }
+
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string)
   }
 
   const handleDragOver = (event: DragOverEvent) => {
-    // Optional: Handle drag over for visual feedback
+    const { over, active } = event
+    if (!over) return
+
+    const activeId = active.id as string
+    const overId = over.id as string
+
+    // Only auto-expand when dragging operations, not when dragging areas
+    if (activeId.startsWith('area-')) {
+      return // Skip auto-expand when reordering areas
+    }
+
+    // Check if we're dragging over an area container
+    // Handle both formats: "areaName" (droppable) and "area-areaName" (sortable)
+    let targetAreaName: string | null = null
+
+    if (sortedAreaNames.includes(overId)) {
+      // Direct area name match (droppable id)
+      targetAreaName = overId
+    } else if (overId.startsWith('area-')) {
+      // Sortable area format: "area-{areaName}"
+      const areaName = overId.replace('area-', '')
+      if (sortedAreaNames.includes(areaName)) {
+        targetAreaName = areaName
+      }
+    } else {
+      // We're over an operation, check which area it belongs to
+      const overOperation = processor.operations.find((op) => op.id === overId)
+      if (overOperation && overOperation.area) {
+        targetAreaName = overOperation.area
+      }
+    }
+
+    // Auto-expand the target area if it's collapsed
+    if (targetAreaName && !openAreas.get(targetAreaName)) {
+      setOpenAreas((prev) => {
+        const next = new Map(prev)
+        next.set(targetAreaName, true)
+        return next
+      })
+    }
   }
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -148,9 +222,23 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     let targetPosition = activeOperation.position
 
     // Check if dropped over an area (container)
+    // Handle both formats: "areaName" (droppable) and "area-areaName" (sortable)
+    let droppedOnAreaName: string | null = null
+
     if (sortedAreaNames.includes(overId)) {
-      targetArea = overId
-      const areaOps = groupedOperations.get(overId) || []
+      // Direct area name match (droppable id)
+      droppedOnAreaName = overId
+    } else if (overId.startsWith('area-')) {
+      // Sortable area format: "area-{areaName}"
+      const areaName = overId.replace('area-', '')
+      if (sortedAreaNames.includes(areaName)) {
+        droppedOnAreaName = areaName
+      }
+    }
+
+    if (droppedOnAreaName) {
+      targetArea = droppedOnAreaName
+      const areaOps = groupedOperations.get(droppedOnAreaName) || []
       // Place at end of area
       targetPosition = areaOps.length > 0 ? areaOps[areaOps.length - 1].position + 1 : 1
     } else {
@@ -207,7 +295,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
   // Render static version during SSR, DnD version after hydration
   if (!isMounted) {
     return (
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="flex flex-col gap-4">
         {sortedAreaNames.map((areaName) => {
           const operations = groupedOperations.get(areaName) || []
           return (
@@ -215,6 +303,8 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
               key={areaName}
               areaName={areaName}
               operations={operations}
+              isOpen={openAreas.get(areaName) ?? false}
+              onToggle={() => toggleArea(areaName)}
             />
           )
         })}
@@ -231,9 +321,9 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     >
       <SortableContext
         items={sortedAreaNames.map((name) => `area-${name}`)}
-        strategy={horizontalListSortingStrategy}
+        strategy={verticalListSortingStrategy}
       >
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-4">
           {sortedAreaNames.map((areaName) => {
             const operations = groupedOperations.get(areaName) || []
             return (
@@ -241,6 +331,8 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
                 key={areaName}
                 areaName={areaName}
                 operations={operations}
+                isOpen={openAreas.get(areaName) ?? false}
+                onToggle={() => toggleArea(areaName)}
               />
             )
           })}
