@@ -1,3 +1,6 @@
+"use client"
+
+import { usePathname } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
   Breadcrumb,
@@ -14,12 +17,26 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { APP_NAME } from "@/lib/constants/app"
+import { useProcessorDetail } from "@/app/queries/processors/use-processor-detail"
 
 export default function ProcessorsLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const pathname = usePathname()
+
+  // Extract processor ID from pathname if on detail page
+  const processorIdMatch = pathname.match(/^\/proc\/([^\/]+)$/)
+  const processorId = processorIdMatch ? processorIdMatch[1] : null
+
+  // Fetch processor data only if on detail page
+  const { data: processor } = useProcessorDetail(processorId || "", {
+    enabled: !!processorId,
+  })
+
+  const isDetailPage = !!processorId
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -40,8 +57,22 @@ export default function ProcessorsLayout({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Processors</BreadcrumbPage>
+                  {isDetailPage ? (
+                    <BreadcrumbLink href="/proc">Processors</BreadcrumbLink>
+                  ) : (
+                    <BreadcrumbPage>Processors</BreadcrumbPage>
+                  )}
                 </BreadcrumbItem>
+                {isDetailPage && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>
+                        {processor?.processor_name || "Loading..."}
+                      </BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </>
+                )}
               </BreadcrumbList>
             </Breadcrumb>
           </div>

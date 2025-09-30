@@ -196,7 +196,6 @@ export type Database = {
           created_by: string
           deleted_at: string | null
           description: string | null
-          document_type: string | null
           id: string
           name: string
           organization_id: string
@@ -205,6 +204,7 @@ export type Database = {
           system_prompt: string | null
           tags: string[] | null
           updated_at: string
+          usage_description: string | null
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }
         Insert: {
@@ -214,7 +214,6 @@ export type Database = {
           created_by: string
           deleted_at?: string | null
           description?: string | null
-          document_type?: string | null
           id?: string
           name: string
           organization_id: string
@@ -223,6 +222,7 @@ export type Database = {
           system_prompt?: string | null
           tags?: string[] | null
           updated_at?: string
+          usage_description?: string | null
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Update: {
@@ -232,7 +232,6 @@ export type Database = {
           created_by?: string
           deleted_at?: string | null
           description?: string | null
-          document_type?: string | null
           id?: string
           name?: string
           organization_id?: string
@@ -241,6 +240,7 @@ export type Database = {
           system_prompt?: string | null
           tags?: string[] | null
           updated_at?: string
+          usage_description?: string | null
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Relationships: [
@@ -355,6 +355,27 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_processor_with_operations: {
+        Args: { p_processor_id: string }
+        Returns: {
+          area_configuration: Json
+          configuration: Json
+          created_at: string
+          created_by: string
+          created_by_name: string
+          operations: Json
+          processor_description: string
+          processor_id: string
+          processor_name: string
+          published_at: string
+          status: Database["public"]["Enums"]["processor_status"]
+          system_prompt: string
+          tags: string[]
+          updated_at: string
+          usage_description: string
+          visibility: Database["public"]["Enums"]["processor_visibility"]
+        }[]
+      }
       get_user_organizations: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -385,6 +406,29 @@ export type Database = {
       }
       get_user_processors: {
         Args: { p_include_archived?: boolean }
+        Returns: {
+          created_at: string
+          created_by: string
+          created_by_name: string
+          is_owner: boolean
+          operation_count: number
+          processor_description: string
+          processor_id: string
+          processor_name: string
+          published_at: string
+          status: Database["public"]["Enums"]["processor_status"]
+          tags: string[]
+          updated_at: string
+          usage_description: string
+          visibility: Database["public"]["Enums"]["processor_visibility"]
+        }[]
+      }
+      get_user_processors_debug: {
+        Args: {
+          p_include_archived?: boolean
+          p_org_id: string
+          p_user_id: string
+        }
         Returns: {
           created_at: string
           created_by: string

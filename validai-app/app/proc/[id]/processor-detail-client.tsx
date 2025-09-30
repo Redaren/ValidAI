@@ -40,16 +40,6 @@ export function ProcessorDetailClient({
 
   return (
     <div className="container mx-auto space-y-6 py-6">
-      {/* Back Navigation */}
-      <div>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/proc">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Processors
-          </Link>
-        </Button>
-      </div>
-
       {/* Processor Header */}
       <ProcessorHeader processor={processor} />
 

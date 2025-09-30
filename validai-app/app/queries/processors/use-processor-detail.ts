@@ -28,7 +28,7 @@ export interface ProcessorDetail {
   processor_id: string
   processor_name: string
   processor_description: string | null
-  document_type: string | null
+  usage_description: string | null
   status: ProcessorStatus
   visibility: ProcessorVisibility
   system_prompt: string | null
@@ -41,13 +41,14 @@ export interface ProcessorDetail {
   configuration: unknown | null
   tags: string[] | null
   created_by: string
+  created_by_name: string | null
   created_at: string
   updated_at: string
   published_at: string | null
   operations: Operation[]
 }
 
-export function useProcessorDetail(processorId: string) {
+export function useProcessorDetail(processorId: string, options?: { enabled?: boolean }) {
   const supabase = createClient()
 
   return useQuery({
@@ -72,6 +73,7 @@ export function useProcessorDetail(processorId: string) {
       return processor
     },
     staleTime: 30 * 1000, // 30 seconds
+    enabled: options?.enabled !== false && !!processorId,
   })
 }
 
