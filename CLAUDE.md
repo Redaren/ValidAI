@@ -189,6 +189,21 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 - **ALWAYS** use devtools middleware for debugging
 - **ALWAYS** export stores through `stores/index.ts`
 
+### Validation Schema Management Rules
+- **ALWAYS** create Zod validation schemas in the `lib/validations/` directory
+- **NEVER** define validation schemas inline in components or hooks
+- **ALWAYS** use common schemas from `common-schemas.ts` for reusable primitives (names, descriptions, tags, UUIDs)
+- **ALWAYS** create feature-specific schema files (e.g., `processor-schemas.ts`, `operation-schemas.ts`)
+- **ALWAYS** export schemas through `lib/validations/index.ts` for centralized imports
+- **ALWAYS** include JSDoc comments explaining what each schema validates and where it's used
+- **ALWAYS** export inferred TypeScript types alongside schemas (e.g., `export type CreateProcessorInput = z.infer<typeof createProcessorSchema>`)
+
+### Form Management Rules
+- **ALWAYS** use React Hook Form for forms with 3+ fields or complex validation
+- **ALWAYS** integrate with Zod schemas using `@hookform/resolvers/zod` (via `zodResolver`)
+- **NEVER** manually manage form state with `useState` for multi-field forms
+- Simple single-field inputs (search bars, filters) don't require React Hook Form
+
 ### Example Routes
 - `/demo` - Original Supabase demo
 

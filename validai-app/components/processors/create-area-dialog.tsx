@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { createAreaSchema } from "@/lib/validations"
 
 interface CreateAreaDialogProps {
   open: boolean
@@ -35,20 +36,16 @@ export function CreateAreaDialog({
     e.preventDefault()
     setError(null)
 
-    const trimmedName = name.trim()
+    // Validate using Zod schema
+    const schema = createAreaSchema(existingNames)
+    const result = schema.safeParse(name)
 
-    // Validation
-    if (!trimmedName) {
-      setError("Area name cannot be empty")
+    if (!result.success) {
+      setError(result.error.errors[0].message)
       return
     }
 
-    if (existingNames.includes(trimmedName)) {
-      setError("An area with this name already exists")
-      return
-    }
-
-    onCreate(trimmedName)
+    onCreate(result.data)
   }
 
   const handleOpenChange = (open: boolean) => {

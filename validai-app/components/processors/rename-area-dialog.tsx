@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { renameAreaSchema } from "@/lib/validations"
 
 interface RenameAreaDialogProps {
   open: boolean
@@ -37,27 +38,22 @@ export function RenameAreaDialog({
     e.preventDefault()
     setError(null)
 
-    const trimmedName = newName.trim()
+    // Validate using Zod schema
+    const schema = renameAreaSchema(existingNames, currentName)
+    const result = schema.safeParse(newName)
 
-    // Validation
-    if (!trimmedName) {
-      setError("Area name cannot be empty")
+    if (!result.success) {
+      setError(result.error.errors[0].message)
       return
     }
 
     // No change - just close dialog
-    if (trimmedName === currentName) {
+    if (result.data === currentName) {
       onOpenChange(false)
       return
     }
 
-    // Check for duplicates (existingNames already excludes current name)
-    if (existingNames.includes(trimmedName)) {
-      setError("An area with this name already exists")
-      return
-    }
-
-    onRename(trimmedName)
+    onRename(result.data)
   }
 
   const handleOpenChange = (open: boolean) => {
