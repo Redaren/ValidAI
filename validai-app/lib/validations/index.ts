@@ -20,6 +20,22 @@ export {
   renameAreaSchema,
 } from './area-schemas'
 
+// Operation schemas
+export {
+  createGenericOperationSchema,
+  createOperationSchema,
+  updateGenericOperationSchema,
+  updateOperationSchema,
+  operationNameSchema,
+  operationDescriptionSchema,
+  operationPromptSchema,
+  type CreateGenericOperationInput,
+  type CreateOperationInput,
+  type UpdateGenericOperationInput,
+  type UpdateOperationInput,
+  type CreateOperationPayload,
+} from './operation-schemas'
+
 // Common reusable schemas
 export {
   nameSchema,

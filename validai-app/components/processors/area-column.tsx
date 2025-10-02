@@ -17,6 +17,7 @@ import { useDroppable } from "@dnd-kit/core"
 import { OperationCard } from "./operation-card"
 import { RenameAreaDialog } from "./rename-area-dialog"
 import { DeleteAreaDialog } from "./delete-area-dialog"
+import { OperationSheet } from "./operation-sheet"
 import { Plus, GripVertical, ChevronDown, ChevronRight, Pencil, Trash2, MoreHorizontal } from "lucide-react"
 
 /**
@@ -27,6 +28,8 @@ interface AreaColumnProps {
   areaName: string
   /** Operations within this area, pre-sorted by position */
   operations: Operation[]
+  /** The processor ID for creating operations */
+  processorId: string
   /** Whether the area is expanded or collapsed */
   isOpen: boolean
   /** Callback to toggle expand/collapse state */
@@ -94,6 +97,7 @@ interface AreaColumnProps {
 export function AreaColumn({
   areaName,
   operations,
+  processorId,
   isOpen,
   onToggle,
   existingAreaNames,
@@ -105,6 +109,7 @@ export function AreaColumn({
 }: AreaColumnProps) {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isCreateOperationOpen, setIsCreateOperationOpen] = useState(false)
 
   /**
    * Make the area itself sortable for reordering.
@@ -192,6 +197,7 @@ export function AreaColumn({
                 <span className="font-semibold">{areaName}</span>
               </CollapsibleTrigger>
             </div>
+            {/* Area Options Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -206,6 +212,12 @@ export function AreaColumn({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => setIsCreateOperationOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Operation
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setIsRenameDialogOpen(true)}
                   disabled={isRenaming}
@@ -234,7 +246,11 @@ export function AreaColumn({
             >
               {operations.length > 0 ? (
                 operations.map((operation) => (
-                  <OperationCard key={operation.id} operation={operation} />
+                  <OperationCard
+                    key={operation.id}
+                    operation={operation}
+                    processorId={processorId}
+                  />
                 ))
               ) : (
                 <div className="flex h-32 items-center justify-center rounded-lg border-2 border-dashed text-sm text-muted-foreground">
@@ -242,12 +258,6 @@ export function AreaColumn({
                 </div>
               )}
             </SortableContext>
-
-            {/* Add Operation Button */}
-            <Button variant="outline" className="w-full" size="sm" disabled>
-              <Plus className="h-4 w-4" />
-              <span className="ml-1">Add Operation</span>
-            </Button>
           </CardContent>
         </CollapsibleContent>
       </Card>
@@ -269,6 +279,14 @@ export function AreaColumn({
         otherAreaNames={existingAreaNames}
         onDelete={handleDelete}
         isLoading={isDeleting}
+      />
+
+      <OperationSheet
+        open={isCreateOperationOpen}
+        onOpenChange={setIsCreateOperationOpen}
+        processorId={processorId}
+        areaName={areaName}
+        mode="create"
       />
     </Collapsible>
   )

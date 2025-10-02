@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { Operation } from "@/app/queries/processors/use-processor-detail"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Pencil } from "lucide-react"
+import { OperationSheet } from "./operation-sheet"
 
 /**
  * Props for the OperationCard component.
@@ -13,12 +15,14 @@ import { GripVertical, Pencil } from "lucide-react"
 interface OperationCardProps {
   /** The operation to display */
   operation: Operation
+  /** The processor ID for editing operations */
+  processorId: string
 }
 
 /**
- * Operation Card Component - Sortable Operation Item
+ * Operation Card Component - Sortable Operation Item with Edit
  *
- * Displays a single operation with drag-and-drop functionality.
+ * Displays a single operation with drag-and-drop functionality and edit capability.
  * Operations can be dragged within their area or moved to other areas.
  *
  * ## Drag-and-Drop Behavior
@@ -33,7 +37,7 @@ interface OperationCardProps {
  * - **Type Badge**: Color-coded by operation type (extraction, validation, etc.)
  * - **Name**: Operation name (truncated if too long)
  * - **Description**: Optional description text (truncated)
- * - **Edit Button**: Appears on hover (currently disabled)
+ * - **Edit Button**: Appears on hover, opens edit sheet
  *
  * ## Operation Types & Colors
  *
@@ -42,12 +46,22 @@ interface OperationCardProps {
  * - **rating**: Purple
  * - **classification**: Orange
  * - **analysis**: Pink
+ * - **generic**: Gray
  * - **default**: Gray
  *
+ * ## Edit Functionality
+ *
+ * - Clicking the pencil icon opens the OperationSheet in edit mode
+ * - Changes are immediately reflected in the UI via cache invalidation
+ * - No page refresh required after editing
+ *
  * @param operation - The operation data to display
- * @returns A draggable operation card
+ * @param processorId - The processor ID for edit functionality
+ * @returns A draggable, editable operation card
  */
-export function OperationCard({ operation }: OperationCardProps) {
+export function OperationCard({ operation, processorId }: OperationCardProps) {
+  const [isEditOpen, setIsEditOpen] = useState(false)
+
   /**
    * Makes the operation sortable within its area.
    * Uses operation UUID as the unique drag identifier.
@@ -88,52 +102,66 @@ export function OperationCard({ operation }: OperationCardProps) {
         return "bg-orange-500/10 text-orange-700 dark:text-orange-400"
       case "analysis":
         return "bg-pink-500/10 text-pink-700 dark:text-pink-400"
+      case "generic":
+        return "bg-gray-500/10 text-gray-700 dark:text-gray-400"
       default:
         return "bg-gray-500/10 text-gray-700 dark:text-gray-400"
     }
   }
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="group flex items-center gap-3 rounded-md border bg-card px-3 py-2 hover:bg-accent/50 transition-colors"
-    >
-      {/* Drag Handle */}
-      <button
-        className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing flex-shrink-0"
-        {...attributes}
-        {...listeners}
+    <>
+      <div
+        ref={setNodeRef}
+        style={style}
+        className="group flex items-center gap-3 rounded-md border bg-card px-3 py-2 hover:bg-accent/50 transition-colors"
       >
-        <GripVertical className="h-4 w-4" />
-      </button>
+        {/* Drag Handle */}
+        <button
+          className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing flex-shrink-0"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
 
-      {/* Type Badge */}
-      <Badge className={`${getOperationTypeColor(operation.operation_type)} text-xs flex-shrink-0`}>
-        {operation.operation_type}
-      </Badge>
+        {/* Type Badge */}
+        <Badge className={`${getOperationTypeColor(operation.operation_type)} text-xs flex-shrink-0`}>
+          {operation.operation_type}
+        </Badge>
 
-      {/* Name */}
-      <span className="font-medium text-sm truncate flex-shrink-0 min-w-0">
-        {operation.name}
-      </span>
-
-      {/* Description */}
-      {operation.description && (
-        <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-          {operation.description}
+        {/* Name */}
+        <span className="font-medium text-sm truncate flex-shrink-0 min-w-0">
+          {operation.name}
         </span>
-      )}
 
-      {/* Edit Icon */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        disabled
-      >
-        <Pencil className="h-4 w-4" />
-      </Button>
-    </div>
+        {/* Description */}
+        {operation.description && (
+          <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+            {operation.description}
+          </span>
+        )}
+
+        {/* Edit Button - Now Enabled */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => setIsEditOpen(true)}
+          title="Edit operation"
+        >
+          <Pencil className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Edit Operation Sheet */}
+      <OperationSheet
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        processorId={processorId}
+        operation={operation}
+        mode="edit"
+      />
+    </>
   )
 }

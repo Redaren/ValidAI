@@ -481,6 +481,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
               key={areaName}
               areaName={areaName}
               operations={operations}
+              processorId={processor.processor_id}
               isOpen={openAreas.get(areaName) ?? false}
               onToggle={() => toggleArea(areaName)}
               existingAreaNames={otherAreaNames}
@@ -517,6 +518,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
                 key={areaName}
                 areaName={areaName}
                 operations={operations}
+                processorId={processor.processor_id}
                 isOpen={openAreas.get(areaName) ?? false}
                 onToggle={() => toggleArea(areaName)}
                 existingAreaNames={otherAreaNames}
