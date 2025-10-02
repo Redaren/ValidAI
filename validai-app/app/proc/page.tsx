@@ -1,12 +1,15 @@
 "use client"
 
+import { useState } from "react"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ProcessorsTable } from "@/components/processors/processors-table"
+import { CreateProcessorSheet } from "@/components/processors/create-processor-sheet"
 import { useUserProcessors } from "@/app/queries/processors/use-processors"
 
 export default function ProcessorsPage() {
   const { data: processors, isLoading, error } = useUserProcessors(false)
+  const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false)
 
   if (error) {
     return (
@@ -28,9 +31,9 @@ export default function ProcessorsPage() {
             Create and manage AI-powered document analysis templates
           </p>
         </div>
-        <Button disabled>
+        <Button onClick={() => setIsCreateSheetOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          New Processor
+          New
         </Button>
       </div>
 
@@ -50,12 +53,17 @@ export default function ProcessorsPage() {
             Get started by creating your first document processor to analyze contracts,
             invoices, or any other documents.
           </p>
-          <Button className="mt-4" disabled>
+          <Button className="mt-4" onClick={() => setIsCreateSheetOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Create your first processor
           </Button>
         </div>
       )}
+
+      <CreateProcessorSheet
+        open={isCreateSheetOpen}
+        onOpenChange={setIsCreateSheetOpen}
+      />
     </div>
   )
 }

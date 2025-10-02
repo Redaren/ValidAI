@@ -177,33 +177,37 @@ export function AreaColumn({
       >
         <CardHeader className="border-b py-3">
           <CardTitle className="flex items-center justify-between text-base">
-            <div className="flex items-center gap-2">
-              {/* Drag handle for area */}
-              <button
-                className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing"
-                {...sortableAttributes}
-                {...sortableListeners}
-              >
-                <GripVertical className="h-4 w-4" />
-              </button>
+            {/* Drag handle - outside of CollapsibleTrigger */}
+            <button
+              className="cursor-grab touch-none text-muted-foreground hover:text-foreground active:cursor-grabbing shrink-0"
+              onClick={(e) => e.stopPropagation()}
+              {...sortableAttributes}
+              {...sortableListeners}
+            >
+              <GripVertical className="h-4 w-4" />
+            </button>
 
-              {/* Collapsible trigger */}
-              <CollapsibleTrigger className="flex items-center gap-1 hover:text-foreground">
+            {/* Collapsible trigger - spans most of the header */}
+            <CollapsibleTrigger className="flex items-center flex-1 gap-2 cursor-pointer px-2 py-1 -my-1">
+              <div className="flex items-center gap-1">
                 {isOpen ? (
                   <ChevronDown className="h-4 w-4" />
                 ) : (
                   <ChevronRight className="h-4 w-4" />
                 )}
                 <span className="font-semibold">{areaName}</span>
-              </CollapsibleTrigger>
-            </div>
-            {/* Area Options Menu */}
+              </div>
+              {/* Empty space in the middle is also clickable */}
+              <div className="flex-1" />
+            </CollapsibleTrigger>
+
+            {/* Area Options Menu - outside of CollapsibleTrigger */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 shrink-0"
                   disabled={isRenaming || isDeleting}
                   title="Area options"
                 >

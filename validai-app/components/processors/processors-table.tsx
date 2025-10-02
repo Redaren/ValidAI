@@ -14,6 +14,7 @@ import {
 import { Lock, Users, Eye, MoreHorizontal } from "lucide-react"
 import { formatDistanceToNow } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 import {
   Table,
@@ -53,10 +54,14 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         accessorKey: "processor_name",
         header: "Name",
         cell: ({ row }) => {
+          const processor = row.original
           return (
-            <div className="font-semibold">
+            <Link
+              href={`/proc/${processor.processor_id}`}
+              className="font-semibold hover:underline"
+            >
               {row.getValue("processor_name")}
-            </div>
+            </Link>
           )
         },
       },
@@ -128,7 +133,6 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 }}
               >
                 <Eye className="h-4 w-4" />
-                <span className="ml-1">View</span>
               </Button>
 
               <DropdownMenu>
