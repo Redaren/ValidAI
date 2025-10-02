@@ -26,16 +26,18 @@ export default function ProcessorsLayout({
 }) {
   const pathname = usePathname()
 
-  // Extract processor ID from pathname if on detail page
-  const processorIdMatch = pathname.match(/^\/proc\/([^\/]+)$/)
+  // Extract processor ID from pathname if on detail or workbench page
+  const processorIdMatch = pathname.match(/^\/proc\/([^\/]+)(?:\/workbench)?$/)
   const processorId = processorIdMatch ? processorIdMatch[1] : null
+  const isWorkbenchPage = pathname.includes('/workbench')
 
-  // Fetch processor data only if on detail page
+  // Fetch processor data only if on detail or workbench page
   const { data: processor } = useProcessorDetail(processorId || "", {
     enabled: !!processorId,
   })
 
-  const isDetailPage = !!processorId
+  const isDetailPage = !!processorId && !isWorkbenchPage
+  const hasProcessor = !!processorId
 
   return (
     <SidebarProvider>
@@ -57,19 +59,33 @@ export default function ProcessorsLayout({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  {isDetailPage ? (
+                  {hasProcessor ? (
                     <BreadcrumbLink href="/proc">Processors</BreadcrumbLink>
                   ) : (
                     <BreadcrumbPage>Processors</BreadcrumbPage>
                   )}
                 </BreadcrumbItem>
-                {isDetailPage && (
+                {hasProcessor && (
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>
-                        {processor?.processor_name || "Loading..."}
-                      </BreadcrumbPage>
+                      {isWorkbenchPage ? (
+                        <BreadcrumbLink href={`/proc/${processorId}`}>
+                          {processor?.processor_name || "Loading..."}
+                        </BreadcrumbLink>
+                      ) : (
+                        <BreadcrumbPage>
+                          {processor?.processor_name || "Loading..."}
+                        </BreadcrumbPage>
+                      )}
+                    </BreadcrumbItem>
+                  </>
+                )}
+                {isWorkbenchPage && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>Workbench</BreadcrumbPage>
                     </BreadcrumbItem>
                   </>
                 )}

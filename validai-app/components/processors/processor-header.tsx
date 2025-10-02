@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { ProcessorDetail } from "@/app/queries/processors/use-processor-detail"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,7 +25,8 @@ import {
   Pencil,
   Play,
   Upload,
-  Users
+  Users,
+  TestTube
 } from "lucide-react"
 
 interface ProcessorHeaderProps {
@@ -98,6 +100,12 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <Link href={`/proc/${processor.processor_id}/workbench`}>
+            <Button variant="outline" size="icon" title="Testbench">
+              <TestTube className="h-4 w-4" />
+              <span className="sr-only">Testbench</span>
+            </Button>
+          </Link>
           <Button variant="outline" size="icon" disabled title="Edit">
             <Pencil className="h-4 w-4" />
             <span className="sr-only">Edit</span>
