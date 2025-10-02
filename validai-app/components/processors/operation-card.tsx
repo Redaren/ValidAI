@@ -6,8 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { GripVertical, Pencil } from "lucide-react"
+import { GripVertical, Pencil, Trash2 } from "lucide-react"
 import { OperationSheet } from "./operation-sheet"
+import { DeleteOperationDialog } from "./delete-operation-dialog"
+import { useDeleteOperation } from "@/app/queries/operations/use-operations"
 
 /**
  * Props for the OperationCard component.
@@ -61,6 +63,8 @@ interface OperationCardProps {
  */
 export function OperationCard({ operation, processorId }: OperationCardProps) {
   const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const deleteOperation = useDeleteOperation()
 
   /**
    * Makes the operation sortable within its area.
@@ -109,6 +113,22 @@ export function OperationCard({ operation, processorId }: OperationCardProps) {
     }
   }
 
+  /**
+   * Handles operation deletion.
+   * Calls the mutation and closes the dialog on success.
+   */
+  const handleDelete = async () => {
+    try {
+      await deleteOperation.mutateAsync({
+        id: operation.id,
+        processorId: processorId,
+      })
+      setIsDeleteDialogOpen(false)
+    } catch (error) {
+      console.error("Failed to delete operation:", error)
+    }
+  }
+
   return (
     <>
       <div
@@ -142,6 +162,17 @@ export function OperationCard({ operation, processorId }: OperationCardProps) {
           </span>
         )}
 
+        {/* Delete Button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => setIsDeleteDialogOpen(true)}
+          title="Delete operation"
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+
         {/* Edit Button - Now Enabled */}
         <Button
           variant="ghost"
@@ -161,6 +192,15 @@ export function OperationCard({ operation, processorId }: OperationCardProps) {
         processorId={processorId}
         operation={operation}
         mode="edit"
+      />
+
+      {/* Delete Operation Dialog */}
+      <DeleteOperationDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        operationName={operation.name}
+        onDelete={handleDelete}
+        isLoading={deleteOperation.isPending}
       />
     </>
   )
