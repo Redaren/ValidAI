@@ -49,6 +49,8 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  let executionId: string | null = null
+
   try {
     const body: WorkbenchTestRequest = await req.json()
 
@@ -59,6 +61,48 @@ serve(async (req) => {
     // Create Supabase client
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+    // Get user ID from JWT
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) {
+      throw new Error('No authorization header')
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+
+    if (userError || !user) {
+      throw new Error('Invalid user token')
+    }
+
+    // Get organization ID from JWT
+    const { data: orgData } = await supabase.rpc('get_llm_config_for_run', {
+      p_processor_id: body.processor_id
+    })
+
+    if (!orgData) {
+      throw new Error('Could not determine organization')
+    }
+
+    // Create initial execution record
+    const { data: execution, error: execError } = await supabase
+      .from('workbench_executions')
+      .insert({
+        processor_id: body.processor_id,
+        user_id: user.id,
+        organization_id: orgData.organization_id,
+        status: 'pending',
+        prompt: body.new_prompt,
+        settings: body.settings
+      })
+      .select()
+      .single()
+
+    if (execError || !execution) {
+      throw new Error(`Failed to create execution record: ${execError?.message}`)
+    }
+
+    executionId = execution.id
 
     // Resolve LLM configuration for the processor
     const { data: llmConfig, error: llmError } = await supabase.rpc('get_llm_config_for_run', {
@@ -175,6 +219,15 @@ serve(async (req) => {
     if (body.settings.stop_sequences) requestParams.stop_sequences = body.settings.stop_sequences
     if (body.settings.thinking) requestParams.thinking = body.settings.thinking
 
+    // Update status to processing
+    await supabase
+      .from('workbench_executions')
+      .update({
+        status: 'processing',
+        model_used: modelToUse
+      })
+      .eq('id', executionId)
+
     // Execute API call
     const startTime = Date.now()
     const response = await anthropic.messages.create(requestParams)
@@ -197,6 +250,7 @@ serve(async (req) => {
 
     // Build result
     const result = {
+      execution_id: executionId,  // Include execution ID for client subscription
       response: responseText,
       thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
       citations: citations.length > 0 ? citations : undefined,
@@ -211,6 +265,19 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     }
 
+    // Update execution record with completion
+    await supabase
+      .from('workbench_executions')
+      .update({
+        status: 'completed',
+        response: responseText,
+        thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : null,
+        citations: citations.length > 0 ? citations : null,
+        tokens_used: result.tokensUsed,
+        execution_time_ms: executionTime
+      })
+      .eq('id', executionId)
+
     return new Response(
       JSON.stringify(result),
       {
@@ -223,6 +290,26 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in execute-workbench-test:', error)
+
+    // Update execution record with error if we have an execution ID
+    if (executionId) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
+        const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
+        await supabase
+          .from('workbench_executions')
+          .update({
+            status: 'failed',
+            error_message: error.message || error.toString()
+          })
+          .eq('id', executionId)
+      } catch (updateError) {
+        console.error('Failed to update execution with error:', updateError)
+      }
+    }
 
     return new Response(
       JSON.stringify({

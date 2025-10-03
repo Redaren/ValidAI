@@ -115,6 +115,7 @@ export type WorkbenchTestInput = z.infer<typeof workbenchTestSchema>
  * Workbench test execution response
  */
 export const workbenchTestResponseSchema = z.object({
+  execution_id: z.string().uuid(),  // For real-time subscription
   response: z.string(),
   thinking_blocks: z.array(z.any()).optional(),
   citations: z.array(z.any()).optional(),
@@ -130,3 +131,28 @@ export const workbenchTestResponseSchema = z.object({
 })
 
 export type WorkbenchTestResponse = z.infer<typeof workbenchTestResponseSchema>
+
+/**
+ * Workbench execution record (from database)
+ */
+export const workbenchExecutionSchema = z.object({
+  id: z.string().uuid(),
+  processor_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  organization_id: z.string().uuid(),
+  status: z.enum(['pending', 'processing', 'completed', 'failed', 'cancelled']),
+  prompt: z.string(),
+  settings: z.any(),
+  model_used: z.string().optional().nullable(),
+  response: z.string().optional().nullable(),
+  partial_response: z.string().optional().nullable(),
+  thinking_blocks: z.any().optional().nullable(),
+  citations: z.any().optional().nullable(),
+  tokens_used: z.any().optional().nullable(),
+  execution_time_ms: z.number().optional().nullable(),
+  error_message: z.string().optional().nullable(),
+  created_at: z.string(),
+  updated_at: z.string()
+})
+
+export type WorkbenchExecution = z.infer<typeof workbenchExecutionSchema>

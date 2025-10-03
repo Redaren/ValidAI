@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type { ConversationMessage } from '@/lib/validations'
+import type { ConversationMessage, WorkbenchExecution } from '@/lib/validations'
+import { createClient } from '@/lib/supabase/client'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 /**
  * Test result from running an operation test
@@ -56,6 +58,7 @@ export type SelectedFile = {
  * - LLM configuration
  * - Multi-turn conversations with prompt caching
  * - Test execution and results
+ * - Real-time execution tracking via Supabase Realtime
  */
 export interface WorkbenchStore {
   // Core State
@@ -77,6 +80,11 @@ export interface WorkbenchStore {
   cachedDocumentContent: string | null  // Keep exact content for cache consistency
   cacheEnabled: boolean
 
+  // Real-time Execution Tracking
+  currentExecutionId: string | null
+  executionStatus: 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
+  realtimeChannel: RealtimeChannel | null
+
   // Results
   isRunning: boolean
   output: TestResult | null
@@ -94,6 +102,9 @@ export interface WorkbenchStore {
   addToConversation: (message: ConversationMessage) => void
   clearConversation: () => void
   clearOutput: () => void
+  subscribeToExecution: (executionId: string) => void
+  unsubscribeFromExecution: () => void
+  handleExecutionUpdate: (execution: WorkbenchExecution) => void
   reset: () => void
 }
 
@@ -121,6 +132,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       conversationHistory: [],
       cachedDocumentContent: null,
       cacheEnabled: false,
+      currentExecutionId: null,
+      executionStatus: 'idle',
+      realtimeChannel: null,
       isRunning: false,
       output: null,
       error: null,
@@ -205,7 +219,88 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         })
       },
 
+      subscribeToExecution: (executionId: string) => {
+        // Unsubscribe from any existing channel
+        get().unsubscribeFromExecution()
+
+        const supabase = createClient()
+
+        // Create channel for this execution
+        const channel = supabase
+          .channel(`workbench-execution-${executionId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'workbench_executions',
+              filter: `id=eq.${executionId}`
+            },
+            (payload) => {
+              console.log('Realtime update received:', payload)
+              const execution = payload.new as WorkbenchExecution
+              get().handleExecutionUpdate(execution)
+            }
+          )
+          .subscribe()
+
+        set({
+          currentExecutionId: executionId,
+          realtimeChannel: channel,
+          executionStatus: 'pending'
+        })
+      },
+
+      unsubscribeFromExecution: () => {
+        const channel = get().realtimeChannel
+        if (channel) {
+          channel.unsubscribe()
+        }
+        set({
+          currentExecutionId: null,
+          realtimeChannel: null,
+          executionStatus: 'idle'
+        })
+      },
+
+      handleExecutionUpdate: (execution: WorkbenchExecution) => {
+        console.log('Processing execution update:', execution)
+
+        // Update execution status
+        set({ executionStatus: execution.status as any })
+
+        // Handle completed execution
+        if (execution.status === 'completed' && execution.response) {
+          // This will be handled by the mutation success callback
+          // Just update the status here
+          set({
+            isRunning: false,
+            executionStatus: 'completed'
+          })
+        }
+
+        // Handle failed execution
+        if (execution.status === 'failed') {
+          set({
+            isRunning: false,
+            executionStatus: 'failed',
+            error: execution.error_message || 'Execution failed'
+          })
+        }
+
+        // Update to processing state
+        if (execution.status === 'processing') {
+          set({
+            isRunning: true,
+            executionStatus: 'processing'
+          })
+        }
+      },
+
       reset: () => {
+        // Unsubscribe before resetting
+        get().unsubscribeFromExecution()
+
         set({
           selectedFile: null,
           selectedModel: 'claude-3-5-sonnet-20241022',
@@ -218,6 +313,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           conversationHistory: [],
           cachedDocumentContent: null,
           cacheEnabled: false,
+          currentExecutionId: null,
+          executionStatus: 'idle',
+          realtimeChannel: null,
           isRunning: false,
           output: null,
           error: null

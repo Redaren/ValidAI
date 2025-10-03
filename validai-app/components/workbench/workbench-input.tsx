@@ -53,13 +53,16 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     toolUse,
     cacheEnabled,
     isRunning,
+    executionStatus,
     conversationHistory,
     setFile,
     setModel,
     updateOperationPrompt,
     toggleFeature,
     toggleCaching,
-    addToConversation
+    addToConversation,
+    subscribeToExecution,
+    unsubscribeFromExecution
   } = useWorkbenchStore()
 
   const { data: availableModels, isLoading: modelsLoading } = useAvailableLLMModels()
@@ -125,6 +128,11 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         }
       })
 
+      // Subscribe to real-time updates for this execution
+      if (result.execution_id) {
+        subscribeToExecution(result.execution_id)
+      }
+
       // Add to conversation history
       addToConversation({
         role: 'user',
@@ -142,8 +150,14 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
       // Clear the prompt for next message
       updateOperationPrompt('')
 
+      // Unsubscribe after getting the result (execution is complete)
+      setTimeout(() => {
+        unsubscribeFromExecution()
+      }, 1000) // Small delay to ensure we receive the final update
+
     } catch (error) {
       console.error('Test execution failed:', error)
+      unsubscribeFromExecution()
     }
   }
 

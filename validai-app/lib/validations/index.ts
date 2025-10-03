@@ -52,9 +52,11 @@ export {
   workbenchSettingsSchema,
   workbenchTestSchema,
   workbenchTestResponseSchema,
+  workbenchExecutionSchema,
   type ThinkingConfig,
   type ConversationMessage,
   type WorkbenchSettings,
   type WorkbenchTestInput,
   type WorkbenchTestResponse,
+  type WorkbenchExecution,
 } from './workbench-schemas'

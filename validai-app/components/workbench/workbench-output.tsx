@@ -25,11 +25,29 @@ export function WorkbenchOutput() {
   const {
     conversationHistory,
     cacheEnabled,
+    executionStatus,
     clearConversation,
     clearOutput
   } = useWorkbenchStore()
 
   const workbenchTest = useWorkbenchTest()
+
+  // Show status badge for current execution
+  const getStatusBadge = () => {
+    if (executionStatus === 'pending') {
+      return <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-700">⏳ Pending</Badge>
+    }
+    if (executionStatus === 'processing') {
+      return <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700">⚡ Processing</Badge>
+    }
+    if (executionStatus === 'completed') {
+      return <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700">✓ Completed</Badge>
+    }
+    if (executionStatus === 'failed') {
+      return <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-700">✗ Failed</Badge>
+    }
+    return null
+  }
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -124,6 +142,7 @@ export function WorkbenchOutput() {
         {/* Header with actions */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
+            {getStatusBadge()}
             <Badge variant="outline" className="gap-1">
               <Coins className="h-3 w-3" />
               {totalTokens} tokens total
