@@ -116,19 +116,33 @@ serve(async (req) => {
     // Use model from request or fallback to resolved config
     const modelToUse = body.settings.model_id || llmConfig.model
 
-    // Decrypt API key (service role only can call this)
-    const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
-      ciphertext: llmConfig.api_key_encrypted,
-      org_id: llmConfig.organization_id
-    })
+    // Get API key: use organization key if configured, otherwise use global env var
+    let apiKey: string | null = null
 
-    if (decryptError || !decryptedKey) {
-      throw new Error(`Failed to decrypt API key: ${decryptError?.message || 'Unknown error'}`)
+    if (llmConfig.api_key_encrypted) {
+      // Organization has custom API key - decrypt it
+      const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+        ciphertext: llmConfig.api_key_encrypted,
+        org_id: llmConfig.organization_id
+      })
+
+      if (decryptError || !decryptedKey) {
+        throw new Error(`Failed to decrypt organization API key: ${decryptError?.message || 'Unknown error'}`)
+      }
+
+      apiKey = decryptedKey
+    } else {
+      // No organization key - use global API key from environment
+      apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+
+      if (!apiKey) {
+        throw new Error('No API key available. Please configure ANTHROPIC_API_KEY environment variable or set organization API key.')
+      }
     }
 
     // Initialize Anthropic client
     const anthropic = new Anthropic({
-      apiKey: decryptedKey
+      apiKey
     })
 
     // Build system message with optional caching

@@ -878,22 +878,29 @@ Future organization features:
 
 ### API Key Security
 
-**Storage:**
-- Encrypted at rest using `encrypt_api_key(plaintext, org_id)`
+**Current Implementation (Pre-Production):**
+- Global API key stored in Edge Function environment variable (`ANTHROPIC_API_KEY`)
+- Used when organization has no custom API key configured
+- Suitable for beta/preview before commercial launch
+- Simple, secure, and allows immediate testing
+
+**Organization API Keys (Future/Enterprise):**
+- Custom keys encrypted at rest using `encrypt_api_key(plaintext, org_id)`
 - Organization-specific encryption keys
 - Stored in `organizations.llm_configuration.api_keys_encrypted`
-
-**Decryption:**
-- Only service-role Edge Function can decrypt
-- `decrypt_api_key(ciphertext, org_id)` restricted to service-role
+- Only service-role Edge Function can decrypt via `decrypt_api_key()`
 - Never sent to client
-- Used only for Anthropic API calls
-
-**Best Practices:**
-- Keys encrypted using pgcrypto with organization salt
-- Decrypted in Edge Function memory only
-- Never logged or persisted decrypted
 - Rotation supported (update encrypted value)
+
+**Edge Function Logic:**
+```typescript
+// Falls back: Organization key → Global env var
+if (llmConfig.api_key_encrypted) {
+  apiKey = await decrypt_api_key(llmConfig.api_key_encrypted, org_id)
+} else {
+  apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+}
+```
 
 ### Row Level Security
 

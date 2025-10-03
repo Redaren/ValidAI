@@ -185,6 +185,13 @@ Result:
 
 ### API Key Storage
 
+**Current Implementation (Pre-Production):**
+- Global API key stored in Edge Function environment variable (`ANTHROPIC_API_KEY`)
+- Enables immediate testing without organization setup
+- Used as fallback when organization has no custom key
+- Suitable for beta/preview deployments
+
+**Organization-Level Keys (Enterprise Feature):**
 API keys are encrypted using pgcrypto with organization-specific keys:
 
 ```
@@ -194,7 +201,7 @@ Plaintext API Key
        ↓
 Base64 Encoded Ciphertext
        ↓
-Stored in JSONB
+Stored in organizations.llm_configuration.api_keys_encrypted
 ```
 
 **Security Features**:
@@ -203,16 +210,28 @@ Stored in JSONB
 - Decrypt function restricted to service role
 - Keys never sent to client
 
+**Edge Function Resolution:**
+```typescript
+// Priority: Organization key → Global env var
+if (llmConfig.api_key_encrypted) {
+  // Use organization's custom key
+  apiKey = await decrypt_api_key(llmConfig.api_key_encrypted, org_id)
+} else {
+  // Fallback to global key
+  apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+}
+```
+
 ### Access Control
 
-Current implementation (Phase 1):
-- All authenticated users can read global settings
-- Users can modify their organization's configuration
+Current implementation:
+- All users use global API key by default
+- Organization custom keys require encryption setup
 - Decrypt function limited to service role
 
-Future implementation (Phase 2):
+Future implementation:
 - Role-based access (admin, member, viewer)
-- Plan-based features (free, pro, enterprise)
+- Plan-based features (free: global key, pro/enterprise: custom keys)
 - Audit logging for configuration changes
 
 ## Usage Patterns
