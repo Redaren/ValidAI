@@ -20,7 +20,11 @@
       "Bash(gh issue view:*)",
       "mcp__supabase__generate_typescript_types",
       "Bash(git ls-files:*)",
-      "mcp__supabase__list_migrations"
+      "mcp__supabase__list_migrations",
+      "WebSearch",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(git log:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

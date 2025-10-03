@@ -4,21 +4,32 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Copy, Download, RotateCcw, AlertCircle, Clock, Coins } from "lucide-react"
+import { Copy, Download, RotateCcw, AlertCircle, Clock, Coins, Trash2 } from "lucide-react"
 import { useWorkbenchStore } from "@/stores/workbench-store"
+import { useWorkbenchTest } from "@/hooks/use-workbench-test"
 import { cn } from "@/lib/utils"
 
 /**
  * Workbench Output Component
  *
  * Displays test results including:
+ * - Conversation history
  * - Response text
- * - Token usage
+ * - Thinking blocks
+ * - Citations
+ * - Token usage (with cache statistics)
  * - Execution time
  * - Error states
  */
 export function WorkbenchOutput() {
-  const { output, error, isRunning, runTest, clearOutput } = useWorkbenchStore()
+  const {
+    conversationHistory,
+    cacheEnabled,
+    clearConversation,
+    clearOutput
+  } = useWorkbenchStore()
+
+  const workbenchTest = useWorkbenchTest()
 
   const copyToClipboard = async (text: string) => {
     try {
@@ -29,15 +40,12 @@ export function WorkbenchOutput() {
     }
   }
 
-  const exportResults = () => {
-    if (!output) return
+  const exportConversation = () => {
+    if (conversationHistory.length === 0) return
 
     const exportData = {
-      timestamp: output.timestamp,
-      response: output.response,
-      parsedValue: output.parsedValue,
-      tokensUsed: output.tokensUsed,
-      executionTime: output.executionTime
+      timestamp: new Date().toISOString(),
+      conversation: conversationHistory
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], {
@@ -46,13 +54,13 @@ export function WorkbenchOutput() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `test-result-${Date.now()}.json`
+    a.download = `workbench-conversation-${Date.now()}.json`
     a.click()
     URL.revokeObjectURL(url)
   }
 
   // Loading state
-  if (isRunning) {
+  if (workbenchTest.isPending) {
     return (
       <Card className="p-8">
         <div className="flex flex-col items-center justify-center space-y-4">
@@ -67,23 +75,16 @@ export function WorkbenchOutput() {
   }
 
   // Error state
-  if (error) {
+  if (workbenchTest.isError) {
     return (
       <Card className="p-6 border-destructive/50 bg-destructive/5">
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
           <div className="flex-1 space-y-2">
             <p className="text-sm font-medium text-destructive">Error</p>
-            <p className="text-sm text-muted-foreground">{error}</p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={runTest}
-              className="mt-3"
-            >
-              <RotateCcw className="h-4 w-4 mr-2" />
-              Retry
-            </Button>
+            <p className="text-sm text-muted-foreground">
+              {workbenchTest.error?.message || 'An error occurred'}
+            </p>
           </div>
         </div>
       </Card>
@@ -91,7 +92,7 @@ export function WorkbenchOutput() {
   }
 
   // Empty state
-  if (!output) {
+  if (conversationHistory.length === 0) {
     return (
       <Card className="p-12">
         <div className="text-center space-y-2">
@@ -106,116 +107,89 @@ export function WorkbenchOutput() {
     )
   }
 
-  // Success state with results
+  // Conversation history display
+  const lastMessage = conversationHistory[conversationHistory.length - 1]
+  const totalTokens = conversationHistory.reduce(
+    (sum, msg) => sum + (msg.tokensUsed?.input || 0) + (msg.tokensUsed?.output || 0),
+    0
+  )
+  const totalCachedRead = conversationHistory.reduce(
+    (sum, msg) => sum + (msg.tokensUsed?.cached_read || 0),
+    0
+  )
+
   return (
     <Card className="p-6">
       <div className="space-y-4">
-        {/* Header with metadata */}
+        {/* Header with actions */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="gap-1">
-              <Clock className="h-3 w-3" />
-              {output.executionTime}ms
-            </Badge>
-            <Badge variant="outline" className="gap-1">
               <Coins className="h-3 w-3" />
-              {output.tokensUsed.total} tokens
+              {totalTokens} tokens total
             </Badge>
+            {totalCachedRead > 0 && (
+              <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700">
+                🎯 {totalCachedRead} cached
+              </Badge>
+            )}
             <span className="text-xs text-muted-foreground">
-              {new Date(output.timestamp).toLocaleTimeString()}
+              {conversationHistory.length} {conversationHistory.length === 1 ? 'message' : 'messages'}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => copyToClipboard(output.response)}
-              title="Copy response"
-            >
-              <Copy className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={exportResults}
-              title="Export results"
+              onClick={exportConversation}
+              title="Export conversation"
             >
               <Download className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              onClick={clearOutput}
-              title="Clear output"
+              onClick={clearConversation}
+              title="Clear conversation"
             >
-              <RotateCcw className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
         <Separator />
 
-        {/* Response Content */}
+        {/* Conversation History */}
         <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-medium mb-2">Response</h4>
-            <div className="rounded-lg bg-muted/50 p-4">
-              <pre className="text-sm whitespace-pre-wrap break-words">
-                {output.response}
-              </pre>
-            </div>
-          </div>
-
-          {/* Parsed Values (if any) */}
-          {output.parsedValue && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-2">Parsed Values</h4>
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <pre className="text-sm whitespace-pre-wrap break-words">
-                    {JSON.stringify(output.parsedValue, null, 2)}
-                  </pre>
-                </div>
+          {conversationHistory.map((message, index) => (
+            <div key={index} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
+                  {message.role === 'user' ? 'You' : 'Assistant'}
+                </Badge>
+                {message.tokensUsed && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>{message.tokensUsed.input + message.tokensUsed.output} tokens</span>
+                    {message.tokensUsed.cached_read && (
+                      <span className="text-green-600">
+                        ({message.tokensUsed.cached_read} cached)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
-            </>
-          )}
-
-          {/* Token Usage Details */}
-          <Separator />
-          <div>
-            <h4 className="text-sm font-medium mb-2">Token Usage</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Input</p>
-                <p className="text-sm font-medium">{output.tokensUsed.input}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Output</p>
-                <p className="text-sm font-medium">{output.tokensUsed.output}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-sm font-medium">{output.tokensUsed.total}</p>
+              <div className={cn(
+                "rounded-lg p-4",
+                message.role === 'user'
+                  ? "bg-primary/5 border border-primary/20"
+                  : "bg-muted/50"
+              )}>
+                <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                  {message.content}
+                </pre>
               </div>
             </div>
-
-            {/* Token usage visualization */}
-            <div className="mt-3">
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all"
-                  style={{
-                    width: `${(output.tokensUsed.input / output.tokensUsed.total) * 100}%`
-                  }}
-                />
-              </div>
-              <div className="flex justify-between mt-1">
-                <span className="text-xs text-muted-foreground">Input</span>
-                <span className="text-xs text-muted-foreground">Output</span>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </Card>

@@ -1,13 +1,22 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 import { Loader2 } from "lucide-react"
 import { useWorkbenchStore } from "@/stores/workbench-store"
+import { useAvailableLLMModels } from "@/hooks/use-llm-config"
+import { useWorkbenchTest } from "@/hooks/use-workbench-test"
 import { cn } from "@/lib/utils"
 
 interface WorkbenchInputProps {
@@ -32,6 +41,8 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
  * - Right: System prompt (read-only) and operation prompt (editable)
  */
 export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
+  const [isModelSheetOpen, setIsModelSheetOpen] = useState(false)
+
   const {
     selectedFile,
     selectedModel,
@@ -40,13 +51,19 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     thinkingMode,
     citations,
     toolUse,
+    cacheEnabled,
     isRunning,
+    conversationHistory,
     setFile,
     setModel,
     updateOperationPrompt,
     toggleFeature,
-    runTest
+    toggleCaching,
+    addToConversation
   } = useWorkbenchStore()
+
+  const { data: availableModels, isLoading: modelsLoading } = useAvailableLLMModels()
+  const workbenchTest = useWorkbenchTest()
 
   const handleFileSelect = () => {
     const input = document.createElement('input')
@@ -78,10 +95,105 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   }
 
   const getModelDisplay = () => {
-    return MODEL_DISPLAY_NAMES[selectedModel] || selectedModel
+    if (!availableModels) return 'Loading...'
+    const model = availableModels.models.find(m => m.model === selectedModel)
+    return model?.display_name || MODEL_DISPLAY_NAMES[selectedModel] || selectedModel
+  }
+
+  const handleRunTest = async () => {
+    if (!operationPrompt.trim()) {
+      return
+    }
+
+    try {
+      const result = await workbenchTest.mutateAsync({
+        processor_id: processor.processor_id,
+        system_prompt: systemPrompt,
+        file_content: selectedFile?.type === 'uploaded'
+          ? await readFileAsText(selectedFile.file)
+          : undefined,
+        file_type: selectedFile?.type === 'uploaded'
+          ? (selectedFile.file.type || 'text/plain') as any
+          : undefined,
+        conversation_history: conversationHistory,
+        new_prompt: operationPrompt,
+        settings: {
+          model_id: selectedModel,
+          citations_enabled: citations,
+          caching_enabled: cacheEnabled,
+          thinking: thinkingMode ? { type: 'enabled', budget_tokens: 10000 } : undefined
+        }
+      })
+
+      // Add to conversation history
+      addToConversation({
+        role: 'user',
+        content: operationPrompt,
+        timestamp: new Date().toISOString()
+      })
+
+      addToConversation({
+        role: 'assistant',
+        content: result.response,
+        timestamp: result.timestamp,
+        tokensUsed: result.tokensUsed
+      })
+
+      // Clear the prompt for next message
+      updateOperationPrompt('')
+
+    } catch (error) {
+      console.error('Test execution failed:', error)
+    }
+  }
+
+  const readFileAsText = async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => resolve(e.target?.result as string)
+      reader.onerror = reject
+      reader.readAsText(file)
+    })
   }
 
   return (
+    <>
+      {/* Model Selector Sheet */}
+      <Sheet open={isModelSheetOpen} onOpenChange={setIsModelSheetOpen}>
+        <SheetContent>
+          <SheetHeader>
+            <SheetTitle>Select Model</SheetTitle>
+            <SheetDescription>
+              Choose an LLM model for testing operations
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-2">
+            {modelsLoading && (
+              <p className="text-sm text-muted-foreground">Loading models...</p>
+            )}
+            {availableModels?.models.map((model) => (
+              <button
+                key={model.id}
+                onClick={() => {
+                  setModel(model.model)
+                  setIsModelSheetOpen(false)
+                }}
+                className={cn(
+                  "w-full text-left px-4 py-3 rounded-lg border transition-colors",
+                  selectedModel === model.model
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:bg-accent"
+                )}
+              >
+                <div className="font-medium">{model.display_name}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {model.provider} • {model.model}
+                </div>
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
     <div className="grid grid-cols-1 lg:grid-cols-[auto,1fr] gap-6">
       {/* Left Column - Text-based UI */}
       <div className="space-y-4">
@@ -115,11 +227,20 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
               <span
                 className="cursor-pointer hover:underline"
-                onClick={() => {/* Future: open model selector */}}
+                onClick={() => setIsModelSheetOpen(true)}
               >
                 Model
               </span>
               <span>{getModelDisplay()}</span>
+            </div>
+
+            {/* Caching */}
+            <div className="grid grid-cols-[140px,auto] gap-4 items-center">
+              <span>Caching</span>
+              <Switch
+                checked={cacheEnabled}
+                onCheckedChange={toggleCaching}
+              />
             </div>
 
             {/* Thinking Mode */}
@@ -175,10 +296,10 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           />
           <div className="flex items-center justify-end">
             <Button
-              onClick={runTest}
-              disabled={isRunning || !operationPrompt}
+              onClick={handleRunTest}
+              disabled={workbenchTest.isPending || !operationPrompt}
             >
-              {isRunning ? (
+              {workbenchTest.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Testing...
@@ -191,5 +312,6 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         </div>
       </div>
     </div>
+    </>
   )
 }

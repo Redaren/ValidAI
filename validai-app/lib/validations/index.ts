@@ -44,3 +44,17 @@ export {
   uuidSchema,
   commaSeparatedToArray,
 } from './common-schemas'
+
+// Workbench schemas
+export {
+  thinkingConfigSchema,
+  conversationMessageSchema,
+  workbenchSettingsSchema,
+  workbenchTestSchema,
+  workbenchTestResponseSchema,
+  type ThinkingConfig,
+  type ConversationMessage,
+  type WorkbenchSettings,
+  type WorkbenchTestInput,
+  type WorkbenchTestResponse,
+} from './workbench-schemas'

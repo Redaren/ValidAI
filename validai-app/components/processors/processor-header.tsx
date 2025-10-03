@@ -28,6 +28,7 @@ import {
   Upload,
   Users,
 } from "lucide-react"
+import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
@@ -35,6 +36,7 @@ interface ProcessorHeaderProps {
 
 export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -174,47 +176,74 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
 
       {/* Expandable Additional Information */}
       <CollapsibleContent className="space-y-4">
-        <div className="flex gap-8 items-start pt-2 border-t">
-          {/* Tags */}
-          {processor.tags && processor.tags.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">Tags</span>
-              <div className="flex flex-wrap gap-1.5">
-                {processor.tags.map((tag, index) => (
-                  <Badge
-                    key={index}
-                    variant="outline"
-                    className="text-xs font-normal"
-                  >
-                    {tag}
-                  </Badge>
-                ))}
+        <div className="space-y-4 pt-2 border-t">
+          {/* First Row: Tags, Created By, Last Updated, Operations Count */}
+          <div className="flex gap-8 items-start">
+            {/* Tags */}
+            {processor.tags && processor.tags.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Tags</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {processor.tags.map((tag, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="text-xs font-normal"
+                    >
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
               </div>
+            )}
+
+            {/* Created By */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Created by</span>
+              <span className="text-sm">
+                {processor.created_by_name || "Unknown"}
+              </span>
             </div>
-          )}
 
-          {/* Created By */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Created by</span>
-            <span className="text-sm">
-              {processor.created_by_name || "Unknown"}
-            </span>
+            {/* Last Updated */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">Last updated</span>
+              <span className="text-sm">
+                {formatRelativeTime(processor.updated_at)}
+              </span>
+            </div>
+
+            {/* Operations Count */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">
+                Operations Count
+              </span>
+              <span className="text-sm">{processor.operations.length}</span>
+            </div>
           </div>
 
-          {/* Last Updated */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Last updated</span>
-            <span className="text-sm">
-              {formatRelativeTime(processor.updated_at)}
-            </span>
-          </div>
-
-          {/* Operations Count */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">
-              Operations Count
-            </span>
-            <span className="text-sm">{processor.operations.length}</span>
+          {/* Second Row: LLM Configuration */}
+          <div className="flex gap-8 items-start pt-2 border-t">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">LLM Configuration</span>
+              {llmConfigLoading ? (
+                <span className="text-sm text-muted-foreground">Loading...</span>
+              ) : llmConfig ? (
+                <div className="space-y-1">
+                  <div className="text-sm">
+                    <span className="font-medium">{llmConfig.display_name || llmConfig.model}</span>
+                    <span className="text-muted-foreground"> • {llmConfig.provider}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {llmConfig.api_key_encrypted
+                      ? "Using organization API key"
+                      : "Using system API key"}
+                  </div>
+                </div>
+              ) : (
+                <span className="text-sm text-muted-foreground">No configuration found</span>
+              )}
+            </div>
           </div>
         </div>
       </CollapsibleContent>

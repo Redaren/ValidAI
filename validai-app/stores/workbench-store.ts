@@ -1,15 +1,19 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import type { ConversationMessage } from '@/lib/validations'
 
 /**
  * Test result from running an operation test
  */
 export interface TestResult {
   response: string
-  parsedValue?: any
+  thinking_blocks?: any[]
+  citations?: any[]
   tokensUsed: {
     input: number
     output: number
+    cached_read?: number
+    cached_write?: number
     total: number
   }
   executionTime: number
@@ -18,13 +22,15 @@ export interface TestResult {
 }
 
 /**
- * Advanced LLM settings (in collapsible section)
+ * Advanced LLM settings
  */
 export interface AdvancedSettings {
   temperature: number
   maxTokens: number
   topP: number
   topK: number
+  thinkingBudget: number | null  // null = disabled, min 1024
+  stopSequences: string[]
 }
 
 /**
@@ -48,6 +54,7 @@ export type SelectedFile = {
  * Manages all state for the testbench interface including:
  * - File management
  * - LLM configuration
+ * - Multi-turn conversations with prompt caching
  * - Test execution and results
  */
 export interface WorkbenchStore {
@@ -65,6 +72,11 @@ export interface WorkbenchStore {
   // Advanced Settings
   advancedSettings: AdvancedSettings
 
+  // Conversation & Caching
+  conversationHistory: ConversationMessage[]
+  cachedDocumentContent: string | null  // Keep exact content for cache consistency
+  cacheEnabled: boolean
+
   // Results
   isRunning: boolean
   output: TestResult | null
@@ -77,16 +89,21 @@ export interface WorkbenchStore {
   updateOperationPrompt: (prompt: string) => void
   toggleFeature: (feature: 'thinking' | 'citations' | 'toolUse') => void
   updateAdvancedSettings: (settings: Partial<AdvancedSettings>) => void
-  runTest: () => Promise<void>
+  setThinkingBudget: (tokens: number | null) => void
+  toggleCaching: () => void
+  addToConversation: (message: ConversationMessage) => void
+  clearConversation: () => void
   clearOutput: () => void
   reset: () => void
 }
 
 const defaultAdvancedSettings: AdvancedSettings = {
-  temperature: 0.7,
+  temperature: 1.0,  // Anthropic default
   maxTokens: 4096,
   topP: 1.0,
-  topK: 40
+  topK: 40,
+  thinkingBudget: null,  // Disabled by default
+  stopSequences: []
 }
 
 export const useWorkbenchStore = create<WorkbenchStore>()(
@@ -101,6 +118,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       citations: false,
       toolUse: false,
       advancedSettings: defaultAdvancedSettings,
+      conversationHistory: [],
+      cachedDocumentContent: null,
+      cacheEnabled: false,
       isRunning: false,
       output: null,
       error: null,
@@ -108,7 +128,11 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       // Actions
 
       setFile: (file) => {
-        set({ selectedFile: file })
+        set({
+          selectedFile: file,
+          // Clear cached content when file changes
+          cachedDocumentContent: null
+        })
       },
 
       setModel: (modelId) => {
@@ -147,52 +171,31 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         })
       },
 
-      runTest: async () => {
-        const state = get()
-
-        // Validate required fields
-        if (!state.operationPrompt) {
-          set({ error: 'Please enter a prompt' })
-          return
-        }
-
+      setThinkingBudget: (tokens) => {
         set({
-          isRunning: true,
-          error: null,
-          output: null
-        })
-
-        try {
-          // TODO: Replace with actual Edge Function call
-          // Simulate API call for now
-          await new Promise(resolve => setTimeout(resolve, 2000))
-
-          // Mock response
-          const mockResult: TestResult = {
-            response: `This is a mock response for testing the operation prompt:\n\n"${state.operationPrompt.slice(0, 100)}..."\n\nModel: ${state.selectedModel}\nFile: ${state.selectedFile?.name || 'No file selected'}\nThinking Mode: ${state.thinkingMode}\nCitations: ${state.citations}\nTool Use: ${state.toolUse}`,
-            parsedValue: {
-              example: "parsed data",
-              confidence: 0.95
-            },
-            tokensUsed: {
-              input: 245,
-              output: 178,
-              total: 423
-            },
-            executionTime: 1842,
-            timestamp: new Date().toISOString()
+          advancedSettings: {
+            ...get().advancedSettings,
+            thinkingBudget: tokens
           }
+        })
+      },
 
-          set({
-            output: mockResult,
-            isRunning: false
-          })
-        } catch (error) {
-          set({
-            error: error instanceof Error ? error.message : 'An error occurred',
-            isRunning: false
-          })
-        }
+      toggleCaching: () => {
+        set({ cacheEnabled: !get().cacheEnabled })
+      },
+
+      addToConversation: (message) => {
+        set({
+          conversationHistory: [...get().conversationHistory, message]
+        })
+      },
+
+      clearConversation: () => {
+        set({
+          conversationHistory: [],
+          output: null,
+          error: null
+        })
       },
 
       clearOutput: () => {
@@ -212,6 +215,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           citations: false,
           toolUse: false,
           advancedSettings: defaultAdvancedSettings,
+          conversationHistory: [],
+          cachedDocumentContent: null,
+          cacheEnabled: false,
           isRunning: false,
           output: null,
           error: null
