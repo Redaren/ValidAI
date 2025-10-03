@@ -14,8 +14,18 @@ import { WorkbenchOutput } from "@/components/workbench/workbench-output"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import type { Database } from "@/lib/database.types"
 
+/**
+ * Type alias for processor data with operations
+ * Retrieved from get_processor_with_operations() database function
+ */
 type ProcessorWithOperations = Database["public"]["Functions"]["get_processor_with_operations"]["Returns"][0]
 
+/**
+ * Props for WorkbenchClient component
+ *
+ * @property processorId - UUID of the current processor
+ * @property initialProcessor - Processor data with operations from server-side fetch
+ */
 interface WorkbenchClientProps {
   processorId: string
   initialProcessor: ProcessorWithOperations

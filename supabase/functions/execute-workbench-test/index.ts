@@ -148,29 +148,34 @@ serve(async (req) => {
     })
 
     // Build system message with optional caching
+    // System prompts can be cached to reduce cost on multi-turn conversations (90% savings)
     let system: any = undefined
     if (body.system_prompt) {
       if (body.settings.caching_enabled) {
+        // Array format with cache_control for caching support
         system = [
           {
             type: 'text',
             text: body.system_prompt,
-            cache_control: { type: 'ephemeral' }
+            cache_control: { type: 'ephemeral' }  // 5-minute TTL
           }
         ]
       } else {
+        // String format for non-cached system prompts
         system = body.system_prompt
       }
     }
 
-    // Build messages array
+    // Build messages array for multi-turn conversation
+    // Format: [user, assistant, user, assistant, ...]
     const messages: any[] = []
 
     // Handle first message with optional document
+    // If file is provided, it's included in the first user message with cache_control
     if (body.file_content) {
       const contentBlocks: any[] = []
 
-      // Add document block
+      // Add document block with Anthropic document format
       const documentBlock: any = {
         type: 'document',
         source: {
@@ -180,19 +185,21 @@ serve(async (req) => {
         }
       }
 
-      // Add caching if enabled
+      // Add caching to document (recommended for multi-turn conversations)
+      // Subsequent messages will hit cache if document content is identical
       if (body.settings.caching_enabled) {
         documentBlock.cache_control = { type: 'ephemeral' }
       }
 
-      // Add citations if enabled
+      // Add citations to enable document grounding (Claude 3.5+)
+      // Model will return citation blocks referencing specific passages
       if (body.settings.citations_enabled) {
         documentBlock.citations = { enabled: true }
       }
 
       contentBlocks.push(documentBlock)
 
-      // Add first prompt
+      // Add first user prompt after document
       contentBlocks.push({
         type: 'text',
         text: body.new_prompt
@@ -204,7 +211,8 @@ serve(async (req) => {
       })
     }
 
-    // Add conversation history (if any)
+    // Add conversation history for multi-turn conversation
+    // Includes all previous user/assistant exchanges
     body.conversation_history.forEach(msg => {
       messages.push({
         role: msg.role,
@@ -212,7 +220,8 @@ serve(async (req) => {
       })
     })
 
-    // Add new prompt (if no document was added in first message)
+    // Add new prompt as standalone message (if no document in first message)
+    // This happens when continuing a conversation without re-uploading document
     if (!body.file_content) {
       messages.push({
         role: 'user',
@@ -244,12 +253,17 @@ serve(async (req) => {
       })
       .eq('id', executionId)
 
-    // Execute API call
+    // Execute Anthropic Messages API call
+    // Tracks execution time for performance metrics
     const startTime = Date.now()
     const response = await anthropic.messages.create(requestParams)
     const executionTime = Date.now() - startTime
 
-    // Extract response text and special blocks
+    // Extract response content and special blocks
+    // Anthropic API returns content as array of blocks with different types:
+    // - "text": Normal response text
+    // - "thinking": Extended thinking blocks (if thinking mode enabled)
+    // - "citation": Citation references (if citations enabled)
     let responseText = ''
     const thinkingBlocks: any[] = []
     const citations: any[] = []
@@ -264,24 +278,26 @@ serve(async (req) => {
       }
     })
 
-    // Build result
+    // Build result payload for client
+    // Includes execution_id for real-time subscription tracking
     const result = {
-      execution_id: executionId,  // Include execution ID for client subscription
+      execution_id: executionId,  // Client subscribes to this ID for status updates
       response: responseText,
       thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
       citations: citations.length > 0 ? citations : undefined,
       tokensUsed: {
         input: response.usage.input_tokens,
         output: response.usage.output_tokens,
-        cached_read: response.usage.cache_read_input_tokens,
-        cached_write: response.usage.cache_creation_input_tokens,
+        cached_read: response.usage.cache_read_input_tokens,  // Cost savings from cache hits
+        cached_write: response.usage.cache_creation_input_tokens,  // One-time cost to create cache
         total: response.usage.input_tokens + response.usage.output_tokens
       },
       executionTime,
       timestamp: new Date().toISOString()
     }
 
-    // Update execution record with completion
+    // Update execution record with completion status
+    // This triggers Supabase Realtime update to subscribed clients
     await supabase
       .from('workbench_executions')
       .update({

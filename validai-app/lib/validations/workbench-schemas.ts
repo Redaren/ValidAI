@@ -89,6 +89,46 @@ export type WorkbenchSettings = z.infer<typeof workbenchSettingsSchema>
 
 /**
  * Complete workbench test execution request
+ *
+ * Used when calling execute-workbench-test Edge Function.
+ * Supports multi-turn conversations with optional document upload.
+ *
+ * @example
+ * ```typescript
+ * const testInput: WorkbenchTestInput = {
+ *   processor_id: "uuid",
+ *   system_prompt: "You are a helpful assistant...",
+ *   file_content: "Document text here...",
+ *   file_type: "text/plain",
+ *   conversation_history: [],  // First message
+ *   new_prompt: "What are the key points in this document?",
+ *   settings: {
+ *     model_id: "claude-3-5-sonnet-20241022",
+ *     temperature: 0.7,
+ *     citations_enabled: true,
+ *     caching_enabled: true
+ *   }
+ * }
+ * ```
+ *
+ * @example Multi-turn conversation
+ * ```typescript
+ * // Second message in conversation
+ * const followUpInput: WorkbenchTestInput = {
+ *   processor_id: "uuid",
+ *   system_prompt: "You are a helpful assistant...",
+ *   file_content: "Same document...",  // Hits cache if identical
+ *   file_type: "text/plain",
+ *   conversation_history: [
+ *     { role: "user", content: "First question?", timestamp: "..." },
+ *     { role: "assistant", content: "First answer...", timestamp: "..." }
+ *   ],
+ *   new_prompt: "Follow-up question?",
+ *   settings: {
+ *     caching_enabled: true  // 90% cost savings on cached content
+ *   }
+ * }
+ * ```
  */
 export const workbenchTestSchema = z.object({
   processor_id: z.string().uuid('Invalid processor ID'),
@@ -113,6 +153,32 @@ export type WorkbenchTestInput = z.infer<typeof workbenchTestSchema>
 
 /**
  * Workbench test execution response
+ *
+ * Returned by execute-workbench-test Edge Function after successful execution.
+ * Includes execution_id for real-time status tracking.
+ *
+ * @example
+ * ```typescript
+ * const response: WorkbenchTestResponse = {
+ *   execution_id: "uuid",  // Subscribe to this for real-time updates
+ *   response: "Based on the document, the key points are...",
+ *   thinking_blocks: [
+ *     { type: "thinking", content: "Let me analyze this step by step..." }
+ *   ],
+ *   citations: [
+ *     { type: "citation", text: "specific passage from document" }
+ *   ],
+ *   tokensUsed: {
+ *     input: 1000,
+ *     output: 500,
+ *     cached_read: 900,  // 90% of input was cached
+ *     cached_write: 0,   // No new cache created this turn
+ *     total: 1500
+ *   },
+ *   executionTime: 2340,  // milliseconds
+ *   timestamp: "2025-10-03T12:34:56Z"
+ * }
+ * ```
  */
 export const workbenchTestResponseSchema = z.object({
   execution_id: z.string().uuid(),  // For real-time subscription

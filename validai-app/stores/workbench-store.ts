@@ -108,6 +108,19 @@ export interface WorkbenchStore {
   reset: () => void
 }
 
+/**
+ * Default advanced settings for Anthropic Claude API
+ *
+ * Values match Anthropic's recommended defaults:
+ * - temperature: 1.0 (balanced creativity/accuracy)
+ * - maxTokens: 4096 (sufficient for most responses)
+ * - topP: 1.0 (nucleus sampling disabled)
+ * - topK: 40 (sample from top 40 tokens)
+ * - thinkingBudget: null (extended thinking disabled)
+ * - stopSequences: [] (no custom stop sequences)
+ *
+ * @see {@link https://docs.claude.com/en/api/messages} Anthropic API parameters
+ */
 const defaultAdvancedSettings: AdvancedSettings = {
   temperature: 1.0,  // Anthropic default
   maxTokens: 4096,

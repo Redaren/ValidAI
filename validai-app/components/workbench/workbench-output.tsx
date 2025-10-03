@@ -32,7 +32,18 @@ export function WorkbenchOutput() {
 
   const workbenchTest = useWorkbenchTest()
 
-  // Show status badge for current execution
+  /**
+   * Get status badge component for current execution
+   *
+   * Returns color-coded badge with icon based on real-time execution status.
+   * Badge colors:
+   * - Pending: Yellow (⏳)
+   * - Processing: Blue (⚡)
+   * - Completed: Green (✓)
+   * - Failed: Red (✗)
+   *
+   * @returns Badge component or null if idle
+   */
   const getStatusBadge = () => {
     if (executionStatus === 'pending') {
       return <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-700">⏳ Pending</Badge>
@@ -49,6 +60,14 @@ export function WorkbenchOutput() {
     return null
   }
 
+  /**
+   * Copy text to clipboard using Clipboard API
+   *
+   * Uses modern navigator.clipboard API for secure clipboard access.
+   * Silently fails if clipboard access is denied.
+   *
+   * @param text - Text content to copy
+   */
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
@@ -58,6 +77,20 @@ export function WorkbenchOutput() {
     }
   }
 
+  /**
+   * Export conversation history as JSON file
+   *
+   * Downloads conversation as JSON with timestamp.
+   * File format:
+   * ```json
+   * {
+   *   "timestamp": "2025-10-03T12:34:56Z",
+   *   "conversation": [ ... messages ... ]
+   * }
+   * ```
+   *
+   * Filename: `workbench-conversation-{timestamp}.json`
+   */
   const exportConversation = () => {
     if (conversationHistory.length === 0) return
 

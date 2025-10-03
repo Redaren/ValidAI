@@ -19,12 +19,24 @@ import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import { useWorkbenchTest } from "@/hooks/use-workbench-test"
 import { cn } from "@/lib/utils"
 
+/**
+ * Props for WorkbenchInput component
+ *
+ * @property processor - Current processor data from database
+ * @property operations - Operations configured for this processor (future use)
+ */
 interface WorkbenchInputProps {
   processor: any
   operations: any[]
 }
 
-// Model ID to friendly name mapping
+/**
+ * Model ID to friendly display name mapping
+ *
+ * Fallback mapping for model display names when organization
+ * config doesn't provide a custom display_name.
+ * Used by getModelDisplay() helper function.
+ */
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'claude-3-5-sonnet-20241022': 'Sonnet 3.5',
   'claude-3-opus-20240229': 'Opus 3',
@@ -68,6 +80,12 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   const { data: availableModels, isLoading: modelsLoading } = useAvailableLLMModels()
   const workbenchTest = useWorkbenchTest()
 
+  /**
+   * Opens native file picker dialog for document upload
+   *
+   * Programmatically creates and triggers a file input element.
+   * Accepts common document formats for testing operations.
+   */
   const handleFileSelect = () => {
     const input = document.createElement('input')
     input.type = 'file'
@@ -86,23 +104,57 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     input.click()
   }
 
+  /**
+   * Format file size in human-readable format
+   *
+   * @param bytes - File size in bytes
+   * @returns Formatted string (e.g., "1.5 mb", "234 kb", "56 B")
+   */
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B'
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' kb'
     return (bytes / (1024 * 1024)).toFixed(1) + ' mb'
   }
 
+  /**
+   * Get display string for currently selected file
+   *
+   * @returns "Not selected" or "filename.pdf / 1.5 mb"
+   */
   const getFileDisplay = () => {
     if (!selectedFile) return 'Not selected'
     return `${selectedFile.name} / ${formatFileSize(selectedFile.size)}`
   }
 
+  /**
+   * Get display name for currently selected model
+   *
+   * Resolves from:
+   * 1. Organization's available_models display_name
+   * 2. MODEL_DISPLAY_NAMES fallback mapping
+   * 3. Raw model ID as last resort
+   *
+   * @returns Model display name (e.g., "Claude 3.5 Sonnet")
+   */
   const getModelDisplay = () => {
     if (!availableModels) return 'Loading...'
     const model = availableModels.models.find(m => m.model === selectedModel)
     return model?.display_name || MODEL_DISPLAY_NAMES[selectedModel] || selectedModel
   }
 
+  /**
+   * Execute workbench test with current settings
+   *
+   * Flow:
+   * 1. Validate prompt is not empty
+   * 2. Read file content if file is uploaded
+   * 3. Call Edge Function with conversation history
+   * 4. Subscribe to real-time updates
+   * 5. Add messages to conversation history
+   * 6. Clear prompt for next turn
+   *
+   * @throws Error if test execution fails
+   */
   const handleRunTest = async () => {
     if (!operationPrompt.trim()) {
       return
@@ -161,6 +213,16 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     }
   }
 
+  /**
+   * Read file content as text using FileReader API
+   *
+   * Used to extract document content before sending to Edge Function.
+   * Supports plain text files (PDF reading requires base64 encoding).
+   *
+   * @param file - File object from file input
+   * @returns Promise resolving to file content as string
+   * @throws Error if file read fails
+   */
   const readFileAsText = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
