@@ -60,7 +60,7 @@ export async function updateSession(request: NextRequest) {
   }
 
   // Enrich JWT with organization details if user is authenticated but JWT lacks enriched data
-  if (user && user.app_metadata?.organization_id) {
+  if (user) {
     const hasEnrichedData = user.app_metadata?.organization_name &&
                            user.app_metadata?.organization_slug &&
                            user.app_metadata?.organization_role;

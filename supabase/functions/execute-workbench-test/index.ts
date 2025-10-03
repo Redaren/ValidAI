@@ -77,7 +77,8 @@ serve(async (req) => {
 
     // Get organization ID from JWT
     const { data: orgData } = await supabase.rpc('get_llm_config_for_run', {
-      p_processor_id: body.processor_id
+      p_processor_id: body.processor_id,
+      p_user_id: user.id
     })
 
     if (!orgData) {
@@ -106,7 +107,8 @@ serve(async (req) => {
 
     // Resolve LLM configuration for the processor
     const { data: llmConfig, error: llmError } = await supabase.rpc('get_llm_config_for_run', {
-      p_processor_id: body.processor_id
+      p_processor_id: body.processor_id,
+      p_user_id: user.id
     })
 
     if (llmError || !llmConfig) {

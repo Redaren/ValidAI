@@ -67,11 +67,13 @@ The system follows a strict inheritance hierarchy for LLM configuration:
 ```
 
 **Resolution Logic:**
-1. Check if processor has `selected_model_id`
-2. If yes, resolve from organization's `available_models` (or global if not found)
-3. If no processor config, use organization's `default_model_id`
-4. If no organization config, use global default model
-5. Merge with operation/workbench settings (temperature, thinking, etc.)
+1. Edge Function extracts `user_id` from incoming JWT
+2. Database function queries `organization_members` to get `organization_id`
+3. Check if processor has `selected_model_id`
+4. If yes, resolve from organization's `available_models` (or global if not found)
+5. If no processor config, use organization's `default_model_id`
+6. If no organization config, use global default model
+7. Merge with operation/workbench settings (temperature, thinking, etc.)
 
 ### 2. Database Schema
 
@@ -215,11 +217,11 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 
 **Flow:**
 ```
-1. Receive request from client
-2. Extract user_id from JWT
-3. Create execution record (status: pending)
-4. Resolve LLM configuration (get_llm_config_for_run)
-5. Decrypt API key (service-role only)
+1. Receive request from client with user JWT
+2. Extract user_id from JWT using service-role auth
+3. Resolve LLM configuration (pass user_id explicitly)
+4. Create execution record (status: pending)
+5. Decrypt API key (service-role only) or use global ANTHROPIC_API_KEY
 6. Build Anthropic API request with caching/thinking/citations
 7. Update execution (status: processing)
 8. Call Anthropic Messages API
@@ -227,6 +229,12 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 10. Update execution (status: completed)
 11. Return result with execution_id
 ```
+
+**Key Architectural Pattern:**
+- Edge Function uses **service-role key** (bypasses RLS)
+- User context passed **explicitly as parameter** to database functions
+- Database functions query `organization_members` to get organization context
+- No reliance on `auth.jwt()` or `auth.uid()` in service-role context
 
 **Real-time Updates:**
 ```typescript
@@ -251,10 +259,12 @@ catch (error) {
 ```
 
 **Security:**
-- Validates JWT and extracts user_id
+- Validates user JWT and extracts user_id
+- Passes user_id explicitly to database functions (not via auth.jwt())
+- Database functions validate organization membership
 - Creates execution records with proper organization_id
 - Uses service-role key for API key decryption
-- RLS policies prevent unauthorized access
+- RLS policies prevent unauthorized access to execution records
 
 ### 4. Frontend State Management
 
@@ -1130,6 +1140,25 @@ This architecture provides a proven foundation for the production execution syst
 
 ---
 
-**Last Updated:** 2025-10-03
+**Last Updated:** 2025-10-03 (Architecture corrected for service-role + SECURITY DEFINER pattern)
 **Phase:** 1.6 Complete
 **Next Phase:** 2.0 - Run Execution System
+
+## Architecture Notes
+
+### Service-Role + SECURITY DEFINER Pattern
+
+The Edge Function uses a **service-role key** which bypasses RLS. This is architecturally correct for:
+- External API integrations (Anthropic)
+- API key decryption (requires service-role privileges)
+- Cross-table queries without RLS overhead
+
+However, `auth.jwt()` and `auth.uid()` helper functions only work with **user JWT context** (anon/authenticated roles), not service-role keys.
+
+**Solution Implemented:**
+- Database function `get_llm_config_for_run(p_processor_id uuid, p_user_id uuid)` accepts explicit user_id parameter
+- Edge Function extracts user_id from incoming JWT and passes it explicitly
+- Function queries `organization_members` table to resolve organization context
+- Maintains backward compatibility: parameter is optional, falls back to `auth.uid()` when called from client
+
+This follows Supabase best practices where Edge Functions handle service-role operations with explicit parameter passing rather than relying on JWT context that doesn't exist in service-role mode.
