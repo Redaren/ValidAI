@@ -20,13 +20,13 @@ import {
 import {
   Archive,
   Eye,
+  FlaskConical,
   Lock,
   MoreHorizontal,
   Pencil,
   Play,
   Upload,
   Users,
-  TestTube
 } from "lucide-react"
 
 interface ProcessorHeaderProps {
@@ -100,12 +100,6 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/proc/${processor.processor_id}/workbench`}>
-            <Button variant="outline" size="icon" title="Testbench">
-              <TestTube className="h-4 w-4" />
-              <span className="sr-only">Testbench</span>
-            </Button>
-          </Link>
           <Button variant="outline" size="icon" disabled title="Edit">
             <Pencil className="h-4 w-4" />
             <span className="sr-only">Edit</span>
@@ -122,6 +116,13 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/proc/${processor.processor_id}/workbench`}>
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Workbench
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
                 <Upload className="mr-2 h-4 w-4" />
                 Publish

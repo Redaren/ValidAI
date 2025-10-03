@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { MoreHorizontal } from "lucide-react"
+import { FlaskConical, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -59,9 +59,12 @@ export function WorkbenchClient({
         <div className="flex items-center justify-between gap-4">
           <CollapsibleTrigger asChild>
             <div className="flex items-center gap-4 flex-1 min-w-0 cursor-pointer">
-              <h1 className="text-2xl font-bold tracking-tight shrink-0">
-                Testbench
-              </h1>
+              <div className="flex items-center gap-2 shrink-0">
+                <FlaskConical className="h-6 w-6" />
+                <h1 className="text-2xl font-bold tracking-tight">
+                  Workbench
+                </h1>
+              </div>
               <p className="text-muted-foreground text-sm truncate">
                 Test generic operations with different prompts and settings
               </p>

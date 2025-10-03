@@ -150,17 +150,20 @@ export function OperationCard({ operation, processorId }: OperationCardProps) {
           {operation.operation_type}
         </Badge>
 
-        {/* Name */}
-        <span className="font-medium text-sm truncate flex-shrink-0 min-w-0">
-          {operation.name}
-        </span>
-
-        {/* Description */}
-        {operation.description && (
-          <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
-            {operation.description}
+        {/* Name and Description Container */}
+        <div className="flex-1 min-w-0 flex items-center gap-3">
+          {/* Name */}
+          <span className="font-medium text-sm truncate min-w-0">
+            {operation.name}
           </span>
-        )}
+
+          {/* Description */}
+          {operation.description && (
+            <span className="text-sm text-muted-foreground truncate flex-1 min-w-0">
+              {operation.description}
+            </span>
+          )}
+        </div>
 
         {/* Delete Button */}
         <Button
