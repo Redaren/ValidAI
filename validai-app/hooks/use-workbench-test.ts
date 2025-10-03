@@ -14,6 +14,8 @@ export function useWorkbenchTest() {
 
   return useMutation({
     mutationFn: async (input: WorkbenchTestInput): Promise<WorkbenchTestResponse> => {
+      console.log('Sending request to Edge Function:', input)
+
       const { data, error } = await supabase.functions.invoke<WorkbenchTestResponse>(
         'execute-workbench-test',
         {
@@ -22,12 +24,20 @@ export function useWorkbenchTest() {
       )
 
       if (error) {
-        throw new Error(error.message || 'Failed to execute workbench test')
+        console.error('Edge Function error details:', {
+          message: error.message,
+          context: error.context,
+          error: error
+        })
+        throw new Error(error.message || error.context?.error || 'Failed to execute workbench test')
       }
 
       if (!data) {
         throw new Error('No response from Edge Function')
       }
+
+      // Log response for debugging
+      console.log('Edge Function response:', data)
 
       return data
     }

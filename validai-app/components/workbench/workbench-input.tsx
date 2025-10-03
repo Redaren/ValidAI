@@ -197,31 +197,62 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         subscribeToExecution(result.execution_id)
       }
 
-      // Add to conversation history with metadata
-      addToConversation({
-        role: 'user',
-        content: operationPrompt,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          mode: mode,
-          cacheEnabled: cacheEnabled,
-          systemPromptSent: sendSystemPrompt,
-          thinkingEnabled: thinkingMode,
-          citationsEnabled: citations,
-          inputTokens: result.metadata.inputTokens,
-          outputTokens: 0,
-          cachedReadTokens: result.metadata.cachedReadTokens,
-          cachedWriteTokens: result.metadata.cachedWriteTokens
-        }
-      })
+      // Add to conversation history with metadata (only in stateful mode)
+      if (mode === 'stateful') {
+        addToConversation({
+          role: 'user',
+          content: operationPrompt,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            mode: mode,
+            cacheEnabled: cacheEnabled,
+            systemPromptSent: sendSystemPrompt,
+            thinkingEnabled: thinkingMode,
+            citationsEnabled: citations,
+            inputTokens: result.metadata.inputTokens,
+            outputTokens: 0,
+            cachedReadTokens: result.metadata.cachedReadTokens,
+            cachedWriteTokens: result.metadata.cachedWriteTokens
+          }
+        })
 
-      addToConversation({
-        role: 'assistant',
-        content: result.response,
-        timestamp: result.timestamp,
-        metadata: result.metadata,
-        tokensUsed: result.tokensUsed  // Keep for backward compatibility
-      })
+        addToConversation({
+          role: 'assistant',
+          content: result.response,
+          timestamp: result.timestamp,
+          metadata: result.metadata,
+          tokensUsed: result.tokensUsed  // Keep for backward compatibility
+        })
+      } else {
+        // Stateless mode: Still show output but don't add to conversation
+        // Output will be cleared on next message (line 171)
+        // For now, we could optionally add messages that will be cleared
+        // This allows viewing the result before the next test
+        addToConversation({
+          role: 'user',
+          content: operationPrompt,
+          timestamp: new Date().toISOString(),
+          metadata: {
+            mode: mode,
+            cacheEnabled: cacheEnabled,
+            systemPromptSent: sendSystemPrompt,
+            thinkingEnabled: thinkingMode,
+            citationsEnabled: citations,
+            inputTokens: result.metadata.inputTokens,
+            outputTokens: 0,
+            cachedReadTokens: result.metadata.cachedReadTokens,
+            cachedWriteTokens: result.metadata.cachedWriteTokens
+          }
+        })
+
+        addToConversation({
+          role: 'assistant',
+          content: result.response,
+          timestamp: result.timestamp,
+          metadata: result.metadata,
+          tokensUsed: result.tokensUsed
+        })
+      }
 
       // Clear the prompt for next message
       updateOperationPrompt('')
@@ -238,21 +269,42 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   }
 
   /**
-   * Read file content as text using FileReader API
+   * Read file content using FileReader API
    *
-   * Used to extract document content before sending to Edge Function.
-   * Supports plain text files (PDF reading requires base64 encoding).
+   * Handles both text and binary files:
+   * - Text files: Read as plain text
+   * - PDF files: Read as base64-encoded data URL, then extract base64 content
    *
    * @param file - File object from file input
-   * @returns Promise resolving to file content as string
+   * @returns Promise resolving to file content (text or base64 string)
    * @throws Error if file read fails
    */
   const readFileAsText = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target?.result as string)
+
+      reader.onload = (e) => {
+        const result = e.target?.result as string
+
+        // For PDFs, extract base64 content from data URL
+        if (file.type === 'application/pdf') {
+          // Data URL format: data:application/pdf;base64,<base64content>
+          const base64Content = result.split(',')[1]
+          resolve(base64Content)
+        } else {
+          // For text files, return as-is
+          resolve(result)
+        }
+      }
+
       reader.onerror = reject
-      reader.readAsText(file)
+
+      // Read PDFs as data URL (base64), text files as text
+      if (file.type === 'application/pdf') {
+        reader.readAsDataURL(file)
+      } else {
+        reader.readAsText(file)
+      }
     })
   }
 
