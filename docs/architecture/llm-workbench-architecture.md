@@ -1,27 +1,80 @@
 # LLM Workbench Architecture
 
-The LLM Workbench is a testing environment for operations that integrates with Anthropic's Claude API, featuring multi-turn conversations, prompt caching, real-time execution tracking, and comprehensive LLM configuration management.
+The LLM Workbench is a testing environment for operations that integrates with Anthropic's Claude API, featuring two distinct execution modes (stateful and stateless), prompt caching, real-time execution tracking, and comprehensive LLM configuration management.
 
-**Implementation:** Phase 1.6 (Completed)
+**Implementation:** Phase 1.7 (Completed - Mode-based Architecture)
 **Documentation Date:** 2025-10-03
 **Based on:** Official Anthropic API documentation (https://docs.claude.com/en/api/messages)
 
 ## Overview
 
 The Workbench provides a sandboxed environment where users can:
-- Test operations with real LLM responses
-- Experiment with different models and settings
+- Test operations with real LLM responses in two distinct modes
+- Simulate document validation RUNs with caching (Stateful Mode)
+- Execute independent single queries (Stateless Mode)
 - Leverage prompt caching for cost optimization (90% savings)
 - Enable extended thinking for complex reasoning tasks
 - Use citations for document grounding
 - Track execution progress in real-time
-- Maintain multi-turn conversations within a session
+- View comprehensive per-message metadata
 
 **Key Characteristics:**
+- **Mode-based**: Explicit separation between stateful (cached conversations) and stateless (independent queries)
 - **Ephemeral**: State is not persisted across sessions (except execution audit trail)
 - **Real-time**: Live execution status updates via Supabase Realtime
-- **Cost-optimized**: Prompt caching reduces token costs by up to 90%
-- **Auditable**: All executions logged in database for compliance
+- **Cost-optimized**: Prompt caching reduces token costs by up to 90% in stateful mode
+- **Auditable**: All executions logged with comprehensive metadata
+
+## Execution Modes
+
+### Stateful Mode (Document Testing)
+
+**Purpose:** Simulate a document validation RUN with caching
+
+**Characteristics:**
+- Caching: Auto-enabled (enforced)
+- Conversation history: Maintained
+- System prompt: Sent on first message only (cached)
+- Document: Cached on first message
+- Follow-up messages: Hit cache (90% cost savings)
+- Use case: Testing operations against the same document with multiple questions
+
+**Flow:**
+```
+Message 1: System prompt (cached) + Document (cached) + "What are payment terms?"
+  → Cache write: System + Document
+  → Cost: 100% + 25% cache write
+
+Message 2: "What about liability clauses?"
+  → Cache hit: System + Document
+  → Cost: 10% (90% savings)
+
+Message 3: "Summarize key points"
+  → Cache hit again
+  → Cost: 10% (90% savings)
+```
+
+### Stateless Mode (Single Queries)
+
+**Purpose:** Execute independent single queries
+
+**Characteristics:**
+- Caching: Auto-disabled (enforced)
+- Conversation history: None (each message independent)
+- System prompt: Sent with every message (if toggle enabled)
+- Document: Optional per message
+- Use case: Testing different prompts, tool use, web search
+
+**Flow:**
+```
+Message 1: System prompt + "Search internet for latest news"
+  → Complete execution
+  → Output cleared before next message
+
+Message 2: System prompt + "Calculate 2+2"
+  → Completely independent from Message 1
+  → No history or cache
+```
 
 ## Architecture Layers
 
@@ -60,9 +113,9 @@ The system follows a strict inheritance hierarchy for LLM configuration:
            ▼
 ┌─────────────────────────┐
 │   Workbench State       │ ← Test-time settings (NOT persisted)
-│   Zustand Store         │    - Conversation history
-│   (Client-side only)    │    - Caching enabled/disabled
-│                         │    - Advanced settings overrides
+│   Zustand Store         │    - Mode (stateful/stateless)
+│   (Client-side only)    │    - Conversation history
+│                         │    - Feature toggles
 └─────────────────────────┘
 ```
 
@@ -90,19 +143,10 @@ CREATE TABLE llm_global_settings (
   display_name text NOT NULL,
   is_default boolean DEFAULT false,
   is_active boolean DEFAULT true,
-  configuration jsonb DEFAULT '{}',  -- Default settings only
+  configuration jsonb DEFAULT '{}',
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
-```
-
-**Example Configuration:**
-```json
-{
-  "default_temperature": 1.0,
-  "default_max_tokens": 4096,
-  "default_top_p": 1.0
-}
 ```
 
 ##### `organizations.llm_configuration`
@@ -116,8 +160,7 @@ ALTER TABLE organizations ADD COLUMN llm_configuration jsonb;
 ```json
 {
   "api_keys_encrypted": {
-    "anthropic": "encrypted_base64_string",
-    "mistral": "encrypted_base64_string"
+    "anthropic": "encrypted_base64_string"
   },
   "available_models": [
     {
@@ -125,25 +168,16 @@ ALTER TABLE organizations ADD COLUMN llm_configuration jsonb;
       "provider": "anthropic",
       "model": "claude-3-5-sonnet-20241022",
       "display_name": "Claude 3.5 Sonnet"
-    },
-    {
-      "id": "haiku",
-      "provider": "anthropic",
-      "model": "claude-3-5-haiku-20241022",
-      "display_name": "Claude 3.5 Haiku"
     }
   ],
   "default_model_id": "sonnet"
 }
 ```
 
-**Note:** API keys are encrypted using `encrypt_api_key()` function with organization-specific encryption.
-
 ##### `processors.configuration`
 Processor-level model selection.
 
 ```sql
--- processors table already exists
 ALTER TABLE processors ADD COLUMN configuration jsonb;
 ```
 
@@ -167,47 +201,27 @@ CREATE TABLE workbench_executions (
   processor_id uuid REFERENCES processors(id) ON DELETE CASCADE NOT NULL,
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   organization_id uuid REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
-
-  -- Execution status
   status text NOT NULL CHECK (status IN ('pending', 'processing', 'completed', 'failed', 'cancelled')),
-
-  -- Request data
   prompt text NOT NULL,
   settings jsonb NOT NULL DEFAULT '{}',
   model_used text,
-
-  -- Response data (updated during execution)
   response text,
-  partial_response text,  -- For future streaming support
+  partial_response text,
   thinking_blocks jsonb,
   citations jsonb,
-
-  -- Metrics
   tokens_used jsonb,
   execution_time_ms integer,
-
-  -- Error handling
   error_message text,
-
-  -- Timestamps
   created_at timestamptz DEFAULT now() NOT NULL,
   updated_at timestamptz DEFAULT now() NOT NULL
 );
 
--- RLS Policies
 CREATE POLICY "Users can view their own workbench executions"
   ON workbench_executions FOR SELECT
   USING (user_id = auth.uid());
 
--- Added to realtime publication
 ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 ```
-
-**Purpose:**
-- Audit trail for all LLM calls
-- Real-time progress tracking
-- Cost monitoring (tokens used)
-- Debugging and compliance
 
 ### 3. Edge Function Architecture
 
@@ -215,56 +229,89 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 
 **Location:** `supabase/functions/execute-workbench-test/index.ts`
 
-**Flow:**
-```
-1. Receive request from client with user JWT
-2. Extract user_id from JWT using service-role auth
-3. Resolve LLM configuration (pass user_id explicitly)
-4. Create execution record (status: pending)
-5. Decrypt API key (service-role only) or use global ANTHROPIC_API_KEY
-6. Build Anthropic API request with caching/thinking/citations
-7. Update execution (status: processing)
-8. Call Anthropic Messages API
-9. Extract response, thinking blocks, citations
-10. Update execution (status: completed)
-11. Return result with execution_id
-```
-
-**Key Architectural Pattern:**
-- Edge Function uses **service-role key** (bypasses RLS)
-- User context passed **explicitly as parameter** to database functions
-- Database functions query `organization_members` to get organization context
-- No reliance on `auth.jwt()` or `auth.uid()` in service-role context
-
-**Real-time Updates:**
+**Mode Validation:**
 ```typescript
-// Database writes trigger Supabase Realtime events
-await supabase.from('workbench_executions')
-  .update({ status: 'processing', model_used: modelToUse })
-  .eq('id', executionId)
-// ↓ Client subscribed to execution_id receives update immediately
-```
-
-**Error Handling:**
-```typescript
-catch (error) {
-  // Update execution with error
-  await supabase.from('workbench_executions')
-    .update({
-      status: 'failed',
-      error_message: error.message
-    })
-    .eq('id', executionId)
+// Validate mode constraints
+if (body.mode === 'stateful' && !body.settings.caching_enabled) {
+  throw new Error('Stateful mode requires caching to be enabled')
+}
+if (body.mode === 'stateless' && body.conversation_history.length > 0) {
+  throw new Error('Stateless mode cannot have conversation history')
 }
 ```
 
-**Security:**
-- Validates user JWT and extracts user_id
-- Passes user_id explicitly to database functions (not via auth.jwt())
-- Database functions validate organization membership
-- Creates execution records with proper organization_id
-- Uses service-role key for API key decryption
-- RLS policies prevent unauthorized access to execution records
+**System Prompt Handling (Mode-based):**
+```typescript
+if (body.send_system_prompt && body.system_prompt) {
+  if (body.mode === 'stateful' && body.settings.caching_enabled) {
+    // Stateful: Cache on first message only
+    const isFirstMessage = body.conversation_history.length === 0
+    if (isFirstMessage) {
+      system = [{
+        type: 'text',
+        text: body.system_prompt,
+        cache_control: { type: 'ephemeral' }
+      }]
+    }
+    // Follow-up messages: system is undefined (cache hit)
+  } else {
+    // Stateless: Send every time
+    system = body.system_prompt
+  }
+}
+```
+
+**Message Building (Mode-based):**
+```typescript
+if (body.mode === 'stateful') {
+  const isFirstMessage = body.conversation_history.length === 0
+
+  if (isFirstMessage) {
+    // First message: Document + prompt with caching
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'document', source: {...}, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: body.new_prompt }
+      ]
+    })
+  } else {
+    // Follow-up: Add history + new prompt
+    body.conversation_history.forEach(msg => messages.push(msg))
+    messages.push({ role: 'user', content: body.new_prompt })
+  }
+} else {
+  // Stateless: Single independent message (no history)
+  messages.push({
+    role: 'user',
+    content: body.file_content
+      ? [document_block, text_block]
+      : body.new_prompt
+  })
+}
+```
+
+**Response with Metadata:**
+```typescript
+return {
+  execution_id: executionId,
+  response: responseText,
+  metadata: {
+    mode: body.mode,
+    cacheEnabled: body.settings.caching_enabled,
+    systemPromptSent: body.send_system_prompt && !!body.system_prompt,
+    thinkingEnabled: !!body.settings.thinking,
+    citationsEnabled: body.settings.citations_enabled,
+    inputTokens: response.usage.input_tokens,
+    outputTokens: response.usage.output_tokens,
+    cachedReadTokens: response.usage.cache_read_input_tokens,
+    cachedWriteTokens: response.usage.cache_creation_input_tokens,
+    executionTimeMs: executionTime
+  },
+  tokensUsed: {...},
+  timestamp: new Date().toISOString()
+}
+```
 
 ### 4. Frontend State Management
 
@@ -274,153 +321,172 @@ catch (error) {
 
 ```typescript
 interface WorkbenchStore {
+  // Mode Management
+  mode: 'stateful' | 'stateless'
+  sendSystemPrompt: boolean
+
   // File & Model Selection
   selectedFile: SelectedFile
   selectedModel: string
 
   // Prompts
-  systemPrompt: string        // From processor (read-only)
-  operationPrompt: string     // User-editable test prompt
+  systemPrompt: string
+  operationPrompt: string
 
   // Feature Toggles
-  thinkingMode: boolean       // Extended thinking
-  citations: boolean          // Document citations
-  toolUse: boolean           // Tool use (future)
-  cacheEnabled: boolean      // Prompt caching
-
-  // Advanced Settings
-  advancedSettings: {
-    temperature: number
-    maxTokens: number
-    topP: number
-    topK: number
-    thinkingBudget: number | null  // null = disabled
-    stopSequences: string[]
-  }
+  thinkingMode: boolean
+  citations: boolean
+  toolUse: boolean
+  cacheEnabled: boolean  // Auto-managed by mode
 
   // Conversation State
   conversationHistory: ConversationMessage[]
-  cachedDocumentContent: string | null  // For cache consistency
 
   // Real-time Tracking
   currentExecutionId: string | null
   executionStatus: 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
-  realtimeChannel: RealtimeChannel | null
 
   // Actions
+  setMode: (mode: 'stateful' | 'stateless') => void
+  toggleSystemPrompt: () => void
   subscribeToExecution: (executionId: string) => void
-  unsubscribeFromExecution: () => void
-  handleExecutionUpdate: (execution: WorkbenchExecution) => void
 }
 ```
 
-**Lifecycle:**
-1. User enters workbench → Store initialized with processor's system prompt
-2. User sends test → `subscribeToExecution()` called with execution_id
-3. Real-time updates received → `handleExecutionUpdate()` updates status
-4. Execution completes → Auto-unsubscribe after 1 second
-5. User leaves page → `reset()` cleans up subscriptions
-
-#### Real-time Subscription
-
+**Mode Change Behavior:**
 ```typescript
-subscribeToExecution: (executionId: string) => {
-  const supabase = createClient()
-
-  const channel = supabase
-    .channel(`workbench-execution-${executionId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'workbench_executions',
-        filter: `id=eq.${executionId}`
-      },
-      (payload) => {
-        const execution = payload.new as WorkbenchExecution
-        handleExecutionUpdate(execution)
-      }
-    )
-    .subscribe()
-
-  set({ currentExecutionId: executionId, realtimeChannel: channel })
+setMode: (mode) => {
+  if (mode === 'stateful') {
+    set({
+      mode: 'stateful',
+      cacheEnabled: true,  // Force ON
+      sendSystemPrompt: !!systemPrompt
+    })
+  } else {
+    set({
+      mode: 'stateless',
+      cacheEnabled: false,  // Force OFF
+      conversationHistory: [],  // Clear history
+      output: null
+    })
+  }
 }
 ```
 
-**Benefits:**
-- Live status updates (pending → processing → completed)
-- Multi-device support (same execution visible across tabs)
-- Automatic cleanup on completion
-- No polling required
+## UI Components
+
+### Workbench Input
+
+**Location:** `components/workbench/workbench-input.tsx`
+
+**Settings Layout:**
+```
+┌──────────────────────────────────────┐
+│ Settings                             │
+├──────────────────────────────────────┤
+│ Mode              [Stateful] [Stateless] │
+│ Send system prompt     [Toggle]      │  ← Only if prompt exists
+│ Operation type         Generic       │
+│ File                   Not selected  │
+│ Model                  Claude 3.5 Sonnet │
+│ Caching                Auto-enabled  │  ← Disabled toggle, shows status
+│ Thinking mode          [Toggle]      │
+│ Citations              [Toggle]      │
+│ Tool use               [Toggle]      │
+└──────────────────────────────────────┘
+```
+
+**Mode Toggle Buttons:**
+- Two buttons: "Stateful" and "Stateless"
+- Active mode highlighted with primary color
+- Switching modes auto-clears conversation in stateless
+
+**System Prompt Toggle:**
+- Only visible when processor has system prompt
+- Controls whether to send system prompt with message
+- In stateful: Auto-managed (first message only)
+- In stateless: User-controlled (every message if enabled)
+
+### Workbench Output
+
+**Location:** `components/workbench/workbench-output.tsx`
+
+**Message Display with Metadata:**
+```
+┌────────────────────────────────────────────────────────┐
+│ You                                   10:34 AM          │
+│ Mode: Stateful │ Cache: ✓ │ System Prompt: ✓ │        │
+│ Thinking: ✗ │ Citations: ✗                            │
+│                                                        │
+│ Input: 1042 tokens (950 cached) │ Output: 0 tokens    │
+├────────────────────────────────────────────────────────┤
+│ What are the payment terms in this contract?          │
+└────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────┐
+│ Assistant                             10:34 AM          │
+│ Mode: Stateful │ Cache: ✓ │ System Prompt: ✗ │        │
+│ Thinking: ✗ │ Citations: ✗                            │
+│                                                        │
+│ Input: 1042 tokens (950 cached) │ Output: 245 tokens  │
+│ Time: 1.2s                                             │
+├────────────────────────────────────────────────────────┤
+│ The payment terms are Net 30, with a 2% discount...   │
+└────────────────────────────────────────────────────────┘
+```
+
+**Per-Message Metadata:**
+- Mode indicator (Stateful/Stateless with color coding)
+- Feature flags (Cache, System Prompt, Thinking, Citations)
+- Token breakdown (Input/Output with cached breakdown)
+- Execution time (for assistant messages)
+- Timestamp
+
+**Features:**
+- Real-time status badges (⏳ Pending, ⚡ Processing, ✓ Completed, ✗ Failed)
+- Token statistics with cache breakdown
+- Export conversation as JSON
+- Clear conversation button
 
 ## Anthropic API Integration
 
-### Supported Features
+### 1. Prompt Caching (Stateful Mode Only)
 
-Based on official documentation (https://docs.claude.com/en/api/messages):
+**Purpose:** 90% cost reduction for repeated content
 
-#### 1. Prompt Caching
-
-**Purpose:** Reduce costs and latency for repeated content (90% cost savings)
-
-**How It Works:**
-- Mark content with `cache_control: { type: 'ephemeral' }`
-- Cache lifetime: 5 minutes (default) or 1 hour (optional)
-- Automatic cache hits when content is identical
-- Cache statistics returned in response
-
-**Example:**
+**Implementation:**
 ```json
 {
-  "system": [
-    {
-      "type": "text",
-      "text": "You are a helpful assistant...",
-      "cache_control": { "type": "ephemeral" }
-    }
-  ],
-  "messages": [
-    {
-      "role": "user",
-      "content": [
-        {
-          "type": "document",
-          "source": { "type": "text", "data": "Large document..." },
-          "cache_control": { "type": "ephemeral" }
-        },
-        {
-          "type": "text",
-          "text": "What are the key points?"
-        }
-      ]
-    }
-  ]
+  "system": [{
+    "type": "text",
+    "text": "You are a legal assistant...",
+    "cache_control": { "type": "ephemeral" }
+  }],
+  "messages": [{
+    "role": "user",
+    "content": [
+      {
+        "type": "document",
+        "source": { "type": "text", "data": "Contract text..." },
+        "cache_control": { "type": "ephemeral" }
+      },
+      { "type": "text", "text": "What are payment terms?" }
+    ]
+  }]
 }
 ```
 
-**Workbench Implementation:**
-- Toggle: "Caching" switch in settings
-- Caches system prompt + document
-- Subsequent messages to same document hit cache
-- Cache stats displayed: "🎯 X tokens cached"
+**Cache Lifecycle:**
+- First message: Cache write (system + document)
+- Follow-up messages: Cache hit (90% savings)
+- TTL: 5 minutes
+- Requirements: Minimum 1024 tokens
 
-**Requirements:**
-- Minimum 1024 tokens (2048 for Haiku)
-- Content must be identical for cache hit
-- Up to 4 cache breakpoints per request
+### 2. Extended Thinking
 
-#### 2. Extended Thinking
+**Toggle:** "Thinking mode"
 
-**Purpose:** Enable deeper reasoning for complex tasks
-
-**How It Works:**
-- Add `thinking` parameter with budget_tokens
-- Model generates internal reasoning in thinking blocks
-- Thinking blocks not counted toward output limit
-- Final response follows thinking process
-
-**Example:**
+**Implementation:**
 ```json
 {
   "thinking": {
@@ -430,735 +496,183 @@ Based on official documentation (https://docs.claude.com/en/api/messages):
 }
 ```
 
-**Workbench Implementation:**
-- Toggle: "Thinking mode" switch
-- Default budget: 10,000 tokens
-- Thinking blocks displayed separately in output
-- Configurable in advanced settings (future)
+### 3. Citations
 
-**Requirements:**
-- Minimum 1024 tokens
-- Must be less than max_tokens
-- Supported models: Claude 3.7 Sonnet, Claude 4.x
+**Toggle:** "Citations"
 
-#### 3. Citations
-
-**Purpose:** Ground responses in source documents with exact references
-
-**How It Works:**
-- Enable on document blocks: `citations: { enabled: true }`
-- Model returns citation blocks referencing specific passages
-- Automatic sentence-level chunking
-- 15% improvement in recall accuracy
-
-**Example:**
+**Implementation:**
 ```json
 {
   "type": "document",
-  "source": {
-    "type": "text",
-    "media_type": "text/plain",
-    "data": "Document content..."
-  },
+  "source": {...},
   "citations": { "enabled": true }
 }
 ```
 
-**Workbench Implementation:**
-- Toggle: "Citations" switch
-- Applied to uploaded documents
-- Citation blocks displayed in output
-- Shows exact source passages
+## Mode Comparison
 
-**Supported Models:**
-- Claude Opus 4.1, Opus 4
-- Claude Sonnet 4.5, 4, 3.7
-- Claude Haiku 3.5
-
-#### 4. Multi-turn Conversations
-
-**Purpose:** Maintain context across multiple messages
-
-**How It Works:**
-- Build messages array with alternating user/assistant turns
-- Include all previous turns in conversation_history
-- Combine with caching for cost optimization
-
-**Workbench Implementation:**
-```typescript
-// First message with document
-messages = [
-  {
-    role: 'user',
-    content: [document_block, first_question]
-  }
-]
-
-// Subsequent messages
-messages = [
-  { role: 'user', content: [document_block, first_question] },
-  { role: 'assistant', content: first_answer },
-  { role: 'user', content: second_question },  // New question
-]
-```
-
-**Optimization:**
-- Document cached on first message
-- Subsequent messages: 90% cost reduction via cache hits
-- Conversation history maintained in Zustand store
-- Cleared when user leaves page or clicks "Clear conversation"
-
-## Data Flow Diagrams
-
-### Complete Test Execution Flow
-
-```
-┌────────────┐
-│   User     │
-│  Workbench │
-└──────┬─────┘
-       │ 1. User clicks "Test"
-       │ 2. handleRunTest() called
-       ▼
-┌─────────────────────────────────────┐
-│  Workbench Input Component          │
-│  - Reads store state                │
-│  - Builds request payload           │
-│  - Calls useWorkbenchTest.mutate()  │
-└──────┬──────────────────────────────┘
-       │ 3. HTTP POST to Edge Function
-       ▼
-┌─────────────────────────────────────────────┐
-│  Edge Function: execute-workbench-test      │
-│  ┌───────────────────────────────────────┐  │
-│  │ 1. Extract user_id from JWT          │  │
-│  │ 2. Create execution (pending)        │  │
-│  │    ↓ Realtime: ⏳ Pending            │  │
-│  │ 3. Resolve LLM config               │  │
-│  │ 4. Decrypt API key                  │  │
-│  │ 5. Build Anthropic request          │  │
-│  │ 6. Update execution (processing)     │  │
-│  │    ↓ Realtime: ⚡ Processing        │  │
-│  │ 7. Call Anthropic API               │  │
-│  │ 8. Parse response                   │  │
-│  │ 9. Update execution (completed)      │  │
-│  │    ↓ Realtime: ✓ Completed          │  │
-│  │ 10. Return result + execution_id    │  │
-│  └───────────────────────────────────────┘  │
-└──────┬──────────────────────────────────────┘
-       │ 4. Response with execution_id
-       ▼
-┌─────────────────────────────────────┐
-│  React Query Mutation Success       │
-│  - subscribeToExecution(exec_id)    │
-│  - addToConversation(user_msg)      │
-│  - addToConversation(assistant_msg) │
-│  - clearPrompt()                    │
-└──────┬──────────────────────────────┘
-       │ 5. Realtime subscription active
-       ▼
-┌─────────────────────────────────────┐
-│  Supabase Realtime Channel          │
-│  - Subscribed to execution_id       │
-│  - Receives UPDATE events           │
-│  - Calls handleExecutionUpdate()    │
-└──────┬──────────────────────────────┘
-       │ 6. Status updates received
-       ▼
-┌─────────────────────────────────────┐
-│  Workbench Store                    │
-│  - executionStatus updated          │
-│  - UI rerenders with new status     │
-└──────┬──────────────────────────────┘
-       │ 7. After 1 second
-       ▼
-┌─────────────────────────────────────┐
-│  Auto-unsubscribe                   │
-│  - Channel closed                   │
-│  - executionStatus → 'idle'         │
-└─────────────────────────────────────┘
-```
-
-### Prompt Caching Flow
-
-```
-First Message (Cache MISS):
-┌────────────┐
-│   User     │ "Analyze this document"
-└──────┬─────┘
-       │
-       ▼
-┌──────────────────────────┐
-│  Edge Function           │
-│  {                       │
-│    system: [             │
-│      {                   │
-│        text: "...",      │
-│        cache_control ✓   │  ← Cache this
-│      }                   │
-│    ],                    │
-│    messages: [           │
-│      {                   │
-│        content: [        │
-│          {               │
-│            type: "doc",  │
-│            data: "...",  │
-│            cache_control ✓ ← And this
-│          }              │
-│        ]                │
-│      }                  │
-│    ]                    │
-│  }                      │
-└──────┬───────────────────┘
-       │
-       ▼
-┌──────────────────────────┐
-│  Anthropic API           │
-│  - Processes request     │
-│  - Creates cache         │
-│  - Returns response      │
-│  Usage: {                │
-│    input_tokens: 5000    │
-│    cache_write: 5000 ✓   │  ← Cache created
-│  }                       │
-└──────────────────────────┘
-
-Second Message (Cache HIT):
-┌────────────┐
-│   User     │ "What are the key points?"
-└──────┬─────┘
-       │
-       ▼
-┌──────────────────────────┐
-│  Edge Function           │
-│  {                       │
-│    system: [... same]    │  ← Identical
-│    messages: [           │
-│      {content: [doc]},   │  ← Identical
-│      {role: "assistant"},│
-│      {role: "user",      │
-│       content: "key?"}   │  ← New question only
-│    ]                    │
-│  }                      │
-└──────┬───────────────────┘
-       │
-       ▼
-┌──────────────────────────┐
-│  Anthropic API           │
-│  - Recognizes cached     │
-│  - Skips reprocessing    │
-│  - Returns response      │
-│  Usage: {                │
-│    input_tokens: 10      │  ← Only new question
-│    cache_read: 5000 ✓    │  ← 90% cost savings!
-│  }                       │
-└──────────────────────────┘
-```
-
-## UI Components
-
-### Workbench Input
-**Location:** `components/workbench/workbench-input.tsx`
-
-**Features:**
-- Two-column layout (settings | prompts)
-- Model selector (Sheet component)
-- File upload (text/PDF)
-- Feature toggles (thinking, citations, caching, tool use)
-- System prompt (read-only from processor)
-- Operation prompt (editable)
-- Test button with loading state
-
-**Model Selector:**
-- Triggered by clicking "Model" text
-- Sheet slides in from right
-- Shows organization's available models (or global)
-- Highlights current selection
-- Preserves minimal UI when closed
-
-### Workbench Output
-**Location:** `components/workbench/workbench-output.tsx`
-
-**Features:**
-- Real-time status badges:
-  - ⏳ Pending (yellow)
-  - ⚡ Processing (blue)
-  - ✓ Completed (green)
-  - ✗ Failed (red)
-- Token statistics with cache breakdown
-- Conversation history (all turns)
-- Copy/export conversation
-- Clear conversation button
-
-**Display:**
-```
-┌────────────────────────────────────────┐
-│ ⚡ Processing  |  423 tokens  | 🎯 90 cached │
-├────────────────────────────────────────┤
-│ You                              10:34 │
-│ ┌────────────────────────────────────┐ │
-│ │ What are the payment terms?        │ │
-│ └────────────────────────────────────┘ │
-│                                        │
-│ Assistant                  245 tokens │
-│ ┌────────────────────────────────────┐ │
-│ │ The payment terms are Net 30...    │ │
-│ └────────────────────────────────────┘ │
-└────────────────────────────────────────┘
-```
-
-### Processor Header
-**Location:** `components/processors/processor-header.tsx`
-
-**Addition:** LLM Configuration Display
-
-Shows in collapsible "Advanced settings":
-```
-LLM Configuration
-  Claude 3.5 Sonnet • anthropic
-  Using organization API key
-```
+| Feature | Stateful Mode | Stateless Mode |
+|---------|--------------|----------------|
+| **Purpose** | Document testing with caching | Independent queries |
+| **Caching** | Auto-enabled (enforced) | Auto-disabled (enforced) |
+| **System Prompt** | Sent once (first message) | Sent every time (if enabled) |
+| **Document** | Cached on first message | Optional per message |
+| **Conversation History** | Maintained | None |
+| **Follow-up Messages** | 90% cost savings | Full cost each time |
+| **Output** | Accumulated | Cleared between messages |
+| **Use Case** | Simulating RUNs | Testing prompts/tools |
 
 ## What's Implemented
 
 ### ✅ Phase A: Anthropic LLM Integration
 - Anthropic SDK integration (@anthropic-ai/sdk v0.65.0)
-- Global LLM settings table with 3 Claude models
+- Global LLM settings with Claude models
 - Multi-turn conversations with full context
 - Prompt caching (5-min TTL, 90% cost reduction)
-- Extended thinking mode (configurable budget)
-- Document citations with exact references
-- Model selector UI (Sheet component)
-- Conversation history display
-- Cache hit statistics
-- LLM config in processor header
-- Export conversation as JSON
+- Extended thinking mode
+- Document citations
+- Model selector UI
 
 ### ✅ Phase B: Real-time Streaming
 - `workbench_executions` table with RLS
 - Edge Function database tracking
 - Supabase Realtime subscriptions
-- Live status updates (pending → processing → completed)
-- Automatic subscription management
+- Live status updates
 - Execution audit trail
-- Multi-device support
-- Error handling with real-time feedback
 
-## What's NOT Implemented
+### ✅ Phase C: Mode-Based Architecture (Current)
+- Stateful mode (document testing with caching)
+- Stateless mode (independent queries)
+- Mode validation in Edge Function
+- Mode-based system prompt handling
+- Mode-based message building
+- Per-message metadata display
+- System prompt toggle
+- Auto-managed caching per mode
 
-### Future Enhancements
+## Bug Fixes (Phase 1.7)
 
-#### 1. Operation-Level Configuration
-**Status:** Architecture ready, not implemented
+### Fixed: Caching Message Order Bug
 
-Currently workbench uses processor's system prompt and user's test settings. Future:
-- Store operation-specific settings in `operations.configuration`
-- Pre-populate workbench with operation's temperature, thinking, citations
-- Allow overriding for testing
-
-**Migration Path:**
-```sql
--- Already exists, just need to populate
-UPDATE operations SET configuration = jsonb_build_object(
-  'temperature', 0.7,
-  'max_tokens', 4096,
-  'thinking', jsonb_build_object('type', 'enabled', 'budget_tokens', 8000),
-  'citations_enabled', true
-) WHERE operation_type = 'analysis';
+**Original Issue:**
+When caching was enabled with a file, the Edge Function built messages in wrong order:
+```
+[NEW message with doc], [HISTORY], // Wrong - timeline backwards
 ```
 
-#### 2. Advanced Settings UI
-**Status:** Store has fields, UI incomplete
+**Root Cause:**
+- Added new message with document first
+- Then added conversation history
+- Skipped adding new prompt because file_content existed
+- Result: Invalid message structure, non-2xx errors from Anthropic
 
-Store has `advancedSettings` but UI only shows toggles. Future:
-- Collapsible "Advanced Settings" panel
-- Sliders for temperature, top_p, top_k
-- Input for thinking budget (min 1024)
-- Stop sequences editor
-- Max tokens override
-
-#### 3. Tool Use Support
-**Status:** Toggle exists, not functional
-
-UI has "Tool use" toggle but Anthropic tool use not implemented. Future:
-- Define tools in processor configuration
-- Pass tools to Anthropic API
-- Display tool use in output
-- Support for code execution, web search, etc.
-
-**Anthropic API:**
-```json
-{
-  "tools": [
-    {
-      "name": "get_weather",
-      "description": "Get weather for a location",
-      "input_schema": { ... }
-    }
-  ],
-  "tool_choice": { "type": "auto" }
-}
-```
-
-#### 4. Streaming Responses
-**Status:** Infrastructure ready, not implemented
-
-Table has `partial_response` field for incremental updates. Future:
-- Use Anthropic streaming API (`stream: true`)
-- Update `partial_response` as chunks arrive
-- Display text as it's generated (typewriter effect)
-- Realtime broadcasts partial updates
-
-**Implementation:**
+**Solution:**
+Mode-based message building with proper timeline:
 ```typescript
-const stream = await anthropic.messages.stream(requestParams)
+// Stateful follow-up (correct)
+[HISTORY],  // Previous conversation
+[NEW prompt]  // New question
 
-for await (const chunk of stream) {
-  // Update database with partial response
-  await supabase
-    .from('workbench_executions')
-    .update({ partial_response: accumulatedText })
-    .eq('id', executionId)
-  // Realtime broadcasts update → Client displays incrementally
-}
+// System + Document cached from first message (cache hit)
 ```
 
-#### 5. Document Upload from Supabase Storage
-**Status:** Not implemented
+## Future Enhancements
 
-Currently only file upload from computer. Future:
-- Browse documents from `documents` table
-- Select existing document for testing
-- Avoid re-uploading same file
-- Automatically enable caching for selected documents
+### 1. Advanced Settings UI
+- Sliders for temperature, top_p, top_k
+- Thinking budget input
+- Stop sequences editor
 
-#### 6. Persistent Workbench Sessions
-**Status:** Intentionally not implemented
+### 2. Tool Use Support
+- Define tools in processor configuration
+- Display tool use in output
+- Support web search, code execution
 
-Currently all state lost on page refresh. Could add:
-- Save workbench state to local storage
-- Resume conversation on page reload
-- Option to save/load test sessions
-- Share test sessions via URL
+### 3. Streaming Responses
+- Use Anthropic streaming API
+- Typewriter effect display
+- Real-time partial updates
 
-**Trade-off:** Simplicity vs. convenience (current choice: simplicity)
+### 4. Document Selection from Storage
+- Browse existing documents
+- Avoid re-uploading
+- Auto-enable caching
 
-#### 7. Batch Testing
-**Status:** Not implemented
-
-Test same prompt against multiple models/settings. Future:
-- Select multiple models
-- Run same test N times
-- Compare responses side-by-side
-- Aggregate token usage statistics
-
-#### 8. Cost Tracking
-**Status:** Metrics stored, no UI
-
-Database stores `tokens_used` but no cost calculation. Future:
-- Calculate cost per execution based on model pricing
-- Show cumulative cost for session
-- Organization-level budget tracking
-- Alert when approaching limits
-
-**Pricing (as of 2025-01-01):**
-- Claude 3.5 Sonnet: $3/M input, $15/M output
-- Cache writes: +25% of input cost
-- Cache reads: -90% of input cost
-
-#### 9. Export Formats
-**Status:** JSON only
-
-Currently exports as JSON. Could add:
-- Markdown export
-- HTML export
-- CSV for token statistics
-- PDF reports
-
-#### 10. Collaborative Testing
-**Status:** Not planned
-
-Future organization features:
-- Share test sessions with team members
-- Comment on test results
-- Version control for test prompts
-- Team analytics
+### 5. Cost Tracking UI
+- Calculate cost per execution
+- Session cumulative cost
+- Organization budget tracking
 
 ## Security & Privacy
 
 ### API Key Security
-
-**Current Implementation (Pre-Production):**
-- Global API key stored in Edge Function environment variable (`ANTHROPIC_API_KEY`)
-- Used when organization has no custom API key configured
-- Suitable for beta/preview before commercial launch
-- Simple, secure, and allows immediate testing
-
-**Organization API Keys (Future/Enterprise):**
-- Custom keys encrypted at rest using `encrypt_api_key(plaintext, org_id)`
-- Organization-specific encryption keys
-- Stored in `organizations.llm_configuration.api_keys_encrypted`
-- Only service-role Edge Function can decrypt via `decrypt_api_key()`
+- Global API key in Edge Function env var (pre-production)
+- Organization keys encrypted at rest
+- Service-role decryption only
 - Never sent to client
-- Rotation supported (update encrypted value)
-
-**Edge Function Logic:**
-```typescript
-// Falls back: Organization key → Global env var
-if (llmConfig.api_key_encrypted) {
-  apiKey = await decrypt_api_key(llmConfig.api_key_encrypted, org_id)
-} else {
-  apiKey = Deno.env.get('ANTHROPIC_API_KEY')
-}
-```
 
 ### Row Level Security
-
 ```sql
--- Workbench executions
 CREATE POLICY "Users can view their own workbench executions"
   ON workbench_executions FOR SELECT
   USING (user_id = auth.uid());
-
-CREATE POLICY "Users can insert their own workbench executions"
-  ON workbench_executions FOR INSERT
-  WITH CHECK (
-    user_id = auth.uid() AND
-    organization_id = (auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid
-  );
-
-CREATE POLICY "Users can update their own workbench executions"
-  ON workbench_executions FOR UPDATE
-  USING (user_id = auth.uid());
 ```
 
-**Realtime Security:**
-- Filters by `id=eq.{execution_id}`
-- User can only subscribe to own executions
-- RLS policies enforce access control
-- No cross-organization data leakage
-
 ### Data Isolation
-
-**Organization Boundaries:**
-- All executions scoped to organization_id
-- JWT metadata determines organization context
+- Executions scoped to organization_id and user_id
 - RLS policies prevent cross-org access
 - Edge Function validates organization membership
 
-**User Boundaries:**
-- Executions scoped to user_id
-- Only creator can view execution details
-- Future: Share executions within organization
-
 ## Performance Considerations
 
-### Prompt Caching Benefits
-
-**Cost Savings:**
+### Prompt Caching Benefits (Stateful Mode)
 - Cache writes: +25% cost (one-time)
 - Cache reads: -90% cost (recurring)
 - Break-even: After 2nd use
-- 10-turn conversation: ~85% total cost savings
+- 10-turn conversation: ~85% total savings
 
-**Latency Improvements:**
-- Cache hit: ~50-85% faster response
-- Larger documents: Greater improvements
-- 5-minute TTL: Sufficient for testing sessions
-
-**Optimization Tips:**
-- Enable caching for documents > 1024 tokens
-- Keep system prompt consistent
-- Upload document once, ask multiple questions
-- Use same processor to maintain cache
-
-### Database Performance
-
-**Indexes:**
+### Database Indexes
 ```sql
 CREATE INDEX idx_workbench_executions_user_id ON workbench_executions(user_id);
 CREATE INDEX idx_workbench_executions_processor_id ON workbench_executions(processor_id);
 CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
-CREATE INDEX idx_workbench_executions_created_at ON workbench_executions(created_at DESC);
 ```
-
-**Query Optimization:**
-- Realtime filters by primary key (execution_id)
-- User queries filtered by indexed user_id
-- Processor queries use processor_id index
-- Recent executions use created_at index
-
-**Scaling:**
-- Partition by created_at (monthly/quarterly)
-- Archive old executions (> 90 days)
-- Aggregate statistics for cost tracking
-- Soft delete vs. hard delete (compliance)
-
-### Realtime Scalability
-
-**Connection Management:**
-- One channel per execution
-- Automatic cleanup on completion
-- Max 100 concurrent channels per client (Supabase limit)
-- Reconnection on network failures
-
-**Message Volume:**
-- 2-3 updates per execution (pending → processing → completed)
-- Low message frequency (not streaming text yet)
-- Minimal bandwidth usage
-- Scales with user count, not message count
 
 ## Troubleshooting
 
 ### Common Issues
 
-#### 1. "No models available"
-**Cause:** No global settings or organization config
-**Solution:**
-```sql
--- Check global settings
-SELECT * FROM llm_global_settings WHERE is_active = true;
+#### 1. "Stateful mode requires caching to be enabled"
+**Cause:** Mode validation failed
+**Solution:** Ensure caching toggle is enabled when in stateful mode
 
--- Check organization config
-SELECT llm_configuration FROM organizations
-WHERE id = (auth.jwt() -> 'app_metadata' ->> 'organization_id')::uuid;
-```
+#### 2. "Stateless mode cannot have conversation history"
+**Cause:** Conversation history passed in stateless mode
+**Solution:** Clear conversation when switching to stateless
 
-#### 2. "Failed to decrypt API key"
-**Cause:** Missing organization API key or encryption issue
-**Solution:**
-```sql
--- Verify encrypted key exists
-SELECT llm_configuration -> 'api_keys_encrypted' -> 'anthropic'
-FROM organizations WHERE id = 'org-uuid';
-
--- Re-encrypt if needed using set_organization_llm_config()
-```
-
-#### 3. "Execution stuck in 'processing'"
-**Cause:** Edge Function error or timeout
-**Solution:**
-```sql
--- Check execution error message
-SELECT error_message, updated_at FROM workbench_executions
-WHERE id = 'execution-uuid';
-
--- Check Edge Function logs
-```
-
-#### 4. "Realtime updates not received"
-**Cause:** Subscription not established or table not in publication
-**Solution:**
-```sql
--- Verify table in realtime publication
-SELECT * FROM pg_publication_tables
-WHERE pubname = 'supabase_realtime' AND tablename = 'workbench_executions';
-
--- Check browser console for subscription errors
-```
-
-#### 5. "Cache not working"
+#### 3. Cache not working
 **Cause:** Content changed or cache expired
 **Solution:**
-- Verify caching toggle enabled
-- Check system prompt hasn't changed
+- Verify in stateful mode
+- Check system prompt unchanged
 - Ensure document content identical
-- Verify file uploaded vs. document selection
-- Cache expires after 5 minutes of inactivity
-
-### Debug Queries
-
-```sql
--- Recent executions for debugging
-SELECT id, status, model_used, error_message,
-       tokens_used, execution_time_ms, created_at
-FROM workbench_executions
-WHERE user_id = auth.uid()
-ORDER BY created_at DESC
-LIMIT 10;
-
--- Check cache hit rates
-SELECT
-  model_used,
-  COUNT(*) as total_executions,
-  SUM((tokens_used->>'cached_read')::int) as total_cached_tokens,
-  SUM((tokens_used->>'input')::int) as total_input_tokens,
-  ROUND(100.0 * SUM((tokens_used->>'cached_read')::int) /
-    NULLIF(SUM((tokens_used->>'input')::int), 0), 2) as cache_hit_rate_pct
-FROM workbench_executions
-WHERE user_id = auth.uid()
-  AND status = 'completed'
-  AND tokens_used IS NOT NULL
-GROUP BY model_used;
-
--- Execution performance metrics
-SELECT
-  DATE_TRUNC('hour', created_at) as hour,
-  COUNT(*) as executions,
-  AVG(execution_time_ms) as avg_time_ms,
-  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY execution_time_ms) as median_time_ms,
-  PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY execution_time_ms) as p95_time_ms
-FROM workbench_executions
-WHERE user_id = auth.uid()
-  AND status = 'completed'
-  AND created_at > NOW() - INTERVAL '24 hours'
-GROUP BY hour
-ORDER BY hour DESC;
-```
-
-## Migration Path to Production Runs
-
-The Workbench architecture intentionally mirrors the future Run execution system:
-
-**Similarities:**
-- Same database structure (`runs` will mirror `workbench_executions`)
-- Same Edge Function pattern (execution tracking)
-- Same real-time subscription approach
-- Same LLM configuration resolution
-
-**Differences:**
-- Runs are permanent (not ephemeral)
-- Runs execute all operations in processor
-- Runs process actual documents (not test uploads)
-- Runs have workflow orchestration
-- Runs generate structured output/reports
-
-**Reusable Components:**
-- `execute-workbench-test` → `execute-run` (similar structure)
-- Workbench store patterns → Run tracking store
-- Real-time subscription logic → Run progress tracking
-- LLM config resolution → Same function
-
-**Next Steps (Phase 2):**
-1. Create `runs` and `operation_results` tables
-2. Adapt Edge Function for operation execution
-3. Build run orchestration system
-4. Create result aggregation views
-5. Generate reports from results
-
-This architecture provides a proven foundation for the production execution system.
+- Cache expires after 5 minutes
 
 ---
 
-**Last Updated:** 2025-10-03 (Architecture corrected for service-role + SECURITY DEFINER pattern)
-**Phase:** 1.6 Complete
+**Last Updated:** 2025-10-03
+**Phase:** 1.7 Complete (Mode-Based Architecture)
 **Next Phase:** 2.0 - Run Execution System
+**Edge Function Version:** 6
 
 ## Architecture Notes
 
-### Service-Role + SECURITY DEFINER Pattern
+### Service-Role + Explicit Parameter Pattern
 
-The Edge Function uses a **service-role key** which bypasses RLS. This is architecturally correct for:
-- External API integrations (Anthropic)
-- API key decryption (requires service-role privileges)
-- Cross-table queries without RLS overhead
+Edge Function uses **service-role key** (bypasses RLS) with explicit user context:
+- Extracts user_id from incoming JWT
+- Passes user_id explicitly to database functions
+- Functions query `organization_members` for context
+- No reliance on `auth.jwt()` in service-role context
 
-However, `auth.jwt()` and `auth.uid()` helper functions only work with **user JWT context** (anon/authenticated roles), not service-role keys.
-
-**Solution Implemented:**
-- Database function `get_llm_config_for_run(p_processor_id uuid, p_user_id uuid)` accepts explicit user_id parameter
-- Edge Function extracts user_id from incoming JWT and passes it explicitly
-- Function queries `organization_members` table to resolve organization context
-- Maintains backward compatibility: parameter is optional, falls back to `auth.uid()` when called from client
-
-This follows Supabase best practices where Edge Functions handle service-role operations with explicit parameter passing rather than relying on JWT context that doesn't exist in service-role mode.
+This follows Supabase best practices for Edge Functions handling service-role operations with proper security context.

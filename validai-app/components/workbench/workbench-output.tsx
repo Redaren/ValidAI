@@ -213,23 +213,112 @@ export function WorkbenchOutput() {
 
         {/* Conversation History */}
         <div className="space-y-4">
-          {conversationHistory.map((message, index) => (
+          {[...conversationHistory].reverse().map((message, index) => (
             <div key={index} className="space-y-2">
+              {/* Message Header */}
               <div className="flex items-center justify-between">
-                <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
-                  {message.role === 'user' ? 'You' : 'Assistant'}
-                </Badge>
-                {message.tokensUsed && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{message.tokensUsed.input + message.tokensUsed.output} tokens</span>
-                    {message.tokensUsed.cached_read && (
+                <div className="flex items-center gap-2">
+                  <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
+                    {message.role === 'user' ? 'You' : 'Assistant'}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(message.timestamp).toLocaleTimeString()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Message Metadata - show if available */}
+              {message.metadata && (
+                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  {/* Mode */}
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Mode:</span>
+                    <span className={message.metadata.mode === 'stateful' ? 'text-blue-600' : 'text-orange-600'}>
+                      {message.metadata.mode === 'stateful' ? 'Stateful' : 'Stateless'}
+                    </span>
+                  </span>
+
+                  <span>•</span>
+
+                  {/* Cache */}
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Cache:</span>
+                    <span className={message.metadata.cacheEnabled ? 'text-green-600' : ''}>
+                      {message.metadata.cacheEnabled ? '✓' : '✗'}
+                    </span>
+                  </span>
+
+                  <span>•</span>
+
+                  {/* System Prompt */}
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">System Prompt:</span>
+                    <span>{message.metadata.systemPromptSent ? '✓' : '✗'}</span>
+                  </span>
+
+                  <span>•</span>
+
+                  {/* Thinking */}
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Thinking:</span>
+                    <span>{message.metadata.thinkingEnabled ? '✓' : '✗'}</span>
+                  </span>
+
+                  <span>•</span>
+
+                  {/* Citations */}
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Citations:</span>
+                    <span>{message.metadata.citationsEnabled ? '✓' : '✗'}</span>
+                  </span>
+                </div>
+              )}
+
+              {/* Token Usage */}
+              {message.metadata && (
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Input:</span>
+                    <span>{message.metadata.inputTokens} tokens</span>
+                    {message.metadata.cachedReadTokens && message.metadata.cachedReadTokens > 0 && (
                       <span className="text-green-600">
-                        ({message.tokensUsed.cached_read} cached)
+                        ({message.metadata.cachedReadTokens} cached)
                       </span>
                     )}
-                  </div>
-                )}
-              </div>
+                  </span>
+
+                  <span>•</span>
+
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">Output:</span>
+                    <span>{message.metadata.outputTokens} tokens</span>
+                  </span>
+
+                  {message.metadata.executionTimeMs && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <span className="font-medium">Time:</span>
+                        <span>{(message.metadata.executionTimeMs / 1000).toFixed(2)}s</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Legacy token display for backward compatibility */}
+              {!message.metadata && message.tokensUsed && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span>{message.tokensUsed.input + message.tokensUsed.output} tokens</span>
+                  {message.tokensUsed.cached_read && (
+                    <span className="text-green-600">
+                      ({message.tokensUsed.cached_read} cached)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Message Content */}
               <div className={cn(
                 "rounded-lg p-4",
                 message.role === 'user'

@@ -60,6 +60,8 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     selectedModel,
     systemPrompt,
     operationPrompt,
+    mode,
+    sendSystemPrompt,
     thinkingMode,
     citations,
     toolUse,
@@ -70,9 +72,12 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     setFile,
     setModel,
     updateOperationPrompt,
+    setMode,
+    toggleSystemPrompt,
     toggleFeature,
     toggleCaching,
     addToConversation,
+    clearOutput,
     subscribeToExecution,
     unsubscribeFromExecution
   } = useWorkbenchStore()
@@ -161,16 +166,23 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     }
 
     try {
+      // In stateless mode: clear output before new test
+      if (mode === 'stateless') {
+        clearOutput()
+      }
+
       const result = await workbenchTest.mutateAsync({
         processor_id: processor.processor_id,
+        mode: mode,
         system_prompt: systemPrompt,
+        send_system_prompt: sendSystemPrompt,
         file_content: selectedFile?.type === 'uploaded'
           ? await readFileAsText(selectedFile.file)
           : undefined,
         file_type: selectedFile?.type === 'uploaded'
           ? (selectedFile.file.type || 'text/plain') as any
           : undefined,
-        conversation_history: conversationHistory,
+        conversation_history: mode === 'stateful' ? conversationHistory : [],
         new_prompt: operationPrompt,
         settings: {
           model_id: selectedModel,
@@ -185,18 +197,30 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         subscribeToExecution(result.execution_id)
       }
 
-      // Add to conversation history
+      // Add to conversation history with metadata
       addToConversation({
         role: 'user',
         content: operationPrompt,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        metadata: {
+          mode: mode,
+          cacheEnabled: cacheEnabled,
+          systemPromptSent: sendSystemPrompt,
+          thinkingEnabled: thinkingMode,
+          citationsEnabled: citations,
+          inputTokens: result.metadata.inputTokens,
+          outputTokens: 0,
+          cachedReadTokens: result.metadata.cachedReadTokens,
+          cachedWriteTokens: result.metadata.cachedWriteTokens
+        }
       })
 
       addToConversation({
         role: 'assistant',
         content: result.response,
         timestamp: result.timestamp,
-        tokensUsed: result.tokensUsed
+        metadata: result.metadata,
+        tokensUsed: result.tokensUsed  // Keep for backward compatibility
       })
 
       // Clear the prompt for next message
@@ -277,6 +301,46 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         <div className="space-y-3">
           <Label>Settings</Label>
           <div className="space-y-3 text-sm text-muted-foreground">
+            {/* Mode Toggle */}
+            <div className="grid grid-cols-[140px,auto] gap-4 items-center">
+              <span>Mode</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setMode('stateful')}
+                  className={cn(
+                    "px-3 py-1 text-xs rounded-md transition-colors",
+                    mode === 'stateful'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  )}
+                >
+                  Stateful
+                </button>
+                <button
+                  onClick={() => setMode('stateless')}
+                  className={cn(
+                    "px-3 py-1 text-xs rounded-md transition-colors",
+                    mode === 'stateless'
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  )}
+                >
+                  Stateless
+                </button>
+              </div>
+            </div>
+
+            {/* System Prompt Toggle - only show if system prompt exists */}
+            {systemPrompt && (
+              <div className="grid grid-cols-[140px,auto] gap-4 items-center">
+                <span>Send system prompt</span>
+                <Switch
+                  checked={sendSystemPrompt}
+                  onCheckedChange={toggleSystemPrompt}
+                />
+              </div>
+            )}
+
             {/* Operation Type */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
               <span
@@ -310,13 +374,19 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
               <span>{getModelDisplay()}</span>
             </div>
 
-            {/* Caching */}
+            {/* Caching - Auto-managed by mode */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
               <span>Caching</span>
-              <Switch
-                checked={cacheEnabled}
-                onCheckedChange={toggleCaching}
-              />
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={cacheEnabled}
+                  onCheckedChange={toggleCaching}
+                  disabled
+                />
+                <span className="text-xs text-muted-foreground">
+                  {mode === 'stateful' ? 'Auto-enabled' : 'Auto-disabled'}
+                </span>
+              </div>
             </div>
 
             {/* Thinking Mode */}

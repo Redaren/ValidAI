@@ -24,12 +24,33 @@ export const thinkingConfigSchema = z.object({
 export type ThinkingConfig = z.infer<typeof thinkingConfigSchema>
 
 /**
+ * Message execution metadata
+ * Captures all parameters and metrics for each message execution
+ */
+export const messageMetadataSchema = z.object({
+  mode: z.enum(['stateful', 'stateless']),
+  cacheEnabled: z.boolean(),
+  systemPromptSent: z.boolean(),
+  thinkingEnabled: z.boolean(),
+  citationsEnabled: z.boolean(),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  cachedReadTokens: z.number().optional(),
+  cachedWriteTokens: z.number().optional(),
+  executionTimeMs: z.number().optional()
+})
+
+export type MessageMetadata = z.infer<typeof messageMetadataSchema>
+
+/**
  * Conversation message in workbench history
  */
 export const conversationMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
   content: z.string(),
   timestamp: z.string(),
+  metadata: messageMetadataSchema.optional(),
+  // Legacy field for backward compatibility
   tokensUsed: z.object({
     input: z.number(),
     output: z.number(),
@@ -91,48 +112,69 @@ export type WorkbenchSettings = z.infer<typeof workbenchSettingsSchema>
  * Complete workbench test execution request
  *
  * Used when calling execute-workbench-test Edge Function.
- * Supports multi-turn conversations with optional document upload.
+ * Supports two modes:
+ * - Stateful: Document testing with caching and conversation history
+ * - Stateless: Independent single queries
  *
- * @example
+ * @example Stateful mode (first message)
  * ```typescript
  * const testInput: WorkbenchTestInput = {
  *   processor_id: "uuid",
+ *   mode: "stateful",
  *   system_prompt: "You are a helpful assistant...",
+ *   send_system_prompt: true,
  *   file_content: "Document text here...",
  *   file_type: "text/plain",
  *   conversation_history: [],  // First message
  *   new_prompt: "What are the key points in this document?",
  *   settings: {
  *     model_id: "claude-3-5-sonnet-20241022",
- *     temperature: 0.7,
- *     citations_enabled: true,
- *     caching_enabled: true
+ *     caching_enabled: true  // Auto-enabled in stateful mode
  *   }
  * }
  * ```
  *
- * @example Multi-turn conversation
+ * @example Stateful mode (follow-up message)
  * ```typescript
- * // Second message in conversation
  * const followUpInput: WorkbenchTestInput = {
  *   processor_id: "uuid",
- *   system_prompt: "You are a helpful assistant...",
- *   file_content: "Same document...",  // Hits cache if identical
- *   file_type: "text/plain",
+ *   mode: "stateful",
+ *   send_system_prompt: false,  // System prompt cached from first message
  *   conversation_history: [
- *     { role: "user", content: "First question?", timestamp: "..." },
- *     { role: "assistant", content: "First answer...", timestamp: "..." }
+ *     { role: "user", content: "First question?", timestamp: "...", metadata: {...} },
+ *     { role: "assistant", content: "First answer...", timestamp: "...", metadata: {...} }
  *   ],
  *   new_prompt: "Follow-up question?",
  *   settings: {
- *     caching_enabled: true  // 90% cost savings on cached content
+ *     caching_enabled: true  // Cache hit on system + document
+ *   }
+ * }
+ * ```
+ *
+ * @example Stateless mode
+ * ```typescript
+ * const statelessInput: WorkbenchTestInput = {
+ *   processor_id: "uuid",
+ *   mode: "stateless",
+ *   system_prompt: "You are a helpful assistant...",
+ *   send_system_prompt: true,  // Sent with every message
+ *   conversation_history: [],  // Always empty in stateless mode
+ *   new_prompt: "Calculate 2+2",
+ *   settings: {
+ *     caching_enabled: false  // Auto-disabled in stateless mode
  *   }
  * }
  * ```
  */
 export const workbenchTestSchema = z.object({
   processor_id: z.string().uuid('Invalid processor ID'),
+  mode: z
+    .enum(['stateful', 'stateless'])
+    .describe('Execution mode: stateful (cached conversation) or stateless (independent)'),
   system_prompt: z.string().optional(),
+  send_system_prompt: z
+    .boolean()
+    .describe('Whether to send system prompt with this message'),
   file_content: z.string().optional(),
   file_type: z
     .enum(['text/plain', 'application/pdf'])
@@ -141,7 +183,7 @@ export const workbenchTestSchema = z.object({
   conversation_history: z
     .array(conversationMessageSchema)
     .default([])
-    .describe('Previous conversation turns'),
+    .describe('Previous conversation turns (only in stateful mode)'),
   new_prompt: z
     .string()
     .min(1, 'Prompt cannot be empty')
@@ -155,7 +197,7 @@ export type WorkbenchTestInput = z.infer<typeof workbenchTestSchema>
  * Workbench test execution response
  *
  * Returned by execute-workbench-test Edge Function after successful execution.
- * Includes execution_id for real-time status tracking.
+ * Includes execution_id for real-time status tracking and metadata about the execution.
  *
  * @example
  * ```typescript
@@ -168,11 +210,23 @@ export type WorkbenchTestInput = z.infer<typeof workbenchTestSchema>
  *   citations: [
  *     { type: "citation", text: "specific passage from document" }
  *   ],
+ *   metadata: {
+ *     mode: "stateful",
+ *     cacheEnabled: true,
+ *     systemPromptSent: true,
+ *     thinkingEnabled: false,
+ *     citationsEnabled: true,
+ *     inputTokens: 1000,
+ *     outputTokens: 500,
+ *     cachedReadTokens: 900,  // 90% of input was cached
+ *     cachedWriteTokens: 0,   // No new cache created this turn
+ *     executionTimeMs: 2340
+ *   },
  *   tokensUsed: {
  *     input: 1000,
  *     output: 500,
- *     cached_read: 900,  // 90% of input was cached
- *     cached_write: 0,   // No new cache created this turn
+ *     cached_read: 900,
+ *     cached_write: 0,
  *     total: 1500
  *   },
  *   executionTime: 2340,  // milliseconds
@@ -185,6 +239,7 @@ export const workbenchTestResponseSchema = z.object({
   response: z.string(),
   thinking_blocks: z.array(z.any()).optional(),
   citations: z.array(z.any()).optional(),
+  metadata: messageMetadataSchema,  // Execution metadata
   tokensUsed: z.object({
     input: z.number(),
     output: z.number(),

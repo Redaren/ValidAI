@@ -18,7 +18,9 @@ const corsHeaders = {
 
 interface WorkbenchTestRequest {
   processor_id: string
+  mode: 'stateful' | 'stateless'
   system_prompt?: string
+  send_system_prompt: boolean
   file_content?: string
   file_type?: 'text/plain' | 'application/pdf'
   conversation_history: Array<{
@@ -105,6 +107,14 @@ serve(async (req) => {
 
     executionId = execution.id
 
+    // Validate mode constraints
+    if (body.mode === 'stateful' && !body.settings.caching_enabled) {
+      throw new Error('Stateful mode requires caching to be enabled')
+    }
+    if (body.mode === 'stateless' && body.conversation_history.length > 0) {
+      throw new Error('Stateless mode cannot have conversation history')
+    }
+
     // Resolve LLM configuration for the processor
     const { data: llmConfig, error: llmError } = await supabase.rpc('get_llm_config_for_run', {
       p_processor_id: body.processor_id,
@@ -147,86 +157,102 @@ serve(async (req) => {
       apiKey
     })
 
-    // Build system message with optional caching
-    // System prompts can be cached to reduce cost on multi-turn conversations (90% savings)
+    // Build system message with mode-based logic
     let system: any = undefined
-    if (body.system_prompt) {
-      if (body.settings.caching_enabled) {
-        // Array format with cache_control for caching support
-        system = [
-          {
-            type: 'text',
-            text: body.system_prompt,
-            cache_control: { type: 'ephemeral' }  // 5-minute TTL
-          }
-        ]
+
+    if (body.send_system_prompt && body.system_prompt) {
+      if (body.mode === 'stateful' && body.settings.caching_enabled) {
+        // Stateful mode: Use array format with cache_control (only on first message)
+        const isFirstMessage = body.conversation_history.length === 0
+        if (isFirstMessage) {
+          system = [
+            {
+              type: 'text',
+              text: body.system_prompt,
+              cache_control: { type: 'ephemeral' }  // 5-minute TTL
+            }
+          ]
+        }
+        // On follow-up messages: system is undefined (cache hit from first message)
       } else {
-        // String format for non-cached system prompts
+        // Stateless mode: Simple string format (sent every time)
         system = body.system_prompt
       }
     }
 
-    // Build messages array for multi-turn conversation
-    // Format: [user, assistant, user, assistant, ...]
+    // Build messages array with mode-based logic
     const messages: any[] = []
 
-    // Handle first message with optional document
-    // If file is provided, it's included in the first user message with cache_control
-    if (body.file_content) {
-      const contentBlocks: any[] = []
+    if (body.mode === 'stateful') {
+      // STATEFUL MODE: Maintain conversation with caching
+      const isFirstMessage = body.conversation_history.length === 0
 
-      // Add document block with Anthropic document format
-      const documentBlock: any = {
-        type: 'document',
-        source: {
-          type: body.file_type === 'application/pdf' ? 'base64' : 'text',
-          media_type: body.file_type || 'text/plain',
-          data: body.file_content
+      if (isFirstMessage) {
+        // First message: Document + prompt with caching
+        if (body.file_content) {
+          const contentBlocks: any[] = []
+
+          const documentBlock: any = {
+            type: 'document',
+            source: {
+              type: body.file_type === 'application/pdf' ? 'base64' : 'text',
+              media_type: body.file_type || 'text/plain',
+              data: body.file_content
+            },
+            cache_control: { type: 'ephemeral' }  // Cache document
+          }
+
+          if (body.settings.citations_enabled) {
+            documentBlock.citations = { enabled: true }
+          }
+
+          contentBlocks.push(documentBlock)
+          contentBlocks.push({ type: 'text', text: body.new_prompt })
+
+          messages.push({ role: 'user', content: contentBlocks })
+        } else {
+          // No document, just text
+          messages.push({ role: 'user', content: body.new_prompt })
         }
+      } else {
+        // Follow-up message: Add history + new prompt
+        // History is cached from first message (system + document)
+        body.conversation_history.forEach(msg => {
+          messages.push({
+            role: msg.role,
+            content: msg.content
+          })
+        })
+
+        // Add new prompt as final user message
+        messages.push({ role: 'user', content: body.new_prompt })
       }
+    } else {
+      // STATELESS MODE: Single independent message
+      if (body.file_content) {
+        const contentBlocks: any[] = []
 
-      // Add caching to document (recommended for multi-turn conversations)
-      // Subsequent messages will hit cache if document content is identical
-      if (body.settings.caching_enabled) {
-        documentBlock.cache_control = { type: 'ephemeral' }
+        const documentBlock: any = {
+          type: 'document',
+          source: {
+            type: body.file_type === 'application/pdf' ? 'base64' : 'text',
+            media_type: body.file_type || 'text/plain',
+            data: body.file_content
+          }
+        }
+
+        if (body.settings.citations_enabled) {
+          documentBlock.citations = { enabled: true }
+        }
+
+        contentBlocks.push(documentBlock)
+        contentBlocks.push({ type: 'text', text: body.new_prompt })
+
+        messages.push({ role: 'user', content: contentBlocks })
+      } else {
+        // No document, just text
+        messages.push({ role: 'user', content: body.new_prompt })
       }
-
-      // Add citations to enable document grounding (Claude 3.5+)
-      // Model will return citation blocks referencing specific passages
-      if (body.settings.citations_enabled) {
-        documentBlock.citations = { enabled: true }
-      }
-
-      contentBlocks.push(documentBlock)
-
-      // Add first user prompt after document
-      contentBlocks.push({
-        type: 'text',
-        text: body.new_prompt
-      })
-
-      messages.push({
-        role: 'user',
-        content: contentBlocks
-      })
-    }
-
-    // Add conversation history for multi-turn conversation
-    // Includes all previous user/assistant exchanges
-    body.conversation_history.forEach(msg => {
-      messages.push({
-        role: msg.role,
-        content: msg.content
-      })
-    })
-
-    // Add new prompt as standalone message (if no document in first message)
-    // This happens when continuing a conversation without re-uploading document
-    if (!body.file_content) {
-      messages.push({
-        role: 'user',
-        content: body.new_prompt
-      })
     }
 
     // Build request parameters
@@ -278,13 +304,25 @@ serve(async (req) => {
       }
     })
 
-    // Build result payload for client
+    // Build result payload for client with metadata
     // Includes execution_id for real-time subscription tracking
     const result = {
       execution_id: executionId,  // Client subscribes to this ID for status updates
       response: responseText,
       thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
       citations: citations.length > 0 ? citations : undefined,
+      metadata: {
+        mode: body.mode,
+        cacheEnabled: body.settings.caching_enabled || false,
+        systemPromptSent: body.send_system_prompt && !!body.system_prompt,
+        thinkingEnabled: !!body.settings.thinking,
+        citationsEnabled: body.settings.citations_enabled || false,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cachedReadTokens: response.usage.cache_read_input_tokens,
+        cachedWriteTokens: response.usage.cache_creation_input_tokens,
+        executionTimeMs: executionTime
+      },
       tokensUsed: {
         input: response.usage.input_tokens,
         output: response.usage.output_tokens,

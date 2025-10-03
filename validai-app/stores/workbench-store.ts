@@ -56,6 +56,7 @@ export type SelectedFile = {
  * Manages all state for the testbench interface including:
  * - File management
  * - LLM configuration
+ * - Mode management (stateful vs stateless)
  * - Multi-turn conversations with prompt caching
  * - Test execution and results
  * - Real-time execution tracking via Supabase Realtime
@@ -66,6 +67,10 @@ export interface WorkbenchStore {
   selectedModel: string
   systemPrompt: string
   operationPrompt: string
+
+  // Mode Management
+  mode: 'stateful' | 'stateless'
+  sendSystemPrompt: boolean
 
   // Feature Flags
   thinkingMode: boolean
@@ -95,6 +100,8 @@ export interface WorkbenchStore {
   setModel: (modelId: string) => void
   setSystemPrompt: (prompt: string) => void
   updateOperationPrompt: (prompt: string) => void
+  setMode: (mode: 'stateful' | 'stateless') => void
+  toggleSystemPrompt: () => void
   toggleFeature: (feature: 'thinking' | 'citations' | 'toolUse') => void
   updateAdvancedSettings: (settings: Partial<AdvancedSettings>) => void
   setThinkingBudget: (tokens: number | null) => void
@@ -138,13 +145,15 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       selectedModel: 'claude-3-5-sonnet-20241022',
       systemPrompt: '',
       operationPrompt: '',
+      mode: 'stateful',  // Default to stateful mode
+      sendSystemPrompt: true,  // Default to sending system prompt
       thinkingMode: false,
       citations: false,
       toolUse: false,
       advancedSettings: defaultAdvancedSettings,
       conversationHistory: [],
       cachedDocumentContent: null,
-      cacheEnabled: false,
+      cacheEnabled: true,  // Enabled by default for stateful mode
       currentExecutionId: null,
       executionStatus: 'idle',
       realtimeChannel: null,
@@ -172,6 +181,32 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       updateOperationPrompt: (prompt) => {
         set({ operationPrompt: prompt })
+      },
+
+      setMode: (mode) => {
+        const state = get()
+        if (mode === 'stateful') {
+          // Stateful: enable caching, maintain history, auto-enable system prompt
+          set({
+            mode: 'stateful',
+            cacheEnabled: true,  // Force ON
+            sendSystemPrompt: !!state.systemPrompt  // Enable if system prompt exists
+          })
+        } else {
+          // Stateless: disable caching, clear history
+          set({
+            mode: 'stateless',
+            cacheEnabled: false,  // Force OFF
+            conversationHistory: [],
+            output: null,
+            error: null,
+            sendSystemPrompt: !!state.systemPrompt  // Default ON if prompt exists
+          })
+        }
+      },
+
+      toggleSystemPrompt: () => {
+        set({ sendSystemPrompt: !get().sendSystemPrompt })
       },
 
       toggleFeature: (feature) => {
@@ -319,13 +354,15 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           selectedModel: 'claude-3-5-sonnet-20241022',
           systemPrompt: '',
           operationPrompt: '',
+          mode: 'stateful',
+          sendSystemPrompt: true,
           thinkingMode: false,
           citations: false,
           toolUse: false,
           advancedSettings: defaultAdvancedSettings,
           conversationHistory: [],
           cachedDocumentContent: null,
-          cacheEnabled: false,
+          cacheEnabled: true,
           currentExecutionId: null,
           executionStatus: 'idle',
           realtimeChannel: null,
