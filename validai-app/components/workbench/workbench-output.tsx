@@ -104,9 +104,40 @@ export function WorkbenchOutput() {
   }
 
   /**
+   * Truncate document data in content for cleaner exports
+   *
+   * Replaces full base64 document data with preview + size info.
+   * Makes exported JSON readable and manageable (60x smaller).
+   *
+   * @param content - Message content (string or content blocks array)
+   * @returns Content with truncated document data
+   */
+  const truncateDocumentData = (content: string | unknown[]): string | unknown[] => {
+    if (typeof content === 'string') return content
+
+    return content.map(block => {
+      if (typeof block === 'object' && block !== null &&
+          'type' in block && block.type === 'document' &&
+          'source' in block && block.source?.data) {
+        const originalSize = block.source.data.length
+        return {
+          ...block,
+          source: {
+            ...block.source,
+            data: block.source.data.substring(0, 20) + `... [${originalSize.toLocaleString()} bytes truncated]`
+          }
+        }
+      }
+      return block
+    })
+  }
+
+  /**
    * Export conversation history as JSON file
    *
    * Downloads conversation as JSON with timestamp.
+   * Document data is truncated for readability (original files unchanged).
+   *
    * File format:
    * ```json
    * {
@@ -122,7 +153,10 @@ export function WorkbenchOutput() {
 
     const exportData = {
       timestamp: new Date().toISOString(),
-      conversation: conversationHistory
+      conversation: conversationHistory.map(msg => ({
+        ...msg,
+        content: truncateDocumentData(msg.content)
+      }))
     }
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], {
