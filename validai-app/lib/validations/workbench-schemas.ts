@@ -45,10 +45,19 @@ export type MessageMetadata = z.infer<typeof messageMetadataSchema>
 
 /**
  * Conversation message in workbench history
+ *
+ * Content can be:
+ * - string: Simple text message
+ * - array: Content blocks (e.g., [{type: 'document', ...}, {type: 'text', text: '...'}])
+ *
+ * We store the EXACT structure sent to Anthropic API to ensure cache hits.
  */
 export const conversationMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
-  content: z.string(),
+  content: z.union([
+    z.string(),
+    z.array(z.any())
+  ]),
   timestamp: z.string(),
   metadata: messageMetadataSchema.optional(),
   // Legacy field for backward compatibility
@@ -252,7 +261,10 @@ export const workbenchTestResponseSchema = z.object({
     total: z.number()
   }),
   executionTime: z.number(),
-  timestamp: z.string()
+  timestamp: z.string(),
+  // Actual content structure sent to Anthropic (for cache consistency)
+  user_content_sent: z.union([z.string(), z.array(z.any())]),
+  system_sent: z.union([z.string(), z.array(z.any())]).optional()
 })
 
 export type WorkbenchTestResponse = z.infer<typeof workbenchTestResponseSchema>

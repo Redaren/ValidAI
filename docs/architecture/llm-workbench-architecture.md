@@ -403,6 +403,8 @@ interface WorkbenchStore {
 
   // Conversation State
   conversationHistory: ConversationMessage[]
+  // Note: Stores EXACT content structure sent to Anthropic (string or content blocks array)
+  // This ensures perfect cache hits by preserving message structure including documents
 
   // Real-time Tracking
   currentExecutionId: string | null
@@ -630,9 +632,9 @@ if (createCache) {
 - System prompt toggle
 - Auto-managed caching per mode
 
-## Bug Fixes (Phase 1.7)
+## Bug Fixes
 
-### Fixed: Caching Message Order Bug
+### Phase 1.7: Caching Message Order Bug
 
 **Original Issue:**
 When caching was enabled with a file, the Edge Function built messages in wrong order:
@@ -655,6 +657,91 @@ Mode-based message building with proper timeline:
 
 // System + Document cached from first message (cache hit)
 ```
+
+### Phase 1.8: Content Structure Preservation for Cache Hits
+
+**Original Issue:**
+Cache MISS on follow-up messages despite identical content. New cache created instead of cache hit:
+```
+Message 1: cachedWriteTokens: 3660 ✅
+Message 2: cachedWriteTokens: 3702 ❌ (should be cachedReadTokens!)
+```
+
+**Root Cause:**
+Conversation history stored only text, losing document structure:
+```typescript
+// Message 1 sent to Anthropic
+{
+  role: 'user',
+  content: [
+    {type: 'document', source: {...}, cache_control: {...}},
+    {type: 'text', text: 'Question?'}
+  ]
+}
+
+// Message 1 stored in frontend (WRONG!)
+{
+  role: 'user',
+  content: 'Question?'  // Lost document structure!
+}
+
+// Message 2 replayed with history (WRONG STRUCTURE!)
+{
+  role: 'user',
+  content: 'Question?'  // Text only, no document
+}
+```
+
+**Solution:**
+Store EXACT content structure sent to Anthropic:
+
+1. **Edge Function returns actual content** ([index.ts:303](supabase/functions/execute-workbench-test/index.ts#L303)):
+```typescript
+return {
+  ...result,
+  user_content_sent: messages[messages.length - 1].content,  // Actual structure
+  system_sent: system
+}
+```
+
+2. **Frontend stores full structure** ([workbench-input.tsx:210](validai-app/components/workbench/workbench-input.tsx#L210)):
+```typescript
+addToConversation({
+  role: 'user',
+  content: result.user_content_sent,  // Full structure, not just text
+  ...
+})
+```
+
+3. **Schema allows both formats** ([workbench-schemas.ts:57](validai-app/lib/validations/workbench-schemas.ts#L57)):
+```typescript
+content: z.union([
+  z.string(),        // Simple text
+  z.array(z.any())   // Content blocks array
+])
+```
+
+4. **UI extracts text for display** ([workbench-output.tsx:77](validai-app/components/workbench/workbench-output.tsx#L77)):
+```typescript
+const extractText = (content: string | unknown[]): string => {
+  if (typeof content === 'string') return content
+  // Extract text from content blocks
+  return content.filter(block => block.type === 'text')
+    .map(block => block.text).join(' ')
+}
+```
+
+**Result:**
+✅ Perfect cache hits on follow-up messages
+✅ Exact API replay capability
+✅ Session-scoped storage (~93KB per message with document)
+✅ Exported conversations preserve full structure
+
+**Memory Impact:**
+- Before: ~1KB per message (text only)
+- After: ~93KB per message (with 92KB PDF base64)
+- Typical session: 5 messages = ~465KB
+- Acceptable: Ephemeral test environment, cleared on refresh
 
 ## Future Enhancements
 
@@ -741,9 +828,9 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 ---
 
 **Last Updated:** 2025-10-04
-**Phase:** 1.8 Complete (Message Composition Architecture)
+**Phase:** 1.8 Complete (Message Composition Architecture + Cache Fix)
 **Next Phase:** 2.0 - Run Execution System
-**Edge Function Version:** 7
+**Edge Function Version:** 8 (content structure preservation)
 
 ## Architecture Notes
 

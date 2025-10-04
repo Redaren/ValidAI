@@ -207,7 +207,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
       if (mode === 'stateful') {
         addToConversation({
           role: 'user',
-          content: operationPrompt,
+          content: result.user_content_sent,  // Store exact content structure sent to Anthropic
           timestamp: new Date().toISOString(),
           metadata: {
             mode: mode,
@@ -237,7 +237,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         // This allows viewing the result before the next test
         addToConversation({
           role: 'user',
-          content: operationPrompt,
+          content: result.user_content_sent,  // Store exact content structure sent to Anthropic
           timestamp: new Date().toISOString(),
           metadata: {
             mode: mode,

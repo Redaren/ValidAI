@@ -65,6 +65,28 @@ export function WorkbenchOutput() {
   }
 
   /**
+   * Extract text from content (handles both string and content blocks array)
+   *
+   * Content can be:
+   * - string: Simple text message
+   * - array: Content blocks [{type: 'document', ...}, {type: 'text', text: '...'}]
+   *
+   * @param content - Message content (string or array)
+   * @returns Extracted text string
+   */
+  const extractText = (content: string | unknown[]): string => {
+    if (typeof content === 'string') {
+      return content
+    }
+
+    // Content is an array of blocks - extract text blocks
+    const textBlocks = content.filter((block): block is { type: string; text: string } =>
+      typeof block === 'object' && block !== null && 'type' in block && block.type === 'text'
+    )
+    return textBlocks.map((block) => block.text).join(' ')
+  }
+
+  /**
    * Copy text to clipboard using Clipboard API
    *
    * Uses modern navigator.clipboard API for secure clipboard access.
@@ -425,7 +447,7 @@ export function WorkbenchOutput() {
                   : "bg-muted/50"
               )}>
                 <pre className="text-sm whitespace-pre-wrap break-words font-sans">
-                  {message.content}
+                  {extractText(message.content)}
                 </pre>
               </div>
             </div>

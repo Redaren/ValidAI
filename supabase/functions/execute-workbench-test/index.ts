@@ -298,7 +298,10 @@ serve(async (req) => {
         total: response.usage.input_tokens + response.usage.output_tokens
       },
       executionTime,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      // Return exact content structure sent to Anthropic for cache consistency
+      user_content_sent: messages[messages.length - 1].content,
+      system_sent: system
     }
 
     // Update execution record with completion status
