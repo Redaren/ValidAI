@@ -29,8 +29,9 @@ export type ThinkingConfig = z.infer<typeof thinkingConfigSchema>
  */
 export const messageMetadataSchema = z.object({
   mode: z.enum(['stateful', 'stateless']),
-  cacheEnabled: z.boolean(),
+  cacheCreated: z.boolean(),
   systemPromptSent: z.boolean(),
+  fileSent: z.boolean().optional(),
   thinkingEnabled: z.boolean(),
   citationsEnabled: z.boolean(),
   inputTokens: z.number(),
@@ -96,10 +97,10 @@ export const workbenchSettingsSchema = z.object({
     .boolean()
     .optional()
     .describe('Enable document citations'),
-  caching_enabled: z
+  create_cache: z
     .boolean()
     .optional()
-    .describe('Enable prompt caching (5-min TTL)'),
+    .describe('Create cache for this message (adds cache_control markers)'),
   stop_sequences: z
     .array(z.string())
     .optional()
@@ -175,6 +176,9 @@ export const workbenchTestSchema = z.object({
   send_system_prompt: z
     .boolean()
     .describe('Whether to send system prompt with this message'),
+  send_file: z
+    .boolean()
+    .describe('Whether to send file content with this message'),
   file_content: z.string().optional(),
   file_type: z
     .enum(['text/plain', 'application/pdf'])

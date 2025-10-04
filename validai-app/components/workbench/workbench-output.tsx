@@ -29,7 +29,6 @@ import { cn } from "@/lib/utils"
 export function WorkbenchOutput() {
   const {
     conversationHistory,
-    cacheEnabled,
     executionStatus,
     clearConversation,
     clearOutput
@@ -238,8 +237,8 @@ export function WorkbenchOutput() {
 
         <Separator />
 
-        {/* Cache Performance Panel - Only show when caching is enabled */}
-        {cacheEnabled && (totalCachedRead > 0 || totalCachedWrite > 0) && (
+        {/* Cache Performance Panel - Only show when there are cache statistics */}
+        {(totalCachedRead > 0 || totalCachedWrite > 0) && (
           <>
             <div className="rounded-lg bg-muted/30 p-4 space-y-3">
               <div className="flex items-center gap-2">
@@ -335,11 +334,11 @@ export function WorkbenchOutput() {
 
                   <span>•</span>
 
-                  {/* Cache */}
+                  {/* Cache Created */}
                   <span className="flex items-center gap-1">
                     <span className="font-medium">Cache:</span>
-                    <span className={message.metadata.cacheEnabled ? 'text-green-600' : ''}>
-                      {message.metadata.cacheEnabled ? '✓' : '✗'}
+                    <span className={message.metadata.cacheCreated ? 'text-green-600' : ''}>
+                      {message.metadata.cacheCreated ? '✓ Created' : '✗'}
                     </span>
                   </span>
 

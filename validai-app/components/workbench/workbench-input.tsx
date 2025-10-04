@@ -67,7 +67,8 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     thinkingMode,
     citations,
     toolUse,
-    cacheEnabled,
+    createCache,
+    sendFile,
     isRunning,
     executionStatus,
     conversationHistory,
@@ -77,7 +78,9 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     setMode,
     toggleSystemPrompt,
     toggleFeature,
-    toggleCaching,
+    toggleCreateCache,
+    resetCacheToggle,
+    toggleSendFile,
     addToConversation,
     clearOutput,
     subscribeToExecution,
@@ -178,6 +181,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         mode: mode,
         system_prompt: systemPrompt,
         send_system_prompt: sendSystemPrompt,
+        send_file: sendFile,
         file_content: selectedFile?.type === 'uploaded'
           ? await readFileAsText(selectedFile.file)
           : undefined,
@@ -189,7 +193,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         settings: {
           model_id: selectedModel,
           citations_enabled: citations,
-          caching_enabled: cacheEnabled,
+          create_cache: createCache,
           thinking: thinkingMode ? { type: 'enabled', budget_tokens: 10000 } : undefined
         }
       })
@@ -207,8 +211,9 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           timestamp: new Date().toISOString(),
           metadata: {
             mode: mode,
-            cacheEnabled: cacheEnabled,
+            cacheCreated: createCache,
             systemPromptSent: sendSystemPrompt,
+            fileSent: sendFile && !!selectedFile,
             thinkingEnabled: thinkingMode,
             citationsEnabled: citations,
             inputTokens: result.metadata.inputTokens,
@@ -236,8 +241,9 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           timestamp: new Date().toISOString(),
           metadata: {
             mode: mode,
-            cacheEnabled: cacheEnabled,
+            cacheCreated: createCache,
             systemPromptSent: sendSystemPrompt,
+            fileSent: sendFile && !!selectedFile,
             thinkingEnabled: thinkingMode,
             citationsEnabled: citations,
             inputTokens: result.metadata.inputTokens,
@@ -258,6 +264,11 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
 
       // Clear the prompt for next message
       updateOperationPrompt('')
+
+      // Auto-reset "Create cache" toggle to OFF after successful send
+      if (createCache) {
+        resetCacheToggle()
+      }
 
       // Unsubscribe after getting the result (execution is complete)
       setTimeout(() => {
@@ -417,6 +428,17 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
               <span>{getFileDisplay()}</span>
             </div>
 
+            {/* Send file - only show if file is selected */}
+            {selectedFile && (
+              <div className="grid grid-cols-[140px,auto] gap-4 items-center pl-4">
+                <span>Send file</span>
+                <Switch
+                  checked={sendFile}
+                  onCheckedChange={toggleSendFile}
+                />
+              </div>
+            )}
+
             {/* Model */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
               <span
@@ -428,19 +450,13 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
               <span>{getModelDisplay()}</span>
             </div>
 
-            {/* Caching - Auto-managed by mode */}
+            {/* Create Cache */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
-              <span>Caching</span>
-              <div className="flex items-center gap-2">
-                <Switch
-                  checked={cacheEnabled}
-                  onCheckedChange={toggleCaching}
-                  disabled
-                />
-                <span className="text-xs text-muted-foreground">
-                  {mode === 'stateful' ? 'Auto-enabled' : 'Auto-disabled'}
-                </span>
-              </div>
+              <span>Create cache</span>
+              <Switch
+                checked={createCache}
+                onCheckedChange={toggleCreateCache}
+              />
             </div>
 
             {/* Thinking Mode */}

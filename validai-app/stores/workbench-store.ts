@@ -83,7 +83,8 @@ export interface WorkbenchStore {
   // Conversation & Caching
   conversationHistory: ConversationMessage[]
   cachedDocumentContent: string | null  // Keep exact content for cache consistency
-  cacheEnabled: boolean
+  createCache: boolean
+  sendFile: boolean
 
   // Real-time Execution Tracking
   currentExecutionId: string | null
@@ -105,7 +106,9 @@ export interface WorkbenchStore {
   toggleFeature: (feature: 'thinking' | 'citations' | 'toolUse') => void
   updateAdvancedSettings: (settings: Partial<AdvancedSettings>) => void
   setThinkingBudget: (tokens: number | null) => void
-  toggleCaching: () => void
+  toggleCreateCache: () => void
+  resetCacheToggle: () => void
+  toggleSendFile: () => void
   addToConversation: (message: ConversationMessage) => void
   clearConversation: () => void
   clearOutput: () => void
@@ -153,7 +156,8 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       advancedSettings: defaultAdvancedSettings,
       conversationHistory: [],
       cachedDocumentContent: null,
-      cacheEnabled: true,  // Enabled by default for stateful mode
+      createCache: false,  // Default OFF, user controls when to create cache
+      sendFile: true,  // Default ON, send file when selected
       currentExecutionId: null,
       executionStatus: 'idle',
       realtimeChannel: null,
@@ -184,24 +188,17 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       },
 
       setMode: (mode) => {
-        const state = get()
-        if (mode === 'stateful') {
-          // Stateful: enable caching, maintain history, auto-enable system prompt
-          set({
-            mode: 'stateful',
-            cacheEnabled: true,  // Force ON
-            sendSystemPrompt: !!state.systemPrompt  // Enable if system prompt exists
-          })
-        } else {
-          // Stateless: disable caching, clear history
+        if (mode === 'stateless') {
+          // Stateless: clear history and output (but don't touch cache settings)
           set({
             mode: 'stateless',
-            cacheEnabled: false,  // Force OFF
             conversationHistory: [],
             output: null,
-            error: null,
-            sendSystemPrompt: !!state.systemPrompt  // Default ON if prompt exists
+            error: null
           })
+        } else {
+          // Stateful: just set mode (cache is user-controlled)
+          set({ mode: 'stateful' })
         }
       },
 
@@ -242,8 +239,16 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         })
       },
 
-      toggleCaching: () => {
-        set({ cacheEnabled: !get().cacheEnabled })
+      toggleCreateCache: () => {
+        set({ createCache: !get().createCache })
+      },
+
+      resetCacheToggle: () => {
+        set({ createCache: false })
+      },
+
+      toggleSendFile: () => {
+        set({ sendFile: !get().sendFile })
       },
 
       addToConversation: (message) => {
@@ -362,7 +367,8 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           advancedSettings: defaultAdvancedSettings,
           conversationHistory: [],
           cachedDocumentContent: null,
-          cacheEnabled: true,
+          createCache: false,
+          sendFile: true,
           currentExecutionId: null,
           executionStatus: 'idle',
           realtimeChannel: null,

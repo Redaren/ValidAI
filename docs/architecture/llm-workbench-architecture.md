@@ -1,17 +1,16 @@
 # LLM Workbench Architecture
 
-The LLM Workbench is a testing environment for operations that integrates with Anthropic's Claude API, featuring two distinct execution modes (stateful and stateless), prompt caching, real-time execution tracking, and comprehensive LLM configuration management.
+The LLM Workbench is a testing environment for operations that integrates with Anthropic's Claude API, featuring message composition controls, prompt caching, real-time execution tracking, and comprehensive LLM configuration management.
 
-**Implementation:** Phase 1.7 (Completed - Mode-based Architecture)
-**Documentation Date:** 2025-10-03
+**Implementation:** Phase 1.8 (Completed - Message Composition Architecture)
+**Documentation Date:** 2025-10-04
 **Based on:** Official Anthropic API documentation (https://docs.claude.com/en/api/messages)
 
 ## Overview
 
 The Workbench provides a sandboxed environment where users can:
-- Test operations with real LLM responses in two distinct modes
-- Simulate document validation RUNs with caching (Stateful Mode)
-- Execute independent single queries (Stateless Mode)
+- Compose messages with explicit control over what gets sent (system prompt, file, cache markers)
+- Test operations with real LLM responses in two distinct modes (stateful/stateless)
 - Leverage prompt caching for cost optimization (90% savings)
 - Enable extended thinking for complex reasoning tasks
 - Use citations for document grounding
@@ -19,61 +18,116 @@ The Workbench provides a sandboxed environment where users can:
 - View comprehensive per-message metadata
 
 **Key Characteristics:**
-- **Mode-based**: Explicit separation between stateful (cached conversations) and stateless (independent queries)
+- **Message Composition**: Settings act as toggles to construct each message
+- **User-Controlled Caching**: Explicit "Create cache" toggle instead of mode-based automation
 - **Ephemeral**: State is not persisted across sessions (except execution audit trail)
 - **Real-time**: Live execution status updates via Supabase Realtime
-- **Cost-optimized**: Prompt caching reduces token costs by up to 90% in stateful mode
+- **Cost-optimized**: Prompt caching reduces token costs by up to 90%
 - **Auditable**: All executions logged with comprehensive metadata
 
-## Execution Modes
+## Message Composition System
 
-### Stateful Mode (Document Testing)
+The Workbench uses **explicit toggles** to compose each API message. Users have full control over:
+- What content to send (system prompt, file)
+- Whether to create a cache
+- Which mode (stateful/stateless) controls conversation history
 
-**Purpose:** Simulate a document validation RUN with caching
+### Settings as Message Builders
 
-**Characteristics:**
-- Caching: Auto-enabled (enforced)
-- Conversation history: Maintained
-- System prompt: Sent on first message only (cached)
-- Document: Cached on first message
-- Follow-up messages: Hit cache (90% cost savings)
-- Use case: Testing operations against the same document with multiple questions
+| Setting | Effect |
+|---------|--------|
+| **Mode: Stateful** | Include conversation history in messages array |
+| **Mode: Stateless** | No conversation history (independent messages) |
+| **Send system prompt** | Include `system` field in API request |
+| **Send file** | Include document block in content array |
+| **Create cache** | Add `cache_control` markers to system + document |
+| **Thinking mode** | Add `thinking` parameter to API request |
+| **Citations** | Add `citations: {enabled: true}` to document block |
 
-**Flow:**
+### Execution Modes
+
+**Stateful Mode:**
+- Maintains conversation history across messages
+- Sends full message timeline with each request
+- User controls when to cache (via "Create cache" toggle)
+- Use case: Multi-turn conversations, testing follow-up questions
+
+**Stateless Mode:**
+- Each message is independent (no history)
+- Output cleared between messages
+- User controls caching independently
+- Use case: Testing different prompts, comparing responses
+
+### Example Scenarios
+
+#### Scenario 1: Create Cache with Document
 ```
-Message 1: System prompt (cached) + Document (cached) + "What are payment terms?"
-  → Cache write: System + Document
-  → Cost: 100% + 25% cache write
+Settings:
+- Mode: Stateful
+- Send system prompt: ON
+- Send file: ON
+- Create cache: ON
 
-Message 2: "What about liability clauses?"
-  → Cache hit: System + Document
-  → Cost: 10% (90% savings)
+API Request:
+{
+  "system": [{ "text": "...", "cache_control": {"type": "ephemeral"} }],
+  "messages": [{
+    "role": "user",
+    "content": [
+      { "type": "document", "source": {...}, "cache_control": {"type": "ephemeral"} },
+      { "type": "text", "text": "Analyze payment terms" }
+    ]
+  }]
+}
 
-Message 3: "Summarize key points"
-  → Cache hit again
-  → Cost: 10% (90% savings)
+Result: Cache created
+After send: "Create cache" auto-resets to OFF
 ```
 
-### Stateless Mode (Single Queries)
-
-**Purpose:** Execute independent single queries
-
-**Characteristics:**
-- Caching: Auto-disabled (enforced)
-- Conversation history: None (each message independent)
-- System prompt: Sent with every message (if toggle enabled)
-- Document: Optional per message
-- Use case: Testing different prompts, tool use, web search
-
-**Flow:**
+#### Scenario 2: Use Existing Cache (Stateful)
 ```
-Message 1: System prompt + "Search internet for latest news"
-  → Complete execution
-  → Output cleared before next message
+Settings:
+- Mode: Stateful
+- Send system prompt: ON
+- Send file: ON
+- Create cache: OFF
 
-Message 2: System prompt + "Calculate 2+2"
-  → Completely independent from Message 1
-  → No history or cache
+API Request:
+{
+  "system": [{ "text": "...", "cache_control": {"type": "ephemeral"} }],
+  "messages": [
+    { "role": "user", "content": [...] },  // Previous messages
+    { "role": "assistant", "content": "..." },
+    {
+      "role": "user",
+      "content": [
+        { "type": "document", "source": {...}, "cache_control": {"type": "ephemeral"} },
+        { "type": "text", "text": "Check liability clauses" }
+      ]
+    }
+  ]
+}
+
+Result: Cache hit (90% cost savings)
+```
+
+#### Scenario 3: Independent Operations (Stateless)
+```
+Message 1:
+- Mode: Stateless
+- Send system prompt: ON
+- Send file: ON
+- Create cache: ON
+
+Result: Cache created, output shown
+
+Message 2 (after create cache auto-reset):
+- Mode: Stateless
+- Send system prompt: ON
+- Send file: ON
+- Create cache: OFF
+
+Result: Cache hit, no conversation history sent
 ```
 
 ## Architecture Layers
@@ -229,65 +283,72 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 
 **Location:** `supabase/functions/execute-workbench-test/index.ts`
 
-**Mode Validation:**
-```typescript
-// Validate mode constraints
-if (body.mode === 'stateful' && !body.settings.caching_enabled) {
-  throw new Error('Stateful mode requires caching to be enabled')
-}
-if (body.mode === 'stateless' && body.conversation_history.length > 0) {
-  throw new Error('Stateless mode cannot have conversation history')
-}
-```
-
-**System Prompt Handling (Mode-based):**
+**System Prompt Handling (User-Controlled):**
 ```typescript
 if (body.send_system_prompt && body.system_prompt) {
-  if (body.mode === 'stateful' && body.settings.caching_enabled) {
-    // Stateful: Cache on first message only
-    const isFirstMessage = body.conversation_history.length === 0
-    if (isFirstMessage) {
-      system = [{
-        type: 'text',
-        text: body.system_prompt,
-        cache_control: { type: 'ephemeral' }
-      }]
-    }
-    // Follow-up messages: system is undefined (cache hit)
+  if (body.settings.create_cache) {
+    // User wants to create cache: Use array format with cache_control
+    system = [{
+      type: 'text',
+      text: body.system_prompt,
+      cache_control: { type: 'ephemeral' }  // 5-minute TTL
+    }]
   } else {
-    // Stateless: Send every time
+    // No cache creation: Simple string format
     system = body.system_prompt
   }
 }
 ```
 
-**Message Building (Mode-based):**
+**Message Building (Composition-based):**
 ```typescript
-if (body.mode === 'stateful') {
-  const isFirstMessage = body.conversation_history.length === 0
-
-  if (isFirstMessage) {
-    // First message: Document + prompt with caching
+// In stateful mode: Add conversation history first
+if (body.mode === 'stateful' && body.conversation_history.length > 0) {
+  body.conversation_history.forEach(msg => {
     messages.push({
-      role: 'user',
-      content: [
-        { type: 'document', source: {...}, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: body.new_prompt }
-      ]
+      role: msg.role,
+      content: msg.content
     })
-  } else {
-    // Follow-up: Add history + new prompt
-    body.conversation_history.forEach(msg => messages.push(msg))
-    messages.push({ role: 'user', content: body.new_prompt })
-  }
-} else {
-  // Stateless: Single independent message (no history)
-  messages.push({
-    role: 'user',
-    content: body.file_content
-      ? [document_block, text_block]
-      : body.new_prompt
   })
+}
+
+// Build current message content
+const contentBlocks: any[] = []
+
+// Add document if user toggled "Send file" ON
+if (body.send_file && body.file_content) {
+  const documentBlock: any = {
+    type: 'document',
+    source: {
+      type: body.file_type === 'application/pdf' ? 'base64' : 'text',
+      media_type: body.file_type || 'text/plain',
+      data: body.file_content
+    }
+  }
+
+  // Add cache_control if user toggled "Create cache" ON
+  if (body.settings.create_cache) {
+    documentBlock.cache_control = { type: 'ephemeral' }
+  }
+
+  // Add citations if enabled
+  if (body.settings.citations_enabled) {
+    documentBlock.citations = { enabled: true }
+  }
+
+  contentBlocks.push(documentBlock)
+}
+
+// Add prompt text
+contentBlocks.push({ type: 'text', text: body.new_prompt })
+
+// Add current message
+if (contentBlocks.length === 1) {
+  // Only text prompt, send as string
+  messages.push({ role: 'user', content: body.new_prompt })
+} else {
+  // Has document or other content blocks
+  messages.push({ role: 'user', content: contentBlocks })
 }
 ```
 
@@ -324,6 +385,7 @@ interface WorkbenchStore {
   // Mode Management
   mode: 'stateful' | 'stateless'
   sendSystemPrompt: boolean
+  sendFile: boolean
 
   // File & Model Selection
   selectedFile: SelectedFile
@@ -337,7 +399,7 @@ interface WorkbenchStore {
   thinkingMode: boolean
   citations: boolean
   toolUse: boolean
-  cacheEnabled: boolean  // Auto-managed by mode
+  createCache: boolean  // User-controlled, auto-resets after send
 
   // Conversation State
   conversationHistory: ConversationMessage[]
@@ -349,6 +411,9 @@ interface WorkbenchStore {
   // Actions
   setMode: (mode: 'stateful' | 'stateless') => void
   toggleSystemPrompt: () => void
+  toggleSendFile: () => void
+  toggleCreateCache: () => void
+  resetCacheToggle: () => void  // Auto-called after message sent
   subscribeToExecution: (executionId: string) => void
 }
 ```
@@ -356,20 +421,26 @@ interface WorkbenchStore {
 **Mode Change Behavior:**
 ```typescript
 setMode: (mode) => {
-  if (mode === 'stateful') {
-    set({
-      mode: 'stateful',
-      cacheEnabled: true,  // Force ON
-      sendSystemPrompt: !!systemPrompt
-    })
-  } else {
+  if (mode === 'stateless') {
+    // Stateless: clear history and output (but don't touch cache settings)
     set({
       mode: 'stateless',
-      cacheEnabled: false,  // Force OFF
-      conversationHistory: [],  // Clear history
-      output: null
+      conversationHistory: [],
+      output: null,
+      error: null
     })
+  } else {
+    // Stateful: just set mode (cache is user-controlled)
+    set({ mode: 'stateful' })
   }
+}
+```
+
+**Create Cache Auto-Reset:**
+```typescript
+// After successful message send
+if (createCache) {
+  resetCacheToggle()  // Sets createCache back to false
 }
 ```
 
@@ -387,25 +458,33 @@ setMode: (mode) => {
 │ Mode              [Stateful] [Stateless] │
 │ Send system prompt     [Toggle]      │  ← Only if prompt exists
 │ Operation type         Generic       │
-│ File                   Not selected  │
-│ Model                  Claude 3.5 Sonnet │
-│ Caching                Auto-enabled  │  ← Disabled toggle, shows status
+│ File                   test.pdf / 3.5 mb │
+│   Send file            [Toggle]      │  ← Indented, only if file selected
+│ Model                  Claude 3.5 Haiku │
+│ Create cache           [Toggle]      │  ← User controls, auto-resets to OFF
 │ Thinking mode          [Toggle]      │
 │ Citations              [Toggle]      │
 │ Tool use               [Toggle]      │
 └──────────────────────────────────────┘
 ```
 
-**Mode Toggle Buttons:**
+**Toggle Behaviors:**
+
+**Mode Buttons:**
 - Two buttons: "Stateful" and "Stateless"
 - Active mode highlighted with primary color
-- Switching modes auto-clears conversation in stateless
+- Stateless mode clears conversation history
 
-**System Prompt Toggle:**
-- Only visible when processor has system prompt
-- Controls whether to send system prompt with message
-- In stateful: Auto-managed (first message only)
-- In stateless: User-controlled (every message if enabled)
+**Send file:**
+- Only shown when file is selected
+- Controls whether file is included in THIS message
+- Allows testing cache hits without re-sending document
+
+**Create cache:**
+- User toggles ON to create cache with THIS message
+- Adds `cache_control` markers to system prompt and document
+- **Auto-resets to OFF** after message is sent
+- Following messages can hit the cache by sending same content
 
 ### Workbench Output
 
@@ -513,14 +592,15 @@ setMode: (mode) => {
 
 | Feature | Stateful Mode | Stateless Mode |
 |---------|--------------|----------------|
-| **Purpose** | Document testing with caching | Independent queries |
-| **Caching** | Auto-enabled (enforced) | Auto-disabled (enforced) |
-| **System Prompt** | Sent once (first message) | Sent every time (if enabled) |
-| **Document** | Cached on first message | Optional per message |
-| **Conversation History** | Maintained | None |
-| **Follow-up Messages** | 90% cost savings | Full cost each time |
+| **Purpose** | Multi-turn conversations | Independent queries |
+| **Conversation History** | Maintained and sent | None (cleared between messages) |
+| **Caching** | User-controlled via toggle | User-controlled via toggle |
+| **System Prompt** | User decides per message | User decides per message |
+| **Document** | User decides per message | User decides per message |
 | **Output** | Accumulated | Cleared between messages |
-| **Use Case** | Simulating RUNs | Testing prompts/tools |
+| **Use Case** | Testing follow-up questions | Testing different prompts |
+
+**Note:** Cache behavior is now independent of mode. Users control when to create caches via the "Create cache" toggle.
 
 ## What's Implemented
 
@@ -660,10 +740,10 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-03
-**Phase:** 1.7 Complete (Mode-Based Architecture)
+**Last Updated:** 2025-10-04
+**Phase:** 1.8 Complete (Message Composition Architecture)
 **Next Phase:** 2.0 - Run Execution System
-**Edge Function Version:** 6
+**Edge Function Version:** 7
 
 ## Architecture Notes
 
