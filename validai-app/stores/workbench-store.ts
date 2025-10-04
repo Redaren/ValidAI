@@ -142,7 +142,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
     (set, get) => ({
       // Initial state
       selectedFile: null,
-      selectedModel: 'claude-3-5-sonnet-20241022',
+      selectedModel: 'claude-3-5-haiku-20241022',
       systemPrompt: '',
       operationPrompt: '',
       mode: 'stateful',  // Default to stateful mode
@@ -351,7 +351,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
         set({
           selectedFile: null,
-          selectedModel: 'claude-3-5-sonnet-20241022',
+          selectedModel: 'claude-3-5-haiku-20241022',
           systemPrompt: '',
           operationPrompt: '',
           mode: 'stateful',

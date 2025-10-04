@@ -39,6 +39,8 @@ interface WorkbenchInputProps {
  */
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'claude-3-5-sonnet-20241022': 'Sonnet 3.5',
+  'claude-3-5-haiku-20241022': 'Haiku 3.5',
+  'claude-sonnet-4-5-20250929': 'Sonnet 4.5',
   'claude-3-opus-20240229': 'Opus 3',
   'claude-3-haiku-20240307': 'Haiku 3',
   'gpt-4-turbo': 'GPT-4 Turbo',
