@@ -18,6 +18,11 @@ import { cn } from "@/lib/utils"
  * - Thinking blocks
  * - Citations
  * - Token usage (with cache statistics)
+ * - Cache performance panel (stateful mode only)
+ *   - Cache writes (🔷) and reads (🎯)
+ *   - Cache hit rate percentage
+ *   - Cost savings estimation
+ * - Per-message cache indicators
  * - Execution time
  * - Error states
  */
@@ -151,7 +156,7 @@ export function WorkbenchOutput() {
             Results will appear here after test
           </p>
           <p className="text-xs text-muted-foreground">
-            Configure your test settings above and click "Test" to begin
+            Configure your test settings above and click &quot;Test&quot; to begin
           </p>
         </div>
       </Card>
@@ -168,6 +173,28 @@ export function WorkbenchOutput() {
     (sum, msg) => sum + (msg.tokensUsed?.cached_read || 0),
     0
   )
+  const totalCachedWrite = conversationHistory.reduce(
+    (sum, msg) => sum + (msg.tokensUsed?.cached_write || 0),
+    0
+  )
+  const totalInputTokens = conversationHistory.reduce(
+    (sum, msg) => sum + (msg.tokensUsed?.input || 0),
+    0
+  )
+
+  // Calculate cache performance metrics
+  const totalCacheableTokens = totalInputTokens + totalCachedRead
+  const cacheHitRate = totalCacheableTokens > 0
+    ? ((totalCachedRead / totalCacheableTokens) * 100).toFixed(1)
+    : '0.0'
+
+  // Cache cost calculation (approximate)
+  // Cache write costs 25% more, cache read costs 90% less
+  const costWithoutCache = totalInputTokens + totalCachedRead + (totalCachedWrite * 1.25)
+  const actualCost = totalInputTokens + (totalCachedRead * 0.1) + (totalCachedWrite * 1.25)
+  const costSavingsPercent = costWithoutCache > 0
+    ? (((costWithoutCache - actualCost) / costWithoutCache) * 100).toFixed(1)
+    : '0.0'
 
   return (
     <Card className="p-6">
@@ -211,21 +238,89 @@ export function WorkbenchOutput() {
 
         <Separator />
 
-        {/* Conversation History */}
-        <div className="space-y-4">
-          {[...conversationHistory].reverse().map((message, index) => (
-            <div key={index} className="space-y-2">
-              {/* Message Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
-                    {message.role === 'user' ? 'You' : 'Assistant'}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(message.timestamp).toLocaleTimeString()}
-                  </span>
+        {/* Cache Performance Panel - Only show when caching is enabled */}
+        {cacheEnabled && (totalCachedRead > 0 || totalCachedWrite > 0) && (
+          <>
+            <div className="rounded-lg bg-muted/30 p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-semibold">Cache Performance</h3>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Cache Writes</p>
+                  <p className="text-lg font-semibold text-blue-600">
+                    🔷 {totalCachedWrite.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">tokens (+25% cost)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Cache Hits</p>
+                  <p className="text-lg font-semibold text-green-600">
+                    🎯 {totalCachedRead.toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">tokens (-90% cost)</p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Hit Rate</p>
+                  <p className="text-lg font-semibold">{cacheHitRate}%</p>
+                  <p className="text-xs text-muted-foreground">
+                    {totalCachedRead} / {totalCacheableTokens.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">Cost Savings</p>
+                  <p className="text-lg font-semibold text-green-600">~{costSavingsPercent}%</p>
+                  <p className="text-xs text-muted-foreground">vs. no caching</p>
                 </div>
               </div>
+
+              {totalCachedRead === 0 && totalCachedWrite > 0 && (
+                <div className="text-xs text-muted-foreground italic">
+                  💡 Cache created. Send follow-up messages to see 90% cost savings!
+                </div>
+              )}
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* Conversation History */}
+        <div className="space-y-4">
+          {[...conversationHistory].reverse().map((message, index) => {
+            // Determine cache status for this message
+            const hasCacheWrite = message.tokensUsed?.cached_write && message.tokensUsed.cached_write > 0
+            const hasCacheRead = message.tokensUsed?.cached_read && message.tokensUsed.cached_read > 0
+
+            return (
+              <div key={index} className="space-y-2">
+                {/* Message Header */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
+                      {message.role === 'user' ? 'You' : 'Assistant'}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(message.timestamp).toLocaleTimeString()}
+                    </span>
+
+                    {/* Cache status badges */}
+                    {hasCacheWrite && (
+                      <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700 text-xs">
+                        🔷 Cache Created
+                      </Badge>
+                    )}
+                    {hasCacheRead && (
+                      <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700 text-xs">
+                        🎯 Cache Hit
+                      </Badge>
+                    )}
+                  </div>
+                </div>
 
               {/* Message Metadata - show if available */}
               {message.metadata && (
@@ -282,7 +377,12 @@ export function WorkbenchOutput() {
                     <span>{message.metadata.inputTokens} tokens</span>
                     {message.metadata.cachedReadTokens && message.metadata.cachedReadTokens > 0 && (
                       <span className="text-green-600">
-                        ({message.metadata.cachedReadTokens} cached)
+                        (🎯 {message.metadata.cachedReadTokens} cached)
+                      </span>
+                    )}
+                    {message.metadata.cachedWriteTokens && message.metadata.cachedWriteTokens > 0 && (
+                      <span className="text-blue-600">
+                        (🔷 {message.metadata.cachedWriteTokens} cache write)
                       </span>
                     )}
                   </span>
@@ -330,7 +430,8 @@ export function WorkbenchOutput() {
                 </pre>
               </div>
             </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </Card>
