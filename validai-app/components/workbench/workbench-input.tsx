@@ -255,6 +255,8 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           content: result.response,
           timestamp: result.timestamp,
           metadata: result.metadata,
+          thinking_blocks: result.thinking_blocks,
+          citations: result.citations,
           tokensUsed: result.tokensUsed  // Keep for backward compatibility
         })
       } else {
@@ -285,6 +287,8 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           content: result.response,
           timestamp: result.timestamp,
           metadata: result.metadata,
+          thinking_blocks: result.thinking_blocks,
+          citations: result.citations,
           tokensUsed: result.tokensUsed
         })
       }

@@ -60,6 +60,8 @@ export const conversationMessageSchema = z.object({
   ]),
   timestamp: z.string(),
   metadata: messageMetadataSchema.optional(),
+  thinking_blocks: z.array(z.any()).optional(),
+  citations: z.array(z.any()).optional(),
   // Legacy field for backward compatibility
   tokensUsed: z.object({
     input: z.number(),

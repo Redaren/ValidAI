@@ -432,11 +432,75 @@ export function WorkbenchOutput() {
                         </Badge>
                       )}
                     </div>
+
+                    {/* Thinking Blocks - Show after header, before response */}
+                    {assistantMsg.thinking_blocks && assistantMsg.thinking_blocks.length > 0 && (
+                      <div className="rounded-lg p-4 bg-amber-50/50 border border-amber-200/50 dark:bg-amber-950/20 dark:border-amber-800/30">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="gap-1 bg-amber-500/10 text-amber-700 text-xs">
+                            💭 Extended Thinking
+                          </Badge>
+                        </div>
+                        {assistantMsg.thinking_blocks.map((block: any, idx: number) => (
+                          <div key={idx} className="mt-2">
+                            <pre className="text-sm whitespace-pre-wrap break-words font-sans text-muted-foreground italic">
+                              {block.thinking || block.text || JSON.stringify(block)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Response */}
                     <div className="rounded-lg p-4 bg-muted/50">
                       <pre className="text-sm whitespace-pre-wrap break-words font-sans">
                         {extractText(assistantMsg.content)}
                       </pre>
                     </div>
+
+                    {/* Citations - Show after response */}
+                    {assistantMsg.citations && assistantMsg.citations.length > 0 && (
+                      <div className="rounded-lg p-4 bg-cyan-50/50 border border-cyan-200/50 dark:bg-cyan-950/20 dark:border-cyan-800/30">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="outline" className="gap-1 bg-cyan-500/10 text-cyan-700 text-xs">
+                            📎 Citations
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {assistantMsg.citations.length} {assistantMsg.citations.length === 1 ? 'citation' : 'citations'}
+                          </span>
+                        </div>
+                        <div className="space-y-3">
+                          {assistantMsg.citations.map((citation: any, idx: number) => (
+                            <div key={idx} className="border-l-2 border-cyan-400/50 pl-3">
+                              <div className="text-sm mb-1">
+                                <span className="font-medium text-foreground">"{citation.cited_text}"</span>
+                              </div>
+                              <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
+                                <span className="font-medium">{citation.document_title || 'Document'}</span>
+                                {citation.type === 'page_location' && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Pages {citation.start_page_number}-{citation.end_page_number}</span>
+                                  </>
+                                )}
+                                {citation.type === 'char_location' && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Chars {citation.start_char_index}-{citation.end_char_index}</span>
+                                  </>
+                                )}
+                                {citation.type === 'content_block_location' && (
+                                  <>
+                                    <span>•</span>
+                                    <span>Blocks {citation.start_block_index}-{citation.end_block_index}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )
