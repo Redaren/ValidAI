@@ -38,7 +38,8 @@ export const messageMetadataSchema = z.object({
   outputTokens: z.number(),
   cachedReadTokens: z.number().optional(),
   cachedWriteTokens: z.number().optional(),
-  executionTimeMs: z.number().optional()
+  executionTimeMs: z.number().optional(),
+  modelUsed: z.string().optional()
 })
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>

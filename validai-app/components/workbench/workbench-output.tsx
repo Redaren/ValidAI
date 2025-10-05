@@ -255,6 +255,28 @@ export function WorkbenchOutput() {
     ? (((costWithoutCache - actualCost) / costWithoutCache) * 100).toFixed(1)
     : '0.0'
 
+  // Calculate cumulative context usage for models with context windows
+  const cumulativeInputTokens = conversationHistory.reduce(
+    (sum, msg) => sum + (msg.metadata?.inputTokens || 0),
+    0
+  )
+  const cumulativeOutputTokens = conversationHistory.reduce(
+    (sum, msg) => sum + (msg.metadata?.outputTokens || 0),
+    0
+  )
+  const cumulativeTokens = cumulativeInputTokens + cumulativeOutputTokens
+
+  // Get model info from last message to determine context window
+  const lastModelUsed = lastMessage?.metadata?.modelUsed
+  const contextWindow = lastModelUsed?.includes('claude-sonnet-4-5') || lastModelUsed?.includes('claude-3-5-haiku')
+    ? 200000
+    : null
+
+  const contextPercent = contextWindow
+    ? ((cumulativeTokens / contextWindow) * 100).toFixed(1)
+    : null
+  const remainingTokens = contextWindow ? contextWindow - cumulativeTokens : null
+
   return (
     <Card className="p-6">
       <div className="space-y-4">
@@ -393,6 +415,16 @@ export function WorkbenchOutput() {
                         <>
                           <span>•</span>
                           <span className="text-amber-600">Overrides: {overrides.join(', ')}</span>
+                        </>
+                      )}
+                      {/* Context Window Usage - Only in stateful mode for models with context awareness */}
+                      {metadata.mode === 'stateful' && contextWindow && (
+                        <>
+                          <span>•</span>
+                          <span>
+                            Context: {cumulativeTokens.toLocaleString()}/{contextWindow.toLocaleString()}
+                            ({contextPercent}%) • {remainingTokens?.toLocaleString()} remaining
+                          </span>
                         </>
                       )}
                     </div>
