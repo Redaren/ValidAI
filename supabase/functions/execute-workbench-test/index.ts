@@ -248,85 +248,150 @@ serve(async (req) => {
     // Execute Anthropic Messages API call
     // Tracks execution time for performance metrics
     const startTime = Date.now()
-    const response = await anthropic.messages.create(requestParams)
-    const executionTime = Date.now() - startTime
 
-    // Extract response content and special blocks
-    // Anthropic API returns content as array of blocks with different types:
-    // - "text": Normal response text
-    // - "thinking": Extended thinking blocks (if thinking mode enabled)
-    // - "citation": Citation references (if citations enabled)
-    let responseText = ''
-    const thinkingBlocks: any[] = []
-    const citations: any[] = []
+    try {
+      const response = await anthropic.messages.create(requestParams)
+      const executionTime = Date.now() - startTime
 
-    response.content.forEach((block: any) => {
-      if (block.type === 'text') {
-        responseText += block.text
-      } else if (block.type === 'thinking') {
-        thinkingBlocks.push(block)
-      } else if (block.type === 'citation') {
-        citations.push(block)
-      }
-    })
+      // Extract response content and special blocks
+      // Anthropic API returns content as array of blocks with different types:
+      // - "text": Normal response text
+      // - "thinking": Extended thinking blocks (if thinking mode enabled)
+      // - "citation": Citation references (if citations enabled)
+      let responseText = ''
+      const thinkingBlocks: any[] = []
+      const citations: any[] = []
 
-    // Build result payload for client with metadata
-    // Includes execution_id for real-time subscription tracking
-    const result = {
-      execution_id: executionId,  // Client subscribes to this ID for status updates
-      response: responseText,
-      thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
-      citations: citations.length > 0 ? citations : undefined,
-      metadata: {
-        mode: body.mode,
-        cacheCreated: body.settings.create_cache || false,
-        systemPromptSent: body.send_system_prompt && !!body.system_prompt,
-        fileSent: body.send_file && !!body.file_content,
-        thinkingEnabled: !!body.settings.thinking,
-        citationsEnabled: body.settings.citations_enabled || false,
-        inputTokens: response.usage.input_tokens,
-        outputTokens: response.usage.output_tokens,
-        cachedReadTokens: response.usage.cache_read_input_tokens,
-        cachedWriteTokens: response.usage.cache_creation_input_tokens,
-        executionTimeMs: executionTime
-      },
-      tokensUsed: {
-        input: response.usage.input_tokens,
-        output: response.usage.output_tokens,
-        cached_read: response.usage.cache_read_input_tokens,  // Cost savings from cache hits
-        cached_write: response.usage.cache_creation_input_tokens,  // One-time cost to create cache
-        total: response.usage.input_tokens + response.usage.output_tokens
-      },
-      executionTime,
-      timestamp: new Date().toISOString(),
-      // Return exact content structure sent to Anthropic for cache consistency
-      user_content_sent: messages[messages.length - 1].content,
-      system_sent: system
-    }
-
-    // Update execution record with completion status
-    // This triggers Supabase Realtime update to subscribed clients
-    await supabase
-      .from('workbench_executions')
-      .update({
-        status: 'completed',
-        response: responseText,
-        thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : null,
-        citations: citations.length > 0 ? citations : null,
-        tokens_used: result.tokensUsed,
-        execution_time_ms: executionTime
-      })
-      .eq('id', executionId)
-
-    return new Response(
-      JSON.stringify(result),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json'
+      response.content.forEach((block: any) => {
+        if (block.type === 'text') {
+          responseText += block.text
+        } else if (block.type === 'thinking') {
+          thinkingBlocks.push(block)
+        } else if (block.type === 'citation') {
+          citations.push(block)
         }
+      })
+
+      // Build result payload for client with metadata
+      // Includes execution_id for real-time subscription tracking
+      const result = {
+        execution_id: executionId,  // Client subscribes to this ID for status updates
+        response: responseText,
+        thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
+        citations: citations.length > 0 ? citations : undefined,
+        metadata: {
+          mode: body.mode,
+          cacheCreated: body.settings.create_cache || false,
+          systemPromptSent: body.send_system_prompt && !!body.system_prompt,
+          fileSent: body.send_file && !!body.file_content,
+          thinkingEnabled: !!body.settings.thinking,
+          citationsEnabled: body.settings.citations_enabled || false,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+          cachedReadTokens: response.usage.cache_read_input_tokens,
+          cachedWriteTokens: response.usage.cache_creation_input_tokens,
+          executionTimeMs: executionTime
+        },
+        tokensUsed: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+          cached_read: response.usage.cache_read_input_tokens,  // Cost savings from cache hits
+          cached_write: response.usage.cache_creation_input_tokens,  // One-time cost to create cache
+          total: response.usage.input_tokens + response.usage.output_tokens
+        },
+        executionTime,
+        timestamp: new Date().toISOString(),
+        // Return exact content structure sent to Anthropic for cache consistency
+        user_content_sent: messages[messages.length - 1].content,
+        system_sent: system
       }
-    )
+
+      // Update execution record with completion status
+      // This triggers Supabase Realtime update to subscribed clients
+      await supabase
+        .from('workbench_executions')
+        .update({
+          status: 'completed',
+          response: responseText,
+          thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : null,
+          citations: citations.length > 0 ? citations : null,
+          tokens_used: result.tokensUsed,
+          execution_time_ms: executionTime
+        })
+        .eq('id', executionId)
+
+      return new Response(
+        JSON.stringify(result),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    } catch (apiError: any) {
+      // Anthropic API rejected the request (e.g., unsupported feature, invalid parameters)
+      // Return this as a successful response so it displays in the Output section
+      const executionTime = Date.now() - startTime
+
+      // Extract detailed error message from Anthropic SDK
+      let errorMessage = 'API Error: '
+      if (apiError.error && apiError.error.message) {
+        errorMessage += apiError.error.message
+      } else if (apiError.message) {
+        errorMessage += apiError.message
+      } else {
+        errorMessage += apiError.toString()
+      }
+
+      console.log('Anthropic API error (returning as assistant message):', errorMessage)
+
+      const result = {
+        execution_id: executionId,
+        response: errorMessage,  // Display error as assistant response
+        metadata: {
+          mode: body.mode,
+          cacheCreated: body.settings.create_cache || false,
+          systemPromptSent: body.send_system_prompt && !!body.system_prompt,
+          fileSent: body.send_file && !!body.file_content,
+          thinkingEnabled: !!body.settings.thinking,
+          citationsEnabled: body.settings.citations_enabled || false,
+          inputTokens: 0,
+          outputTokens: 0,
+          executionTimeMs: executionTime
+        },
+        tokensUsed: {
+          input: 0,
+          output: 0,
+          total: 0
+        },
+        executionTime,
+        timestamp: new Date().toISOString(),
+        user_content_sent: messages[messages.length - 1].content,
+        system_sent: system
+      }
+
+      // Mark as COMPLETED (not failed) so it shows in Output section
+      await supabase
+        .from('workbench_executions')
+        .update({
+          status: 'completed',
+          response: errorMessage,
+          execution_time_ms: executionTime
+        })
+        .eq('id', executionId)
+
+      // Return 200 OK so frontend treats this as a valid response
+      return new Response(
+        JSON.stringify(result),
+        {
+          headers: {
+            ...corsHeaders,
+            'Content-Type': 'application/json'
+          }
+        }
+      )
+    }
 
   } catch (error) {
     console.error('Error in execute-workbench-test:', error)

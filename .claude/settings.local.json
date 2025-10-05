@@ -24,7 +24,8 @@
       "WebSearch",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(npx eslint:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

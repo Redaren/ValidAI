@@ -72,6 +72,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     isRunning,
     executionStatus,
     conversationHistory,
+    advancedSettings,
     setFile,
     setModel,
     updateOperationPrompt,
@@ -194,7 +195,33 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           model_id: selectedModel,
           citations_enabled: citations,
           create_cache: createCache,
-          thinking: thinkingMode ? { type: 'enabled', budget_tokens: 10000 } : undefined
+
+          // Always send max_tokens (required by API)
+          max_tokens: advancedSettings.maxTokens,
+
+          // Thinking (only if thinking mode toggle is ON)
+          thinking: thinkingMode ? {
+            type: 'enabled',
+            budget_tokens: advancedSettings.thinkingBudget
+          } : undefined,
+
+          // Optional overrides (only sent when enabled)
+          temperature: advancedSettings.temperature.enabled
+            ? advancedSettings.temperature.value
+            : undefined,
+
+          top_p: advancedSettings.topP.enabled
+            ? advancedSettings.topP.value
+            : undefined,
+
+          top_k: advancedSettings.topK.enabled
+            ? advancedSettings.topK.value
+            : undefined,
+
+          stop_sequences: advancedSettings.stopSequences.enabled &&
+                          advancedSettings.stopSequences.values.length > 0
+            ? advancedSettings.stopSequences.values
+            : undefined
         }
       })
 

@@ -24,15 +24,35 @@ export interface TestResult {
 }
 
 /**
- * Advanced LLM settings
+ * Advanced LLM settings with override controls
+ *
+ * Each optional parameter has an "enabled" flag to control whether it's sent to the API.
+ * When enabled=false, the LLM uses its default value.
  */
 export interface AdvancedSettings {
-  temperature: number
+  // Always sent (required by API)
   maxTokens: number
-  topP: number
-  topK: number
-  thinkingBudget: number | null  // null = disabled, min 1024
-  stopSequences: string[]
+
+  // Conditional (sent when thinking mode is ON)
+  thinkingBudget: number
+
+  // Optional overrides (only sent when enabled)
+  temperature: {
+    enabled: boolean
+    value: number
+  }
+  topP: {
+    enabled: boolean
+    value: number
+  }
+  topK: {
+    enabled: boolean
+    value: number
+  }
+  stopSequences: {
+    enabled: boolean
+    values: string[]
+  }
 }
 
 /**
@@ -116,28 +136,44 @@ export interface WorkbenchStore {
   unsubscribeFromExecution: () => void
   handleExecutionUpdate: (execution: WorkbenchExecution) => void
   reset: () => void
+
+  // Advanced Settings Actions
+  setMaxTokens: (tokens: number) => void
+  setThinkingBudgetValue: (tokens: number) => void
+  toggleTemperature: () => void
+  setTemperatureValue: (value: number) => void
+  toggleTopP: () => void
+  setTopPValue: (value: number) => void
+  toggleTopK: () => void
+  setTopKValue: (value: number) => void
+  toggleStopSequences: () => void
+  addStopSequence: (sequence: string) => void
+  removeStopSequence: (index: number) => void
+  resetAdvancedSettings: () => void
 }
 
 /**
  * Default advanced settings for Anthropic Claude API
  *
  * Values match Anthropic's recommended defaults:
- * - temperature: 1.0 (balanced creativity/accuracy)
- * - maxTokens: 4096 (sufficient for most responses)
- * - topP: 1.0 (nucleus sampling disabled)
- * - topK: 40 (sample from top 40 tokens)
- * - thinkingBudget: null (extended thinking disabled)
- * - stopSequences: [] (no custom stop sequences)
+ * - maxTokens: 4096 (always sent, required by API)
+ * - thinkingBudget: 10000 (used when thinking mode is ON)
+ * - temperature: 1.0 (override disabled by default)
+ * - topP: 1.0 (override disabled by default)
+ * - topK: 40 (override disabled by default)
+ * - stopSequences: [] (override disabled by default)
+ *
+ * When override is disabled, the LLM uses its own default values.
  *
  * @see {@link https://docs.claude.com/en/api/messages} Anthropic API parameters
  */
 const defaultAdvancedSettings: AdvancedSettings = {
-  temperature: 1.0,  // Anthropic default
   maxTokens: 4096,
-  topP: 1.0,
-  topK: 40,
-  thinkingBudget: null,  // Disabled by default
-  stopSequences: []
+  thinkingBudget: 10000,
+  temperature: { enabled: false, value: 1.0 },
+  topP: { enabled: false, value: 1.0 },
+  topK: { enabled: false, value: 40 },
+  stopSequences: { enabled: false, values: [] }
 }
 
 export const useWorkbenchStore = create<WorkbenchStore>()(
@@ -210,7 +246,35 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         const state = get()
         switch (feature) {
           case 'thinking':
-            set({ thinkingMode: !state.thinkingMode })
+            const newThinkingMode = !state.thinkingMode
+            const updates: any = { thinkingMode: newThinkingMode }
+
+            if (newThinkingMode) {
+              // Thinking mode turned ON - apply smart adjustments
+              const currentMaxTokens = state.advancedSettings.maxTokens
+              const currentThinkingBudget = state.advancedSettings.thinkingBudget
+
+              // Auto-increase max_tokens ONLY if insufficient (preserve user's higher values)
+              if (currentMaxTokens < currentThinkingBudget + 1000) {
+                updates.advancedSettings = {
+                  ...state.advancedSettings,
+                  maxTokens: currentThinkingBudget + 1000  // Minimum needed, not hardcoded 16000
+                }
+              }
+
+              // Disable temperature override (incompatible with thinking)
+              if (state.advancedSettings.temperature.enabled) {
+                updates.advancedSettings = {
+                  ...updates.advancedSettings || state.advancedSettings,
+                  temperature: {
+                    ...state.advancedSettings.temperature,
+                    enabled: false
+                  }
+                }
+              }
+            }
+
+            set(updates)
             break
           case 'citations':
             set({ citations: !state.citations })
@@ -231,12 +295,15 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       },
 
       setThinkingBudget: (tokens) => {
-        set({
-          advancedSettings: {
-            ...get().advancedSettings,
-            thinkingBudget: tokens
-          }
-        })
+        // Legacy method - now use setThinkingBudgetValue
+        if (tokens !== null) {
+          set({
+            advancedSettings: {
+              ...get().advancedSettings,
+              thinkingBudget: tokens
+            }
+          })
+        }
       },
 
       toggleCreateCache: () => {
@@ -348,6 +415,148 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
             executionStatus: 'processing'
           })
         }
+      },
+
+      // Advanced Settings Actions
+
+      setMaxTokens: (tokens) => {
+        const state = get()
+        const newSettings = {
+          ...state.advancedSettings,
+          maxTokens: tokens
+        }
+
+        // Auto-adjust thinking budget if it would exceed new max_tokens
+        if (state.thinkingMode && state.advancedSettings.thinkingBudget >= tokens) {
+          newSettings.thinkingBudget = Math.max(1024, tokens - 1000)
+        }
+
+        set({ advancedSettings: newSettings })
+      },
+
+      setThinkingBudgetValue: (tokens) => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            thinkingBudget: tokens
+          }
+        })
+      },
+
+      toggleTemperature: () => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            temperature: {
+              ...get().advancedSettings.temperature,
+              enabled: !get().advancedSettings.temperature.enabled
+            }
+          }
+        })
+      },
+
+      setTemperatureValue: (value) => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            temperature: {
+              ...get().advancedSettings.temperature,
+              value
+            }
+          }
+        })
+      },
+
+      toggleTopP: () => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            topP: {
+              ...get().advancedSettings.topP,
+              enabled: !get().advancedSettings.topP.enabled
+            }
+          }
+        })
+      },
+
+      setTopPValue: (value) => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            topP: {
+              ...get().advancedSettings.topP,
+              value
+            }
+          }
+        })
+      },
+
+      toggleTopK: () => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            topK: {
+              ...get().advancedSettings.topK,
+              enabled: !get().advancedSettings.topK.enabled
+            }
+          }
+        })
+      },
+
+      setTopKValue: (value) => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            topK: {
+              ...get().advancedSettings.topK,
+              value
+            }
+          }
+        })
+      },
+
+      toggleStopSequences: () => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            stopSequences: {
+              ...get().advancedSettings.stopSequences,
+              enabled: !get().advancedSettings.stopSequences.enabled
+            }
+          }
+        })
+      },
+
+      addStopSequence: (sequence) => {
+        const current = get().advancedSettings.stopSequences.values
+        if (current.length < 4 && !current.includes(sequence)) {
+          set({
+            advancedSettings: {
+              ...get().advancedSettings,
+              stopSequences: {
+                ...get().advancedSettings.stopSequences,
+                values: [...current, sequence]
+              }
+            }
+          })
+        }
+      },
+
+      removeStopSequence: (index) => {
+        const current = get().advancedSettings.stopSequences.values
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            stopSequences: {
+              ...get().advancedSettings.stopSequences,
+              values: current.filter((_, i) => i !== index)
+            }
+          }
+        })
+      },
+
+      resetAdvancedSettings: () => {
+        set({ advancedSettings: defaultAdvancedSettings })
       },
 
       reset: () => {

@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/collapsible"
 import { WorkbenchInput } from "@/components/workbench/workbench-input"
 import { WorkbenchOutput } from "@/components/workbench/workbench-output"
+import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-advanced-settings"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import type { Database } from "@/lib/database.types"
 
@@ -88,9 +89,7 @@ export function WorkbenchClient({
         {/* Expandable Content */}
         <CollapsibleContent className="space-y-4">
           <div className="pt-4 border-t">
-            <p className="text-sm text-muted-foreground text-center">
-              Advanced settings will be available here in a future update.
-            </p>
+            <WorkbenchAdvancedSettings />
           </div>
         </CollapsibleContent>
       </Collapsible>

@@ -488,6 +488,192 @@ if (createCache) {
 - **Auto-resets to OFF** after message is sent
 - Following messages can hit the cache by sending same content
 
+### Advanced Settings
+
+**Location:** Collapsible header in `app/proc/[id]/workbench/workbench-client.tsx`
+
+**Component:** `components/workbench/workbench-advanced-settings.tsx`
+
+**Purpose:** Override optional Anthropic API parameters with explicit user control over what gets sent to the API.
+
+#### Parameter Overview
+
+| Parameter | Type | Default | Override Toggle | Sent When |
+|-----------|------|---------|----------------|-----------|
+| `max_tokens` | Required | 4096 | N/A (always sent) | Always |
+| `thinking.budget_tokens` | Conditional | 10000 | Via "Thinking mode" | When thinking mode ON |
+| `temperature` | Optional | 1.0 | Yes | When override enabled |
+| `top_p` | Optional | 1.0 | Yes | When override enabled |
+| `top_k` | Optional | 40 | Yes | When override enabled |
+| `stop_sequences` | Optional | [] | Yes | When override enabled & has values |
+
+#### Override Toggle Pattern
+
+Each optional parameter follows this pattern:
+
+**Toggle OFF** (default):
+- Parameter NOT sent to API
+- LLM uses its built-in default value
+- UI shows: "LLM will use its default: X"
+
+**Toggle ON**:
+- Parameter sent with user's configured value
+- UI shows: "Default: X → Sending: Y"
+- User can adjust value via input/slider
+
+#### Parameter Details
+
+**Max Tokens** (Required):
+- Always sent to API (required by Anthropic)
+- Range: 1 - 200,000
+- Default: 4,096
+- No toggle (always active)
+
+**Thinking Budget** (Conditional):
+- Only visible when "Thinking mode" toggle is ON
+- Range: 1,024 - (max_tokens - 1)
+- Default: 10,000
+- Validation: Must be < max_tokens
+- No toggle (controlled by thinking mode toggle)
+
+**Temperature** (Optional):
+- Range: 0.0 - 1.0 (slider with 0.1 steps)
+- Default: 1.0
+- Incompatibility: Disabled when thinking mode is ON
+- Lower = focused/deterministic, Higher = creative
+
+**Top P** (Optional):
+- Range: 0.0 - 1.0 (slider with 0.01 steps)
+- Default: 1.0
+- Nucleus sampling threshold
+
+**Top K** (Optional):
+- Range: 0+ (integer input)
+- Default: 40
+- Sample from top K token options
+
+**Stop Sequences** (Optional):
+- Array of custom strings (max 4)
+- Default: [] (empty)
+- Claude stops generating when encountering these strings
+
+#### Smart Behaviors
+
+**When "Thinking mode" is toggled ON**:
+1. Check if `max_tokens < thinking_budget + 1000`
+2. If yes, auto-increase `max_tokens` to 16,000
+3. Auto-disable `temperature` override (incompatible with thinking)
+4. Show `thinking_budget` field
+
+**When "Thinking mode" is toggled OFF**:
+1. Hide `thinking_budget` field
+2. Re-enable `temperature` toggle
+
+**When `max_tokens` is changed**:
+1. If `thinking_budget ≥ max_tokens`: Auto-reduce to `max_tokens - 1000`
+2. Minimum thinking_budget enforced: 1,024
+
+**When `temperature` toggle is changed**:
+1. If thinking mode is ON: Prevented (toggle disabled)
+
+#### Request Building Logic
+
+From `components/workbench/workbench-input.tsx`:
+
+```typescript
+settings: {
+  model_id: selectedModel,
+  citations_enabled: citations,
+  create_cache: createCache,
+
+  // Always send max_tokens (required)
+  max_tokens: advancedSettings.maxTokens,
+
+  // Thinking (only if thinking mode toggle is ON)
+  thinking: thinkingMode ? {
+    type: 'enabled',
+    budget_tokens: advancedSettings.thinkingBudget
+  } : undefined,
+
+  // Optional overrides (only sent when enabled)
+  temperature: advancedSettings.temperature.enabled
+    ? advancedSettings.temperature.value
+    : undefined,
+
+  top_p: advancedSettings.topP.enabled
+    ? advancedSettings.topP.value
+    : undefined,
+
+  top_k: advancedSettings.topK.enabled
+    ? advancedSettings.topK.value
+    : undefined,
+
+  stop_sequences: advancedSettings.stopSequences.enabled &&
+                  advancedSettings.stopSequences.values.length > 0
+    ? advancedSettings.stopSequences.values
+    : undefined
+}
+```
+
+#### State Management
+
+**Store:** `stores/workbench-store.ts`
+
+**Structure:**
+```typescript
+interface AdvancedSettings {
+  // Always sent (required by API)
+  maxTokens: number
+
+  // Conditional (sent when thinking mode is ON)
+  thinkingBudget: number
+
+  // Optional overrides (only sent when enabled)
+  temperature: {
+    enabled: boolean
+    value: number
+  }
+  topP: {
+    enabled: boolean
+    value: number
+  }
+  topK: {
+    enabled: boolean
+    value: number
+  }
+  stopSequences: {
+    enabled: boolean
+    values: string[]
+  }
+}
+```
+
+**Actions:**
+- `setMaxTokens(tokens)` - Set max tokens with auto-adjust for thinking budget
+- `setThinkingBudgetValue(tokens)` - Set thinking budget
+- `toggleTemperature()` - Enable/disable temperature override
+- `setTemperatureValue(value)` - Set temperature value
+- `toggleTopP()` - Enable/disable top P override
+- `setTopPValue(value)` - Set top P value
+- `toggleTopK()` - Enable/disable top K override
+- `setTopKValue(value)` - Set top K value
+- `toggleStopSequences()` - Enable/disable stop sequences
+- `addStopSequence(sequence)` - Add stop sequence (max 4)
+- `removeStopSequence(index)` - Remove stop sequence
+- `resetAdvancedSettings()` - Reset all to defaults
+
+#### "Reset All" Behavior
+
+When clicked:
+- `maxTokens` → 4096
+- `thinkingBudget` → 10000
+- `temperature` → { enabled: false, value: 1.0 }
+- `topP` → { enabled: false, value: 1.0 }
+- `topK` → { enabled: false, value: 40 }
+- `stopSequences` → { enabled: false, values: [] }
+
+All override toggles turn OFF, reverting to LLM defaults.
+
 ### Workbench Output
 
 **Location:** `components/workbench/workbench-output.tsx`

@@ -19,15 +19,16 @@ export default async function WorkbenchPage({
   const supabase = await createClient()
 
   // Fetch processor with operations
-  const { data: processor, error } = await supabase
+  const { data: processors, error } = await supabase
     .rpc('get_processor_with_operations', {
       p_processor_id: id
     })
-    .single()
 
-  if (error || !processor) {
+  if (error || !processors || processors.length === 0) {
     notFound()
   }
+
+  const processor = processors[0]
 
   return (
     <div className="container mx-auto py-6 space-y-6">
