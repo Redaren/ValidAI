@@ -2,8 +2,8 @@
 
 The LLM Workbench is a testing environment for operations that integrates with Anthropic's Claude API, featuring message composition controls, prompt caching, real-time execution tracking, and comprehensive LLM configuration management.
 
-**Implementation:** Phase 1.8 (Completed - Message Composition Architecture)
-**Documentation Date:** 2025-10-04
+**Implementation:** Phase 1.9 (Completed - Context Window Tracking)
+**Documentation Date:** 2025-10-05
 **Based on:** Official Anthropic API documentation (https://docs.claude.com/en/api/messages)
 
 ## Overview
@@ -16,10 +16,12 @@ The Workbench provides a sandboxed environment where users can:
 - Use citations for document grounding
 - Track execution progress in real-time
 - View comprehensive per-message metadata
+- Monitor context window usage (Claude Sonnet 4.5 context awareness)
 
 **Key Characteristics:**
 - **Message Composition**: Settings act as toggles to construct each message
 - **User-Controlled Caching**: Explicit "Create cache" toggle instead of mode-based automation
+- **Context Awareness**: Tracks 200K token usage for Claude Sonnet 4.5 (stateful mode)
 - **Ephemeral**: State is not persisted across sessions (except execution audit trail)
 - **Real-time**: Live execution status updates via Supabase Realtime
 - **Cost-optimized**: Prompt caching reduces token costs by up to 90%
@@ -367,7 +369,8 @@ return {
     outputTokens: response.usage.output_tokens,
     cachedReadTokens: response.usage.cache_read_input_tokens,
     cachedWriteTokens: response.usage.cache_creation_input_tokens,
-    executionTimeMs: executionTime
+    executionTimeMs: executionTime,
+    modelUsed: modelToUse  // Model used for this execution (for context window tracking)
   },
   tokensUsed: {...},
   timestamp: new Date().toISOString()
@@ -776,6 +779,32 @@ All override toggles turn OFF, reverting to LLM defaults.
 }
 ```
 
+### 4. Context Window Tracking (Claude Sonnet 4.5)
+
+**Purpose:** Visibility into 200K context window usage
+
+**How it works:**
+- Claude Sonnet 4.5 has **internal context awareness** (receives system messages about token budget)
+- Workbench mirrors this by calculating cumulative token usage client-side
+- Displayed only in **stateful mode** for models with 200K context windows
+
+**Implementation:**
+```typescript
+// Calculate cumulative tokens across conversation
+const cumulativeTokens = conversationHistory.reduce(
+  (sum, msg) => sum + (msg.metadata?.inputTokens || 0) + (msg.metadata?.outputTokens || 0),
+  0
+)
+
+// Display in advanced mode
+Context: 4,288/200,000 (2.1%) • 195,712 remaining
+```
+
+**Benefits:**
+- Helps users understand when approaching the 200K limit
+- Prevents context overflow in long conversations
+- Shows what Claude internally tracks
+
 ## Mode Comparison
 
 | Feature | Stateful Mode | Stateless Mode |
@@ -797,8 +826,9 @@ All override toggles turn OFF, reverting to LLM defaults.
 - Global LLM settings with Claude models
 - Multi-turn conversations with full context
 - Prompt caching (5-min TTL, 90% cost reduction)
-- Extended thinking mode
-- Document citations
+- Extended thinking mode with thinking block display
+- Document citations with citation block display
+- Context window tracking (Claude Sonnet 4.5, 200K tokens)
 - Model selector UI
 
 ### ✅ Phase B: Real-time Streaming
@@ -1013,10 +1043,10 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-04
-**Phase:** 1.8 Complete (Message Composition Architecture + Cache Fix)
+**Last Updated:** 2025-10-05
+**Phase:** 1.9 Complete (Context Window Tracking + Extended Thinking/Citations Display)
 **Next Phase:** 2.0 - Run Execution System
-**Edge Function Version:** 8 (content structure preservation)
+**Edge Function Version:** 11 (modelUsed tracking + citations extraction fix)
 
 ## Architecture Notes
 
