@@ -8,6 +8,7 @@ import { Copy, Download, RotateCcw, AlertCircle, Clock, Coins, Trash2 } from "lu
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useWorkbenchTest } from "@/hooks/use-workbench-test"
 import { cn } from "@/lib/utils"
+import type { ConversationMessage } from "@/lib/validations"
 
 /**
  * Workbench Output Component
@@ -30,6 +31,8 @@ export function WorkbenchOutput() {
   const {
     conversationHistory,
     executionStatus,
+    advancedSettings,
+    advancedMode,
     clearConversation,
     clearOutput
   } = useWorkbenchStore()
@@ -118,7 +121,8 @@ export function WorkbenchOutput() {
     return content.map(block => {
       if (typeof block === 'object' && block !== null &&
           'type' in block && block.type === 'document' &&
-          'source' in block && block.source?.data) {
+          'source' in block && typeof block.source === 'object' && block.source !== null &&
+          'data' in block.source && typeof block.source.data === 'string') {
         const originalSize = block.source.data.length
         return {
           ...block,
@@ -293,51 +297,14 @@ export function WorkbenchOutput() {
 
         <Separator />
 
-        {/* Cache Performance Panel - Only show when there are cache statistics */}
-        {(totalCachedRead > 0 || totalCachedWrite > 0) && (
+        {/* Cache Performance Panel - Only show in advanced mode when there are cache statistics */}
+        {advancedMode && (totalCachedRead > 0 || totalCachedWrite > 0) && (
           <>
-            <div className="rounded-lg bg-muted/30 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <Coins className="h-4 w-4 text-primary" />
-                <h3 className="text-sm font-semibold">Cache Performance</h3>
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Cache Writes</p>
-                  <p className="text-lg font-semibold text-blue-600">
-                    🔷 {totalCachedWrite.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">tokens (+25% cost)</p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Cache Hits</p>
-                  <p className="text-lg font-semibold text-green-600">
-                    🎯 {totalCachedRead.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">tokens (-90% cost)</p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Hit Rate</p>
-                  <p className="text-lg font-semibold">{cacheHitRate}%</p>
-                  <p className="text-xs text-muted-foreground">
-                    {totalCachedRead} / {totalCacheableTokens.toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Cost Savings</p>
-                  <p className="text-lg font-semibold text-green-600">~{costSavingsPercent}%</p>
-                  <p className="text-xs text-muted-foreground">vs. no caching</p>
-                </div>
-              </div>
-
+            <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Coins className="h-3.5 w-3.5" />
+              <span>Cache Performance: Writes {totalCachedWrite.toLocaleString()} • Hits {totalCachedRead.toLocaleString()} • Hit Rate {cacheHitRate}% {totalCachedRead}/{totalCacheableTokens.toLocaleString()} • Est savings vs no cache ~{costSavingsPercent}%</span>
               {totalCachedRead === 0 && totalCachedWrite > 0 && (
-                <div className="text-xs text-muted-foreground italic">
-                  💡 Cache created. Send follow-up messages to see 90% cost savings!
-                </div>
+                <span className="italic ml-2">💡 Cache created. Send follow-up messages to see 90% cost savings!</span>
               )}
             </div>
             <Separator />
@@ -345,148 +312,136 @@ export function WorkbenchOutput() {
         )}
 
         {/* Conversation History */}
-        <div className="space-y-4">
-          {[...conversationHistory].reverse().map((message, index) => {
-            // Determine cache status for this message
-            const hasCacheWrite = message.tokensUsed?.cached_write && message.tokensUsed.cached_write > 0
-            const hasCacheRead = message.tokensUsed?.cached_read && message.tokensUsed.cached_read > 0
+        <div className="space-y-6">
+          {/* Group messages in pairs (reversed for display) */}
+          {(() => {
+            const pairs: Array<{ user: ConversationMessage; assistant: ConversationMessage }> = []
+            const reversed = [...conversationHistory].reverse()
 
-            return (
-              <div key={index} className="space-y-2">
-                {/* Message Header */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={message.role === 'user' ? 'default' : 'secondary'}>
-                      {message.role === 'user' ? 'You' : 'Assistant'}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(message.timestamp).toLocaleTimeString()}
-                    </span>
+            // Group into user+assistant pairs
+            for (let i = 0; i < reversed.length; i++) {
+              if (reversed[i].role === 'assistant' && i + 1 < reversed.length && reversed[i + 1].role === 'user') {
+                pairs.push({
+                  assistant: reversed[i],
+                  user: reversed[i + 1]
+                })
+                i++ // Skip the next message as it's already paired
+              }
+            }
 
-                    {/* Cache status badges */}
-                    {hasCacheWrite && (
-                      <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700 text-xs">
-                        🔷 Cache Created
-                      </Badge>
-                    )}
-                    {hasCacheRead && (
-                      <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700 text-xs">
-                        🎯 Cache Hit
-                      </Badge>
-                    )}
+            return pairs.map((pair, pairIndex) => {
+              const assistantMsg = pair.assistant
+              const userMsg = pair.user
+              const metadata = assistantMsg.metadata
+
+              // Build advanced settings overrides display
+              const overrides: string[] = []
+              if (metadata) {
+                // Check if advanced settings were overridden (compare to defaults or check if enabled)
+                if (advancedSettings.temperature.enabled) {
+                  overrides.push(`Temp: ${advancedSettings.temperature.value}`)
+                }
+                if (advancedSettings.topP.enabled) {
+                  overrides.push(`TopP: ${advancedSettings.topP.value.toFixed(2)}`)
+                }
+                if (advancedSettings.topK.enabled) {
+                  overrides.push(`TopK: ${advancedSettings.topK.value}`)
+                }
+                if (advancedSettings.stopSequences.enabled && advancedSettings.stopSequences.values.length > 0) {
+                  overrides.push(`Stop: ${advancedSettings.stopSequences.values.length}`)
+                }
+              }
+
+              return (
+                <div key={pairIndex} className="space-y-3">
+                  {/* Execution Statistics - Single row above Assistant (only in advanced mode) */}
+                  {advancedMode && metadata && (
+                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>Time {(metadata.executionTimeMs || 0) / 1000}s</span>
+                      <span>•</span>
+                      <span>Input {metadata.inputTokens} tokens{metadata.cachedReadTokens ? ` (${metadata.cachedReadTokens} cached)` : ''}</span>
+                      <span>•</span>
+                      <span>Output {metadata.outputTokens} tokens</span>
+                      <span>•</span>
+                      <span className={metadata.mode === 'stateful' ? 'text-blue-600' : 'text-orange-600'}>
+                        {metadata.mode === 'stateful' ? 'Stateful' : 'Stateless'}
+                      </span>
+                      <span>•</span>
+                      <span>System {metadata.systemPromptSent ? '✓' : '✗'}</span>
+                      {metadata.fileSent && (
+                        <>
+                          <span>•</span>
+                          <span>File ✓</span>
+                        </>
+                      )}
+                      {metadata.thinkingEnabled && (
+                        <>
+                          <span>•</span>
+                          <span>Thinking ✓ ({advancedSettings.thinkingBudget})</span>
+                        </>
+                      )}
+                      {metadata.citationsEnabled && (
+                        <>
+                          <span>•</span>
+                          <span>Citations ✓</span>
+                        </>
+                      )}
+                      <span>•</span>
+                      <span>Max {advancedSettings.maxTokens}</span>
+                      {overrides.length > 0 && (
+                        <>
+                          <span>•</span>
+                          <span className="text-amber-600">Overrides: {overrides.join(', ')}</span>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* User Message */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="default" className="text-xs">You</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(userMsg.timestamp).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <div className="rounded-lg p-4 bg-primary/5 border border-primary/20">
+                      <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                        {extractText(userMsg.content)}
+                      </pre>
+                    </div>
+                  </div>
+
+                  {/* Assistant Message */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">Assistant</Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(assistantMsg.timestamp).toLocaleTimeString()}
+                      </span>
+                      {/* Cache status badges */}
+                      {metadata?.cachedWriteTokens && metadata.cachedWriteTokens > 0 && (
+                        <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700 text-xs">
+                          🔷 Cache Created
+                        </Badge>
+                      )}
+                      {metadata?.cachedReadTokens && metadata.cachedReadTokens > 0 && (
+                        <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700 text-xs">
+                          🎯 Cache Hit
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="rounded-lg p-4 bg-muted/50">
+                      <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                        {extractText(assistantMsg.content)}
+                      </pre>
+                    </div>
                   </div>
                 </div>
-
-              {/* Message Metadata - show if available */}
-              {message.metadata && (
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  {/* Mode */}
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Mode:</span>
-                    <span className={message.metadata.mode === 'stateful' ? 'text-blue-600' : 'text-orange-600'}>
-                      {message.metadata.mode === 'stateful' ? 'Stateful' : 'Stateless'}
-                    </span>
-                  </span>
-
-                  <span>•</span>
-
-                  {/* Cache Created */}
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Cache:</span>
-                    <span className={message.metadata.cacheCreated ? 'text-green-600' : ''}>
-                      {message.metadata.cacheCreated ? '✓ Created' : '✗'}
-                    </span>
-                  </span>
-
-                  <span>•</span>
-
-                  {/* System Prompt */}
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">System Prompt:</span>
-                    <span>{message.metadata.systemPromptSent ? '✓' : '✗'}</span>
-                  </span>
-
-                  <span>•</span>
-
-                  {/* Thinking */}
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Thinking:</span>
-                    <span>{message.metadata.thinkingEnabled ? '✓' : '✗'}</span>
-                  </span>
-
-                  <span>•</span>
-
-                  {/* Citations */}
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Citations:</span>
-                    <span>{message.metadata.citationsEnabled ? '✓' : '✗'}</span>
-                  </span>
-                </div>
-              )}
-
-              {/* Token Usage */}
-              {message.metadata && (
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Input:</span>
-                    <span>{message.metadata.inputTokens} tokens</span>
-                    {message.metadata.cachedReadTokens && message.metadata.cachedReadTokens > 0 && (
-                      <span className="text-green-600">
-                        (🎯 {message.metadata.cachedReadTokens} cached)
-                      </span>
-                    )}
-                    {message.metadata.cachedWriteTokens && message.metadata.cachedWriteTokens > 0 && (
-                      <span className="text-blue-600">
-                        (🔷 {message.metadata.cachedWriteTokens} cache write)
-                      </span>
-                    )}
-                  </span>
-
-                  <span>•</span>
-
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">Output:</span>
-                    <span>{message.metadata.outputTokens} tokens</span>
-                  </span>
-
-                  {message.metadata.executionTimeMs && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <span className="font-medium">Time:</span>
-                        <span>{(message.metadata.executionTimeMs / 1000).toFixed(2)}s</span>
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Legacy token display for backward compatibility */}
-              {!message.metadata && message.tokensUsed && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>{message.tokensUsed.input + message.tokensUsed.output} tokens</span>
-                  {message.tokensUsed.cached_read && (
-                    <span className="text-green-600">
-                      ({message.tokensUsed.cached_read} cached)
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Message Content */}
-              <div className={cn(
-                "rounded-lg p-4",
-                message.role === 'user'
-                  ? "bg-primary/5 border border-primary/20"
-                  : "bg-muted/50"
-              )}>
-                <pre className="text-sm whitespace-pre-wrap break-words font-sans">
-                  {extractText(message.content)}
-                </pre>
-              </div>
-            </div>
-            )
-          })}
+              )
+            })
+          })()}
         </div>
       </div>
     </Card>

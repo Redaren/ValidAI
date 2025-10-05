@@ -96,6 +96,7 @@ export interface WorkbenchStore {
   thinkingMode: boolean
   citations: boolean
   toolUse: boolean
+  advancedMode: boolean
 
   // Advanced Settings
   advancedSettings: AdvancedSettings
@@ -124,6 +125,7 @@ export interface WorkbenchStore {
   setMode: (mode: 'stateful' | 'stateless') => void
   toggleSystemPrompt: () => void
   toggleFeature: (feature: 'thinking' | 'citations' | 'toolUse') => void
+  toggleAdvancedMode: () => void
   updateAdvancedSettings: (settings: Partial<AdvancedSettings>) => void
   setThinkingBudget: (tokens: number | null) => void
   toggleCreateCache: () => void
@@ -189,6 +191,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       thinkingMode: false,
       citations: false,
       toolUse: false,
+      advancedMode: false,  // Default to simple mode
       advancedSettings: defaultAdvancedSettings,
       conversationHistory: [],
       cachedDocumentContent: null,
@@ -240,6 +243,10 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       toggleSystemPrompt: () => {
         set({ sendSystemPrompt: !get().sendSystemPrompt })
+      },
+
+      toggleAdvancedMode: () => {
+        set({ advancedMode: !get().advancedMode })
       },
 
       toggleFeature: (feature) => {
@@ -573,6 +580,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           thinkingMode: false,
           citations: false,
           toolUse: false,
+          advancedMode: false,
           advancedSettings: defaultAdvancedSettings,
           conversationHistory: [],
           cachedDocumentContent: null,
