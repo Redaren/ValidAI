@@ -1,10 +1,10 @@
 # LLM Workbench Architecture
 
-The LLM Workbench is a testing environment for operations that integrates with Anthropic's Claude API, featuring message composition controls, prompt caching, real-time execution tracking, and comprehensive LLM configuration management.
+The LLM Workbench is a testing environment for operations that integrates with LLM providers through the Vercel AI SDK, featuring message composition controls, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Currently configured for Anthropic's Claude models with the foundation for multi-provider support.
 
-**Implementation:** Phase 1.9 (Completed - Context Window Tracking)
-**Documentation Date:** 2025-10-05
-**Based on:** Official Anthropic API documentation (https://docs.claude.com/en/api/messages)
+**Implementation:** Phase 2.0 (Vercel AI SDK Migration)
+**Documentation Date:** 2025-10-06
+**Based on:** Vercel AI SDK (https://ai-sdk.dev) with Anthropic provider
 
 ## Overview
 
@@ -285,6 +285,8 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 
 **Location:** `supabase/functions/execute-workbench-test/index.ts`
 
+**LLM Integration:** Uses Vercel AI SDK with `@ai-sdk/anthropic` provider for unified LLM interface
+
 **System Prompt Handling (User-Controlled):**
 ```typescript
 if (body.send_system_prompt && body.system_prompt) {
@@ -354,23 +356,25 @@ if (contentBlocks.length === 1) {
 }
 ```
 
-**Response with Metadata:**
+**Response with Metadata (Vercel AI SDK):**
 ```typescript
 return {
   execution_id: executionId,
   response: responseText,
+  thinking_blocks: thinkingBlocks,  // Extracted from response.reasoning
   metadata: {
     mode: body.mode,
-    cacheEnabled: body.settings.caching_enabled,
+    cacheCreated: body.settings.create_cache,
     systemPromptSent: body.send_system_prompt && !!body.system_prompt,
     thinkingEnabled: !!body.settings.thinking,
     citationsEnabled: body.settings.citations_enabled,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    cachedReadTokens: response.usage.cache_read_input_tokens,
-    cachedWriteTokens: response.usage.cache_creation_input_tokens,
+    // Token usage from Vercel AI SDK
+    inputTokens: response.usage?.promptTokens,
+    outputTokens: response.usage?.completionTokens,
+    cachedReadTokens: response.providerMetadata?.anthropic?.cacheReadInputTokens,
+    cachedWriteTokens: response.providerMetadata?.anthropic?.cacheCreationInputTokens,
     executionTimeMs: executionTime,
-    modelUsed: modelToUse  // Model used for this execution (for context window tracking)
+    modelUsed: modelToUse
   },
   tokensUsed: {...},
   timestamp: new Date().toISOString()
@@ -718,9 +722,36 @@ All override toggles turn OFF, reverting to LLM defaults.
 - Export conversation as JSON
 - Clear conversation button
 
-## Anthropic API Integration
+## LLM Provider Integration (Vercel AI SDK)
 
-### 1. Prompt Caching (Stateful Mode Only)
+The workbench uses the Vercel AI SDK to integrate with LLM providers, currently configured for Anthropic's Claude models. This provides a unified interface that simplifies adding support for additional providers (OpenAI, Mistral, Google, etc.) in the future.
+
+### Provider Configuration
+
+**Current Implementation:**
+```typescript
+import { createAnthropic } from '@ai-sdk/anthropic'
+import { generateText } from 'ai'
+
+// Initialize provider with custom API key
+const anthropicProvider = createAnthropic({ apiKey })
+
+// Execute LLM call with unified interface
+const response = await generateText({
+  model: anthropicProvider(modelToUse),
+  messages,
+  system,
+  maxTokens: 4096,
+  providerOptions: {
+    anthropic: {
+      thinking: { type: 'enabled', budgetTokens: 10000 },
+      // Cache control embedded in message blocks
+    }
+  }
+})
+```
+
+### 1. Prompt Caching
 
 **Purpose:** 90% cost reduction for repeated content
 
@@ -752,19 +783,24 @@ All override toggles turn OFF, reverting to LLM defaults.
 - TTL: 5 minutes
 - Requirements: Minimum 1024 tokens
 
-### 2. Extended Thinking
+### 2. Extended Thinking/Reasoning
 
 **Toggle:** "Thinking mode"
 
-**Implementation:**
-```json
-{
-  "thinking": {
-    "type": "enabled",
-    "budget_tokens": 10000
+**Implementation via Vercel AI SDK:**
+```typescript
+providerOptions: {
+  anthropic: {
+    thinking: {
+      type: 'enabled',
+      budgetTokens: 10000  // Budget for reasoning tokens
+    }
   }
 }
 ```
+
+**Response Extraction:**
+The Vercel AI SDK returns reasoning in `response.reasoning`, which is formatted for frontend display.
 
 ### 3. Citations
 
@@ -821,12 +857,13 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 
 ## What's Implemented
 
-### ✅ Phase A: Anthropic LLM Integration
-- Anthropic SDK integration (@anthropic-ai/sdk v0.65.0)
+### ✅ Phase A: LLM Integration via Vercel AI SDK
+- Vercel AI SDK integration with Anthropic provider (@ai-sdk/anthropic)
+- Unified provider interface for future multi-LLM support
 - Global LLM settings with Claude models
 - Multi-turn conversations with full context
 - Prompt caching (5-min TTL, 90% cost reduction)
-- Extended thinking mode with thinking block display
+- Extended thinking mode with reasoning display
 - Document citations with citation block display
 - Context window tracking (Claude Sonnet 4.5, 200K tokens)
 - Model selector UI
@@ -1043,10 +1080,30 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-05
-**Phase:** 1.9 Complete (Context Window Tracking + Extended Thinking/Citations Display)
-**Next Phase:** 2.0 - Run Execution System
-**Edge Function Version:** 11 (modelUsed tracking + citations extraction fix)
+**Last Updated:** 2025-10-06
+**Phase:** 2.0 Complete (Vercel AI SDK Migration)
+**Architecture:** Unified LLM provider interface via Vercel AI SDK
+**Next Phase:** 2.1 - Multi-Provider Support (OpenAI, Mistral, Google)
+**Edge Function Version:** 17 (Vercel AI SDK with thinking/reasoning support)
+
+## Benefits of Vercel AI SDK Architecture
+
+### Unified Provider Interface
+- Single API for all LLM providers (Anthropic, OpenAI, Mistral, etc.)
+- Consistent response formats across providers
+- Simplified error handling and retry logic
+- Future-proof for adding new providers
+
+### Improved Developer Experience
+- Better TypeScript support with strong typing
+- Standardized parameter names (camelCase)
+- Built-in streaming support (ready for future implementation)
+- Active maintenance and regular updates from Vercel
+
+### Cost Optimization
+- Maintains all Anthropic-specific optimizations (caching, thinking mode)
+- Provider-agnostic token tracking
+- Ready for provider comparison and selection based on cost/performance
 
 ## Architecture Notes
 

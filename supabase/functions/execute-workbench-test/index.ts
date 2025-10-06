@@ -244,11 +244,16 @@ serve(async (req) => {
         topP: body.settings.top_p,
         topK: body.settings.top_k,
         stopSequences: body.settings.stop_sequences,
-        // Pass Anthropic-specific options through experimental_providerMetadata
-        experimental_providerMetadata: {
+        // Pass Anthropic-specific options through providerOptions
+        providerOptions: {
           anthropic: {
-            // Pass thinking mode if enabled
-            ...(body.settings.thinking ? { thinking: body.settings.thinking } : {}),
+            // Pass thinking mode if enabled - convert budget_tokens to budgetTokens
+            ...(body.settings.thinking ? {
+              thinking: {
+                type: body.settings.thinking.type,
+                budgetTokens: body.settings.thinking.budget_tokens  // Map budget_tokens to budgetTokens
+              }
+            } : {}),
             // Note: Cache control is already embedded in system and document blocks
             // Citations are also handled in document blocks directly
           }
@@ -260,30 +265,25 @@ serve(async (req) => {
       // Vercel AI SDK provides the text directly in response.text
       const responseText = response.text || ''
 
-      // Extract special blocks from provider metadata if available
+      // Extract thinking/reasoning blocks - Vercel AI SDK returns these as top-level fields
       const thinkingBlocks: any[] = []
-      const citations: any[] = []
-
-      // Check if Anthropic returned additional content blocks in metadata
-      if (response.experimental_providerMetadata?.anthropic?.content) {
-        const content = response.experimental_providerMetadata.anthropic.content
-        if (Array.isArray(content)) {
-          content.forEach((block: any) => {
-            if (block.type === 'thinking') {
-              thinkingBlocks.push(block)
-            } else if (block.type === 'citation') {
-              citations.push(block)
-            }
-          })
-        }
+      if (response.reasoning) {
+        // Format reasoning as thinking block for frontend compatibility
+        // Frontend expects either 'thinking' or 'text' field
+        thinkingBlocks.push({
+          type: 'thinking',
+          thinking: response.reasoning,  // Use 'thinking' field that frontend expects
+          text: response.reasoning  // Also include 'text' as fallback
+        })
       }
 
-      // Alternative: Check rawResponse for additional content types
+      // Extract citations from provider metadata if available
+      const citations: any[] = []
+
+      // Check rawResponse for citation blocks (Anthropic-specific)
       if (response.rawResponse && response.rawResponse.content) {
         response.rawResponse.content.forEach((block: any) => {
-          if (block.type === 'thinking') {
-            thinkingBlocks.push(block)
-          } else if (block.type === 'citation') {
+          if (block.type === 'citation') {
             citations.push(block)
           }
         })
@@ -305,15 +305,15 @@ serve(async (req) => {
           citationsEnabled: body.settings.citations_enabled || false,
           inputTokens: response.usage?.promptTokens || 0,
           outputTokens: response.usage?.completionTokens || 0,
-          cachedReadTokens: response.experimental_providerMetadata?.anthropic?.cacheReadTokens || 0,
-          cachedWriteTokens: response.experimental_providerMetadata?.anthropic?.cacheCreationTokens || 0,
+          cachedReadTokens: response.providerMetadata?.anthropic?.cacheReadInputTokens || 0,
+          cachedWriteTokens: response.providerMetadata?.anthropic?.cacheCreationInputTokens || 0,
           executionTimeMs: executionTime
         },
         tokensUsed: {
           input: response.usage?.promptTokens || 0,
           output: response.usage?.completionTokens || 0,
-          cached_read: response.experimental_providerMetadata?.anthropic?.cacheReadTokens || 0,  // Cost savings from cache hits
-          cached_write: response.experimental_providerMetadata?.anthropic?.cacheCreationTokens || 0,  // One-time cost to create cache
+          cached_read: response.providerMetadata?.anthropic?.cacheReadInputTokens || 0,  // Cost savings from cache hits
+          cached_write: response.providerMetadata?.anthropic?.cacheCreationInputTokens || 0,  // One-time cost to create cache
           total: (response.usage?.promptTokens || 0) + (response.usage?.completionTokens || 0)
         },
         executionTime,
