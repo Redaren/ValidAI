@@ -1,14 +1,16 @@
 "use client"
 
+import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import { Copy, Download, RotateCcw, AlertCircle, Clock, Coins, Trash2 } from "lucide-react"
+import { Download, AlertCircle, Clock, Coins, Trash2, FileJson } from "lucide-react"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useWorkbenchTest } from "@/hooks/use-workbench-test"
-import { cn } from "@/lib/utils"
 import type { ConversationMessage } from "@/lib/validations"
+import { extractStructuredContent } from "@/lib/utils/content-detector"
+import { StructuredOutputVisualizer } from "@/components/workbench/structured-output-visualizer"
 
 /**
  * Workbench Output Component
@@ -33,11 +35,14 @@ export function WorkbenchOutput() {
     executionStatus,
     advancedSettings,
     advancedMode,
-    clearConversation,
-    clearOutput
+    autoParseStructuredData,
+    clearConversation
   } = useWorkbenchStore()
 
   const workbenchTest = useWorkbenchTest()
+
+  // Track which messages have been manually parsed (by index)
+  const [manuallyParsedMessages, setManuallyParsedMessages] = useState<Set<number>>(new Set())
 
   /**
    * Get status badge component for current execution
@@ -89,22 +94,6 @@ export function WorkbenchOutput() {
     return textBlocks.map((block) => block.text).join(' ')
   }
 
-  /**
-   * Copy text to clipboard using Clipboard API
-   *
-   * Uses modern navigator.clipboard API for secure clipboard access.
-   * Silently fails if clipboard access is denied.
-   *
-   * @param text - Text content to copy
-   */
-  const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      // Could add toast notification here
-    } catch (err) {
-      console.error('Failed to copy:', err)
-    }
-  }
 
   /**
    * Truncate document data in content for cleaner exports
@@ -463,6 +452,30 @@ export function WorkbenchOutput() {
                           🎯 Cache Hit
                         </Badge>
                       )}
+                      {/* Manual parse button - only in advanced mode when auto-parse is off */}
+                      {(() => {
+                        const responseText = extractText(assistantMsg.content)
+                        const messageIndex = conversationHistory.indexOf(assistantMsg)
+                        const isParsed = manuallyParsedMessages.has(messageIndex)
+                        const shouldShowParseButton = advancedMode &&
+                          !autoParseStructuredData &&
+                          !isParsed &&
+                          (responseText.includes('{') || responseText.includes('<'))
+
+                        return shouldShowParseButton ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs gap-1 px-2"
+                            onClick={() => {
+                              setManuallyParsedMessages(prev => new Set(prev).add(messageIndex))
+                            }}
+                          >
+                            <FileJson className="h-3 w-3" />
+                            Parse to structured data
+                          </Button>
+                        ) : null
+                      })()}
                     </div>
 
                     {/* Thinking Blocks - Show after header, before response */}
@@ -473,10 +486,10 @@ export function WorkbenchOutput() {
                             💭 Extended Thinking
                           </Badge>
                         </div>
-                        {assistantMsg.thinking_blocks.map((block: any, idx: number) => (
+                        {assistantMsg.thinking_blocks.map((block: Record<string, unknown>, idx: number) => (
                           <div key={idx} className="mt-2">
                             <pre className="text-sm whitespace-pre-wrap break-words font-sans text-muted-foreground italic">
-                              {block.thinking || block.text || JSON.stringify(block)}
+                              {String(block.thinking || block.text || JSON.stringify(block))}
                             </pre>
                           </div>
                         ))}
@@ -484,10 +497,57 @@ export function WorkbenchOutput() {
                     )}
 
                     {/* Response */}
-                    <div className="rounded-lg p-4 bg-muted/50">
-                      <pre className="text-sm whitespace-pre-wrap break-words font-sans">
-                        {extractText(assistantMsg.content)}
-                      </pre>
+                    <div className="space-y-3">
+                      {(() => {
+                        const responseText = extractText(assistantMsg.content)
+                        const messageIndex = conversationHistory.indexOf(assistantMsg)
+                        const isParsed = manuallyParsedMessages.has(messageIndex)
+
+                        // Determine if we should parse structured content
+                        const shouldParse =
+                          // Always parse in non-advanced mode (backward compatibility)
+                          !advancedMode ||
+                          // In advanced mode, parse if auto-parse is on
+                          (advancedMode && autoParseStructuredData) ||
+                          // In advanced mode with auto-parse off, parse if manually triggered
+                          (advancedMode && !autoParseStructuredData && isParsed)
+
+                        if (shouldParse) {
+                          const extracted = extractStructuredContent(responseText)
+
+                          return (
+                            <>
+                              {/* Plain text response */}
+                              {extracted.plainText && (
+                                <div className="rounded-lg p-4 bg-muted/50">
+                                  <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                                    {extracted.plainText}
+                                  </pre>
+                                </div>
+                              )}
+
+                              {/* Structured output blocks */}
+                              {extracted.blocks.map((block, blockIdx) => (
+                                <StructuredOutputVisualizer
+                                  key={blockIdx}
+                                  data={block.data}
+                                  originalType={block.type}
+                                  showRawToggle={true}
+                                />
+                              ))}
+                            </>
+                          )
+                        } else {
+                          // Show raw response without parsing
+                          return (
+                            <div className="rounded-lg p-4 bg-muted/50">
+                              <pre className="text-sm whitespace-pre-wrap break-words font-sans">
+                                {responseText}
+                              </pre>
+                            </div>
+                          )
+                        }
+                      })()}
                     </div>
 
                     {/* Citations - Show after response */}
@@ -502,29 +562,29 @@ export function WorkbenchOutput() {
                           </span>
                         </div>
                         <div className="space-y-3">
-                          {assistantMsg.citations.map((citation: any, idx: number) => (
+                          {assistantMsg.citations.map((citation: Record<string, unknown>, idx: number) => (
                             <div key={idx} className="border-l-2 border-cyan-400/50 pl-3">
                               <div className="text-sm mb-1">
-                                <span className="font-medium text-foreground">"{citation.cited_text}"</span>
+                                <span className="font-medium text-foreground">&quot;{String(citation.cited_text)}&quot;</span>
                               </div>
                               <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
-                                <span className="font-medium">{citation.document_title || 'Document'}</span>
+                                <span className="font-medium">{String(citation.document_title || 'Document')}</span>
                                 {citation.type === 'page_location' && (
                                   <>
                                     <span>•</span>
-                                    <span>Pages {citation.start_page_number}-{citation.end_page_number}</span>
+                                    <span>Pages {String(citation.start_page_number)}-{String(citation.end_page_number)}</span>
                                   </>
                                 )}
                                 {citation.type === 'char_location' && (
                                   <>
                                     <span>•</span>
-                                    <span>Chars {citation.start_char_index}-{citation.end_char_index}</span>
+                                    <span>Chars {String(citation.start_char_index)}-{String(citation.end_char_index)}</span>
                                   </>
                                 )}
                                 {citation.type === 'content_block_location' && (
                                   <>
                                     <span>•</span>
-                                    <span>Blocks {citation.start_block_index}-{citation.end_block_index}</span>
+                                    <span>Blocks {String(citation.start_block_index)}-{String(citation.end_block_index)}</span>
                                   </>
                                 )}
                               </div>

@@ -25,7 +25,12 @@
       "Bash(netstat:*)",
       "Bash(findstr:*)",
       "Bash(git log:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Read(//c/Users/johan/Downloads/**)",
+      "Bash(npm run build:*)",
+      "Bash(node:*)",
+      "Bash(find:*)",
+      "Bash(rm:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

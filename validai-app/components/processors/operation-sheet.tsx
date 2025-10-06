@@ -314,7 +314,7 @@ export function OperationSheet({
                   <SelectContent>
                     <SelectItem value="generic">Generic</SelectItem>
                     {/* Show other types if editing an operation of that type */}
-                    {isEditMode && operation?.operation_type !== 'generic' && (
+                    {isEditMode && operation && (
                       <SelectItem value={operation.operation_type}>
                         {operation.operation_type.charAt(0).toUpperCase() +
                          operation.operation_type.slice(1)}

@@ -97,6 +97,7 @@ export interface WorkbenchStore {
   citations: boolean
   toolUse: boolean
   advancedMode: boolean
+  autoParseStructuredData: boolean  // Auto-parse JSON/XML in responses (default: true)
 
   // Advanced Settings
   advancedSettings: AdvancedSettings
@@ -126,6 +127,7 @@ export interface WorkbenchStore {
   toggleSystemPrompt: () => void
   toggleFeature: (feature: 'thinking' | 'citations' | 'toolUse') => void
   toggleAdvancedMode: () => void
+  toggleAutoParseStructuredData: () => void
   updateAdvancedSettings: (settings: Partial<AdvancedSettings>) => void
   setThinkingBudget: (tokens: number | null) => void
   toggleCreateCache: () => void
@@ -193,6 +195,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       citations: false,
       toolUse: false,
       advancedMode: false,  // Default to simple mode
+      autoParseStructuredData: true,  // Default to auto-parsing for backward compatibility
       advancedSettings: defaultAdvancedSettings,
       conversationHistory: [],
       cachedDocumentContent: null,
@@ -248,6 +251,10 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       toggleAdvancedMode: () => {
         set({ advancedMode: !get().advancedMode })
+      },
+
+      toggleAutoParseStructuredData: () => {
+        set({ autoParseStructuredData: !get().autoParseStructuredData })
       },
 
       toggleFeature: (feature) => {

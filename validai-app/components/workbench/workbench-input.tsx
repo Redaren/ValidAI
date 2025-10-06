@@ -524,7 +524,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
       <div className="space-y-4 lg:pl-8">
         {/* System Prompt */}
         <div className="space-y-2">
-          <Label>Processor's system prompt</Label>
+          <Label>Processor&apos;s system prompt</Label>
           <div className="text-sm text-muted-foreground">
             {systemPrompt
               ? (systemPrompt.length > 158 ? systemPrompt.substring(0, 158) + '..' : systemPrompt)

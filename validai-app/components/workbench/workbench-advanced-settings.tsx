@@ -28,6 +28,7 @@ export function WorkbenchAdvancedSettings() {
   const {
     advancedSettings,
     thinkingMode,
+    autoParseStructuredData,
     setMaxTokens,
     setThinkingBudgetValue,
     toggleTemperature,
@@ -40,7 +41,8 @@ export function WorkbenchAdvancedSettings() {
     addStopSequence,
     removeStopSequence,
     clearStopSequences,
-    resetAdvancedSettings
+    resetAdvancedSettings,
+    toggleAutoParseStructuredData
   } = useWorkbenchStore()
 
   const handleAddStopSequence = () => {
@@ -123,6 +125,30 @@ export function WorkbenchAdvancedSettings() {
                   ⚠️ Must be less than max tokens
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Output Processing */}
+          <div className="space-y-3">
+            <Label className="text-xs text-muted-foreground uppercase">
+              Output Processing
+            </Label>
+
+            {/* Auto-parse Structured Data */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-sm">
+                <span>Auto-parse structured data</span>
+                <Switch
+                  checked={autoParseStructuredData}
+                  onCheckedChange={toggleAutoParseStructuredData}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {autoParseStructuredData
+                  ? "Automatically detect and visualize JSON/XML in responses"
+                  : "Manually trigger parsing with 'Parse to structured data' button"
+                }
+              </p>
             </div>
           </div>
 

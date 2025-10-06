@@ -536,7 +536,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
       <DragOverlay>
         {activeOperation ? (
           <div className="rotate-2 scale-105 cursor-grabbing">
-            <OperationCard operation={activeOperation} />
+            <OperationCard operation={activeOperation} processorId={processor.processor_id} />
           </div>
         ) : null}
       </DragOverlay>
