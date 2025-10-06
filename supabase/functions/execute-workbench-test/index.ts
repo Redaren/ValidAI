@@ -479,18 +479,18 @@ serve(async (req) => {
           fileSent: body.send_file && !!body.file_content,
           thinkingEnabled: !!body.settings.thinking,
           citationsEnabled: body.settings.citations_enabled || false,
-          inputTokens: response.usage?.promptTokens || 0,
-          outputTokens: response.usage?.completionTokens || 0,
-          cachedReadTokens: response.providerMetadata?.anthropic?.cacheReadInputTokens || 0,
+          inputTokens: response.usage?.inputTokens || 0,
+          outputTokens: response.usage?.outputTokens || 0,
+          cachedReadTokens: response.usage?.cachedInputTokens || 0,
           cachedWriteTokens: response.providerMetadata?.anthropic?.cacheCreationInputTokens || 0,
           executionTimeMs: executionTime
         },
         tokensUsed: {
-          input: response.usage?.promptTokens || 0,
-          output: response.usage?.completionTokens || 0,
-          cached_read: response.providerMetadata?.anthropic?.cacheReadInputTokens || 0,  // Cost savings from cache hits
+          input: response.usage?.inputTokens || 0,
+          output: response.usage?.outputTokens || 0,
+          cached_read: response.usage?.cachedInputTokens || 0,  // Cost savings from cache hits
           cached_write: response.providerMetadata?.anthropic?.cacheCreationInputTokens || 0,  // One-time cost to create cache
-          total: (response.usage?.promptTokens || 0) + (response.usage?.completionTokens || 0)
+          total: (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0)
         },
         executionTime,
         timestamp: new Date().toISOString(),
