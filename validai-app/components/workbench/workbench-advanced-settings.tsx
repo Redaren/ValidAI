@@ -39,6 +39,7 @@ export function WorkbenchAdvancedSettings() {
     toggleStopSequences,
     addStopSequence,
     removeStopSequence,
+    clearStopSequences,
     resetAdvancedSettings
   } = useWorkbenchStore()
 
@@ -312,9 +313,18 @@ export function WorkbenchAdvancedSettings() {
                 )}
 
                 {advancedSettings.stopSequences.values.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Will send: {JSON.stringify(advancedSettings.stopSequences.values)}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      Will send: {JSON.stringify(advancedSettings.stopSequences.values)}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearStopSequences}
+                    >
+                      Clear
+                    </Button>
+                  </div>
                 )}
               </div>
             ) : (

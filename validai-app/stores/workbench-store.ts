@@ -151,6 +151,7 @@ export interface WorkbenchStore {
   toggleStopSequences: () => void
   addStopSequence: (sequence: string) => void
   removeStopSequence: (index: number) => void
+  clearStopSequences: () => void
   resetAdvancedSettings: () => void
 }
 
@@ -557,6 +558,18 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
             stopSequences: {
               ...get().advancedSettings.stopSequences,
               values: current.filter((_, i) => i !== index)
+            }
+          }
+        })
+      },
+
+      clearStopSequences: () => {
+        set({
+          advancedSettings: {
+            ...get().advancedSettings,
+            stopSequences: {
+              ...get().advancedSettings.stopSequences,
+              values: []
             }
           }
         })
