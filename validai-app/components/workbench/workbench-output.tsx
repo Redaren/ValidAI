@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Workbench Output Component - Displays LLM test results with rich formatting
+ * @module components/workbench/workbench-output
+ */
+
 "use client"
 
 import { useState } from "react"
@@ -15,19 +20,32 @@ import { StructuredOutputVisualizer } from "@/components/workbench/structured-ou
 /**
  * Workbench Output Component
  *
- * Displays test results including:
- * - Conversation history
- * - Response text
- * - Thinking blocks
- * - Citations
- * - Token usage (with cache statistics)
- * - Cache performance panel (stateful mode only)
- *   - Cache writes (🔷) and reads (🎯)
- *   - Cache hit rate percentage
- *   - Cost savings estimation
- * - Per-message cache indicators
- * - Execution time
- * - Error states
+ * @component
+ * @description
+ * Comprehensive display interface for LLM test results with advanced visualization features.
+ * Handles both simple text responses and complex structured outputs with proper formatting.
+ *
+ * ## Features
+ * - **Conversation History**: Full message thread with user/assistant alternation
+ * - **Token Analytics**: Real-time token usage with cache performance metrics
+ * - **Structured Data**: Auto-detection and visualization of JSON/XML responses
+ * - **Special Blocks**: Renders thinking blocks, citations, and cache indicators
+ * - **Export Function**: Download conversations as JSON for analysis
+ * - **Performance Metrics**: Execution time, cache hit rates, cost savings
+ *
+ * ## Cache Performance Display
+ * - 🔷 Cache Created: Indicates new cache breakpoint (25% extra cost)
+ * - 🎯 Cache Hit: Shows cache reuse (90% cost savings)
+ * - Hit rate calculation: (cached_read / total_cacheable) * 100
+ * - Cost savings: Compares actual cost vs. non-cached scenario
+ *
+ * ## Advanced Mode Features
+ * - Detailed token breakdowns per message
+ * - Context window usage tracking
+ * - Manual structured data parsing toggle
+ * - Advanced settings override display
+ *
+ * @returns {JSX.Element} Rendered output display with results
  */
 export function WorkbenchOutput() {
   const {
@@ -47,14 +65,18 @@ export function WorkbenchOutput() {
   /**
    * Get status badge component for current execution
    *
-   * Returns color-coded badge with icon based on real-time execution status.
-   * Badge colors:
-   * - Pending: Yellow (⏳)
-   * - Processing: Blue (⚡)
-   * - Completed: Green (✓)
-   * - Failed: Red (✗)
+   * @function getStatusBadge
+   * @returns {JSX.Element | null} Color-coded status badge or null if idle
    *
-   * @returns Badge component or null if idle
+   * @description
+   * Generates visual status indicators based on real-time execution state.
+   * Used to provide immediate feedback during test execution.
+   *
+   * @badge-states
+   * - **Pending** (Yellow ⏳): Request queued, awaiting processing
+   * - **Processing** (Blue ⚡): LLM actively generating response
+   * - **Completed** (Green ✓): Response received successfully
+   * - **Failed** (Red ✗): Error occurred during execution
    */
   const getStatusBadge = () => {
     if (executionStatus === 'pending') {
@@ -128,18 +150,32 @@ export function WorkbenchOutput() {
   /**
    * Export conversation history as JSON file
    *
-   * Downloads conversation as JSON with timestamp.
-   * Document data is truncated for readability (original files unchanged).
+   * @function exportConversation
+   * @description
+   * Downloads the complete conversation history as a JSON file for external analysis.
+   * Automatically truncates large document data to keep file sizes manageable.
    *
-   * File format:
+   * ## Export Format
    * ```json
    * {
    *   "timestamp": "2025-10-03T12:34:56Z",
-   *   "conversation": [ ... messages ... ]
+   *   "conversation": [
+   *     {
+   *       "role": "user" | "assistant",
+   *       "content": "...",
+   *       "metadata": { ... },
+   *       "tokensUsed": { ... }
+   *     }
+   *   ]
    * }
    * ```
    *
-   * Filename: `workbench-conversation-{timestamp}.json`
+   * ## Data Processing
+   * - Document/file data truncated to 20 bytes + size indicator
+   * - All metadata and token information preserved
+   * - Timestamps maintained for conversation reconstruction
+   *
+   * @filename-format `workbench-conversation-{timestamp}.json`
    */
   const exportConversation = () => {
     if (conversationHistory.length === 0) return
@@ -214,19 +250,59 @@ export function WorkbenchOutput() {
   // Conversation history display
   const lastMessage = conversationHistory[conversationHistory.length - 1]
   const totalTokens = conversationHistory.reduce(
-    (sum, msg) => sum + (msg.tokensUsed?.input || 0) + (msg.tokensUsed?.output || 0),
+    (sum, msg) => {
+      // Assistant messages have tokensUsed
+      if (msg.tokensUsed) {
+        return sum + (msg.tokensUsed.input || 0) + (msg.tokensUsed.output || 0)
+      }
+      // User messages have metadata with inputTokens
+      if (msg.metadata) {
+        return sum + (msg.metadata.inputTokens || 0) + (msg.metadata.outputTokens || 0)
+      }
+      return sum
+    },
     0
   )
   const totalCachedRead = conversationHistory.reduce(
-    (sum, msg) => sum + (msg.tokensUsed?.cached_read || 0),
+    (sum, msg) => {
+      // Check tokensUsed first (assistant messages)
+      if (msg.tokensUsed?.cached_read !== undefined) {
+        return sum + msg.tokensUsed.cached_read
+      }
+      // Check metadata (user messages)
+      if (msg.metadata?.cachedReadTokens !== undefined) {
+        return sum + msg.metadata.cachedReadTokens
+      }
+      return sum
+    },
     0
   )
   const totalCachedWrite = conversationHistory.reduce(
-    (sum, msg) => sum + (msg.tokensUsed?.cached_write || 0),
+    (sum, msg) => {
+      // Check tokensUsed first (assistant messages)
+      if (msg.tokensUsed?.cached_write !== undefined) {
+        return sum + msg.tokensUsed.cached_write
+      }
+      // Check metadata (user messages)
+      if (msg.metadata?.cachedWriteTokens !== undefined) {
+        return sum + msg.metadata.cachedWriteTokens
+      }
+      return sum
+    },
     0
   )
   const totalInputTokens = conversationHistory.reduce(
-    (sum, msg) => sum + (msg.tokensUsed?.input || 0),
+    (sum, msg) => {
+      // Check tokensUsed first (assistant messages)
+      if (msg.tokensUsed?.input !== undefined) {
+        return sum + msg.tokensUsed.input
+      }
+      // Check metadata (user messages)
+      if (msg.metadata?.inputTokens !== undefined) {
+        return sum + msg.metadata.inputTokens
+      }
+      return sum
+    },
     0
   )
 

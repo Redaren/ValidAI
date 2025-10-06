@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Workbench Input Component - Primary interface for configuring and executing LLM tests
+ * @module components/workbench/workbench-input
+ */
+
 "use client"
 
 import React, { useState } from "react"
@@ -22,8 +27,9 @@ import { cn } from "@/lib/utils"
 /**
  * Props for WorkbenchInput component
  *
- * @property processor - Current processor data from database
- * @property operations - Operations configured for this processor (future use)
+ * @interface WorkbenchInputProps
+ * @property {any} processor - Current processor data from database
+ * @property {any[]} operations - Operations configured for this processor (future use)
  */
 interface WorkbenchInputProps {
   processor: any
@@ -33,9 +39,12 @@ interface WorkbenchInputProps {
 /**
  * Model ID to friendly display name mapping
  *
+ * @constant
+ * @type {Record<string, string>}
+ * @description
  * Fallback mapping for model display names when organization
  * config doesn't provide a custom display_name.
- * Used by getModelDisplay() helper function.
+ * Used by getModelDisplay() helper function to provide user-friendly names.
  */
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   'claude-3-5-sonnet-20241022': 'Sonnet 3.5',
@@ -50,9 +59,24 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
 /**
  * Workbench Input Component
  *
- * Main input interface with two columns:
- * - Left: Operation selection, file upload, model choice, and feature toggles
- * - Right: System prompt (read-only) and operation prompt (editable)
+ * @component
+ * @description
+ * Primary interface for configuring and executing LLM tests in the ValidAI workbench.
+ * Provides comprehensive controls for model selection, prompt configuration, and feature toggles.
+ *
+ * ## Features
+ * - **Mode Selection**: Toggle between stateful (conversation) and stateless (single-shot) modes
+ * - **File Upload**: Support for PDF and text documents with automatic format detection
+ * - **Model Selection**: Dynamic list of available models based on organization config
+ * - **Feature Toggles**: Control prompt caching, thinking mode, citations, and more
+ * - **Real-time Validation**: Disabled state management for running tests
+ * - **Cache Control**: Manual toggle for creating cache breakpoints (auto-resets after use)
+ *
+ * ## State Management
+ * Uses Zustand store for centralized state management across workbench components
+ *
+ * @param {WorkbenchInputProps} props - Component props
+ * @returns {JSX.Element} Rendered workbench input interface
  */
 export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   const [isModelSheetOpen, setIsModelSheetOpen] = useState(false)
@@ -94,8 +118,17 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   /**
    * Opens native file picker dialog for document upload
    *
+   * @function handleFileSelect
+   * @description
    * Programmatically creates and triggers a file input element.
    * Accepts common document formats for testing operations.
+   *
+   * @supported-formats
+   * - PDF (.pdf) - Processed as base64 for Anthropic's native PDF support
+   * - Text files (.txt, .md) - Sent as plain text content
+   * - Documents (.doc, .docx) - For future processing
+   * - Spreadsheets (.xls, .xlsx) - For future processing
+   * - HTML (.html) - Sent as text content
    */
   const handleFileSelect = () => {
     const input = document.createElement('input')
@@ -156,15 +189,31 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   /**
    * Execute workbench test with current settings
    *
-   * Flow:
-   * 1. Validate prompt is not empty
-   * 2. Read file content if file is uploaded
-   * 3. Call Edge Function with conversation history
-   * 4. Subscribe to real-time updates
-   * 5. Add messages to conversation history
-   * 6. Clear prompt for next turn
+   * @async
+   * @function handleRunTest
+   * @description
+   * Orchestrates the complete test execution flow from UI to Edge Function and back.
+   * Handles both stateful and stateless modes with proper conversation management.
    *
-   * @throws Error if test execution fails
+   * ## Execution Flow
+   * 1. **Validation**: Ensures prompt is not empty
+   * 2. **Mode Handling**: Clears output in stateless mode
+   * 3. **File Processing**: Reads and encodes files (PDF as base64, text as string)
+   * 4. **API Call**: Sends request to Edge Function with all settings
+   * 5. **Real-time Subscription**: Subscribes to execution updates via Supabase
+   * 6. **Conversation Management**: Adds user and assistant messages to history
+   * 7. **UI Updates**: Clears prompt and resets cache toggle
+   *
+   * ## Stateful Mode
+   * - Preserves conversation history with exact content structures
+   * - Maintains cache control metadata for 90% cost savings
+   * - Stores file blocks with Buffer representations
+   *
+   * ## Error Handling
+   * - Displays errors in UI via TanStack Query
+   * - Maintains execution state for debugging
+   *
+   * @throws {Error} Test execution failures from Edge Function
    */
   const handleRunTest = async () => {
     if (!operationPrompt.trim()) {
@@ -322,6 +371,23 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
    * @param file - File object from file input
    * @returns Promise resolving to file content (text or base64 string)
    * @throws Error if file read fails
+   */
+  /**
+   * Reads uploaded file content and converts to appropriate format
+   *
+   * @async
+   * @function readFileAsText
+   * @param {File} file - File object from file input
+   * @returns {Promise<string>} Base64 string for PDFs, plain text for other files
+   *
+   * @description
+   * Handles file reading with format-specific processing:
+   * - **PDFs**: Read as data URL, extract base64 portion for Anthropic API
+   * - **Text files**: Read as plain text string
+   *
+   * The base64 extraction for PDFs is critical for proper API consumption.
+   * Data URL format: `data:application/pdf;base64,<base64content>`
+   * We extract only the base64 portion after the comma.
    */
   const readFileAsText = async (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {

@@ -1,22 +1,64 @@
 /**
  * Execute Workbench Test Edge Function
  *
- * Executes LLM test calls for the workbench interface using Vercel AI SDK with Anthropic provider.
- * Supports prompt caching, extended thinking, citations, and multi-turn conversations.
+ * @module execute-workbench-test
+ * @description
+ * Production-ready Edge Function for executing LLM test calls from the ValidAI workbench interface.
+ * Built with Vercel AI SDK and Anthropic provider for robust, scalable AI interactions.
  *
- * Using Vercel AI SDK for unified provider interface and future multi-LLM support.
+ * ## Features
+ * - **Multi-turn Conversations**: Maintains conversation context in stateful mode
+ * - **Prompt Caching**: Reduces costs by 90% for repeated content using Anthropic's cache control
+ * - **PDF Support**: Handles PDF document uploads with proper buffer reconstruction
+ * - **Extended Thinking**: Supports Claude's reasoning mode with configurable token budgets
+ * - **Citations**: Extracts and returns citation blocks from AI responses
+ * - **Advanced Settings**: Fine-grained control over model parameters
+ * - **Real-time Updates**: Publishes execution status via Supabase Realtime
+ *
+ * ## Architecture
+ * - Uses Vercel AI SDK for unified LLM interface (future multi-provider support)
+ * - Handles both organization-specific and global API keys with encryption
+ * - Preserves cache control metadata across conversation turns
+ * - Properly reconstructs complex message structures from stored conversations
+ *
+ * ## Error Handling
+ * - Graceful fallbacks for malformed conversation history
+ * - API errors returned as assistant messages for better UX
+ * - Comprehensive error logging and status tracking
+ *
+ * @version 2.0.0
+ * @since 2025-10-06
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
 import { generateText } from 'npm:ai'
 
-// CORS headers for client requests
+/**
+ * CORS headers configuration for cross-origin requests
+ * @constant
+ */
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/**
+ * Request payload structure for workbench test execution
+ *
+ * @interface WorkbenchTestRequest
+ * @property {string} processor_id - UUID of the processor to test
+ * @property {'stateful' | 'stateless'} mode - Conversation mode (stateful maintains history)
+ * @property {string} [system_prompt] - System instructions for the AI
+ * @property {boolean} send_system_prompt - Whether to include system prompt in request
+ * @property {boolean} send_file - Whether to include uploaded file in request
+ * @property {string} [file_content] - Base64-encoded file content (PDF or text)
+ * @property {'text/plain' | 'application/pdf'} [file_type] - MIME type of uploaded file
+ * @property {Array} conversation_history - Previous messages in stateful mode
+ * @property {string} new_prompt - Current user prompt to send
+ * @property {Object} settings - Model configuration and feature flags
+ */
 interface WorkbenchTestRequest {
   processor_id: string
   mode: 'stateful' | 'stateless'
@@ -27,7 +69,7 @@ interface WorkbenchTestRequest {
   file_type?: 'text/plain' | 'application/pdf'
   conversation_history: Array<{
     role: 'user' | 'assistant'
-    content: string
+    content: string | any[]  // Can be string or array of content blocks
     timestamp: string
   }>
   new_prompt: string
@@ -47,8 +89,28 @@ interface WorkbenchTestRequest {
   }
 }
 
+/**
+ * Main request handler for the Edge Function
+ *
+ * @function serve
+ * @async
+ * @param {Request} req - Incoming HTTP request
+ * @returns {Promise<Response>} HTTP response with test results or error
+ *
+ * @description
+ * Processes workbench test requests through the following steps:
+ * 1. **Authentication**: Validates JWT token and extracts user/org context
+ * 2. **Configuration**: Resolves LLM settings and API keys (org-specific or global)
+ * 3. **Message Construction**: Builds properly formatted messages with cache control
+ * 4. **Conversation History**: Reconstructs previous messages with file/cache preservation
+ * 5. **LLM Execution**: Calls Anthropic via Vercel AI SDK with all settings
+ * 6. **Response Processing**: Extracts text, thinking blocks, citations, and token usage
+ * 7. **Real-time Updates**: Publishes status to Supabase for live UI updates
+ *
+ * @throws {Error} Authentication failures, configuration issues, or LLM API errors
+ */
 serve(async (req) => {
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -149,34 +211,127 @@ serve(async (req) => {
     // Initialize Anthropic provider with API key using createAnthropic factory
     const anthropicProvider = createAnthropic({ apiKey })
 
-    // Build system message based on user toggles
-    let system: any = undefined
-
-    if (body.send_system_prompt && body.system_prompt) {
-      if (body.settings.create_cache) {
-        // User wants to create cache: Use array format with cache_control
-        system = [
-          {
-            type: 'text',
-            text: body.system_prompt,
-            cache_control: { type: 'ephemeral' }  // 5-minute TTL
-          }
-        ]
-      } else {
-        // No cache creation: Simple string format
-        system = body.system_prompt
-      }
-    }
-
     // Build messages array based on mode and user toggles
     const messages: any[] = []
 
-    // In stateful mode: Add conversation history first
+    // Add system message if enabled
+    // Vercel AI SDK supports system messages in the messages array with cache control
+    if (body.send_system_prompt && body.system_prompt) {
+      if (body.settings.create_cache) {
+        // System message with cache control goes in messages array
+        messages.push({
+          role: 'system',
+          content: body.system_prompt,
+          providerOptions: {
+            anthropic: { cacheControl: { type: 'ephemeral' } }
+          }
+        })
+      } else {
+        // Simple system message without cache
+        messages.push({
+          role: 'system',
+          content: body.system_prompt
+        })
+      }
+    }
+
+    /**
+     * Process conversation history for stateful mode
+     *
+     * @description
+     * Reconstructs previous messages from stored conversation history.
+     * Critical for maintaining context and cache consistency across turns.
+     *
+     * ## Challenges Addressed
+     * - **Buffer Reconstruction**: Stored PDFs have serialized Buffer objects that need rebuilding
+     * - **Cache Preservation**: Maintains providerOptions to ensure cache hits (90% cost savings)
+     * - **Format Compatibility**: Converts stored format to Vercel AI SDK requirements
+     * - **Graceful Degradation**: Falls back to text extraction for malformed blocks
+     */
     if (body.mode === 'stateful' && body.conversation_history.length > 0) {
       body.conversation_history.forEach(msg => {
+        // Process content to ensure it's in the correct format for Vercel AI SDK
+        let processedContent = msg.content
+
+        // If content is an array with file blocks, we need to reconstruct it properly
+        if (Array.isArray(msg.content)) {
+          const contentBlocks: any[] = []
+
+          for (const block of msg.content) {
+            if (block.type === 'file' && block.data) {
+              // File blocks from stored conversation have Buffer objects that need reconstruction
+              // For PDFs, reconstruct the file block with proper Buffer
+              if (block.mediaType === 'application/pdf' || block.mimeType === 'application/pdf') {
+                // If data is a Buffer object representation, convert it back
+                let pdfBuffer: Buffer
+                if (block.data.type === 'Buffer' && Array.isArray(block.data.data)) {
+                  // Reconstruct Buffer from array of bytes
+                  pdfBuffer = Buffer.from(block.data.data)
+                } else if (typeof block.data === 'string') {
+                  // If it's a base64 string
+                  pdfBuffer = Buffer.from(block.data, 'base64')
+                } else {
+                  // Already a Buffer
+                  pdfBuffer = block.data
+                }
+
+                const fileBlock: any = {
+                  type: 'file',
+                  data: pdfBuffer,
+                  mediaType: 'application/pdf'
+                }
+
+                // PRESERVE CACHE CONTROL if it exists
+                if (block.providerOptions) {
+                  fileBlock.providerOptions = block.providerOptions
+                }
+
+                contentBlocks.push(fileBlock)
+              } else {
+                // Other file types or malformed blocks - skip for safety
+                console.log('Skipping non-PDF file block in conversation history')
+              }
+            } else if (block.type === 'text' && block.text) {
+              // Text blocks can be passed through
+              const textBlock: any = {
+                type: 'text',
+                text: block.text
+              }
+
+              // PRESERVE CACHE CONTROL if it exists
+              if (block.providerOptions) {
+                textBlock.providerOptions = block.providerOptions
+              }
+
+              contentBlocks.push(textBlock)
+            } else if (block.type === 'document') {
+              // Document blocks with cache control from previous messages
+              // These need special handling but for now we'll skip them
+              console.log('Skipping document block in conversation history - cannot reconstruct')
+            } else if (typeof block === 'string') {
+              // Plain string content
+              contentBlocks.push({
+                type: 'text',
+                text: block
+              })
+            }
+          }
+
+          // If we have content blocks, use them; otherwise fallback to extracting text
+          if (contentBlocks.length > 0) {
+            processedContent = contentBlocks
+          } else {
+            // Fallback: extract text from the blocks
+            const textBlocks = msg.content.filter((b: any) => b.type === 'text' && b.text)
+            processedContent = textBlocks.length > 0
+              ? textBlocks.map((b: any) => b.text).join(' ')
+              : 'Previous message contained non-text content'
+          }
+        }
+
         messages.push({
           role: msg.role,
-          content: msg.content
+          content: processedContent
         })
       })
     }
@@ -184,39 +339,60 @@ serve(async (req) => {
     // Build current message content
     const contentBlocks: any[] = []
 
-    // Add document if user toggled "Send file" ON
+    // Add file if user toggled "Send file" ON
+    // Vercel AI SDK uses 'file' type for documents/PDFs
     if (body.send_file && body.file_content) {
-      const documentBlock: any = {
-        type: 'document',
-        source: {
-          type: body.file_type === 'application/pdf' ? 'base64' : 'text',
-          media_type: body.file_type || 'text/plain',
-          data: body.file_content
+      if (body.file_type === 'application/pdf') {
+        // PDF files use the 'file' type with base64 data
+        // Convert base64 string to Buffer for Vercel AI SDK
+        const pdfBuffer = Buffer.from(body.file_content, 'base64')
+
+        const fileBlock: any = {
+          type: 'file',
+          data: pdfBuffer,
+          mediaType: 'application/pdf'
         }
-      }
 
-      // Add cache_control if user toggled "Create cache" ON
-      if (body.settings.create_cache) {
-        documentBlock.cache_control = { type: 'ephemeral' }
-      }
+        // Add cache control if enabled
+        if (body.settings.create_cache) {
+          fileBlock.providerOptions = {
+            anthropic: { cacheControl: { type: 'ephemeral' } }
+          }
+        }
 
-      // Add citations if enabled
-      if (body.settings.citations_enabled) {
-        documentBlock.citations = { enabled: true }
-      }
+        contentBlocks.push(fileBlock)
+      } else {
+        // Text files can be sent as text blocks with cache control
+        const textBlock: any = {
+          type: 'text',
+          text: body.file_content
+        }
 
-      contentBlocks.push(documentBlock)
+        // Add cache control for text content if enabled
+        if (body.settings.create_cache) {
+          textBlock.providerOptions = {
+            anthropic: { cacheControl: { type: 'ephemeral' } }
+          }
+        }
+
+        contentBlocks.push(textBlock)
+      }
     }
 
     // Add prompt text
-    contentBlocks.push({ type: 'text', text: body.new_prompt })
+    const promptBlock: any = {
+      type: 'text',
+      text: body.new_prompt
+    }
+
+    contentBlocks.push(promptBlock)
 
     // Add current message
     if (contentBlocks.length === 1) {
       // Only text prompt, send as string
       messages.push({ role: 'user', content: body.new_prompt })
     } else {
-      // Has document or other content blocks
+      // Has file or other content blocks
       messages.push({ role: 'user', content: contentBlocks })
     }
 
@@ -238,7 +414,7 @@ serve(async (req) => {
       const response = await generateText({
         model: anthropicProvider(modelToUse),
         messages,
-        system,
+        // system is now included in messages array with cache control
         maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
         temperature: body.settings.temperature,
         topP: body.settings.top_p,
@@ -320,7 +496,8 @@ serve(async (req) => {
         timestamp: new Date().toISOString(),
         // Return exact content structure sent to Anthropic for cache consistency
         user_content_sent: messages[messages.length - 1].content,
-        system_sent: system
+        // System message is now first in messages array if it exists
+        system_sent: messages[0]?.role === 'system' ? messages[0].content : undefined
       }
 
       // Update execution record with completion status
@@ -385,7 +562,8 @@ serve(async (req) => {
         executionTime,
         timestamp: new Date().toISOString(),
         user_content_sent: messages[messages.length - 1].content,
-        system_sent: system
+        // System message is now first in messages array if it exists
+        system_sent: messages[0]?.role === 'system' ? messages[0].content : undefined
       }
 
       // Mark as COMPLETED (not failed) so it shows in Output section

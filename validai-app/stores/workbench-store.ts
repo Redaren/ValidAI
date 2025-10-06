@@ -1,3 +1,8 @@
+/**
+ * @fileoverview Workbench Store - Centralized state management for the ValidAI workbench
+ * @module stores/workbench-store
+ */
+
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { ConversationMessage, WorkbenchExecution } from '@/lib/validations'
@@ -6,6 +11,20 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 
 /**
  * Test result from running an operation test
+ *
+ * @interface TestResult
+ * @property {string} response - AI-generated response text
+ * @property {any[]} [thinking_blocks] - Extended thinking/reasoning blocks from Claude
+ * @property {any[]} [citations] - Citation references from processed documents
+ * @property {Object} tokensUsed - Token consumption metrics
+ * @property {number} tokensUsed.input - Input/prompt tokens consumed
+ * @property {number} tokensUsed.output - Output/completion tokens generated
+ * @property {number} [tokensUsed.cached_read] - Tokens read from cache (90% cost savings)
+ * @property {number} [tokensUsed.cached_write] - Tokens written to cache (25% extra cost)
+ * @property {number} tokensUsed.total - Total tokens (input + output)
+ * @property {number} executionTime - Response generation time in milliseconds
+ * @property {string} timestamp - ISO timestamp of response
+ * @property {string} [error] - Error message if test failed
  */
 export interface TestResult {
   response: string
@@ -26,8 +45,18 @@ export interface TestResult {
 /**
  * Advanced LLM settings with override controls
  *
+ * @interface AdvancedSettings
+ * @description
+ * Fine-grained control over model parameters with selective override capability.
  * Each optional parameter has an "enabled" flag to control whether it's sent to the API.
  * When enabled=false, the LLM uses its default value.
+ *
+ * @property {number} maxTokens - Maximum response length (always sent)
+ * @property {number} thinkingBudget - Token budget for reasoning mode (when enabled)
+ * @property {Object} temperature - Creativity control (0.0-2.0)
+ * @property {Object} topP - Nucleus sampling threshold
+ * @property {Object} topK - Top-K sampling limit
+ * @property {Object} stopSequences - Custom stop strings
  */
 export interface AdvancedSettings {
   // Always sent (required by API)
@@ -57,6 +86,11 @@ export interface AdvancedSettings {
 
 /**
  * Selected file can be either an uploaded File or existing Document
+ *
+ * @type {SelectedFile}
+ * @description
+ * Union type for file selection in the workbench.
+ * Supports both direct file uploads and reference to stored documents.
  */
 export type SelectedFile = {
   type: 'uploaded'
@@ -71,15 +105,31 @@ export type SelectedFile = {
 } | null
 
 /**
- * Workbench Store
+ * Workbench Store Interface
  *
- * Manages all state for the testbench interface including:
- * - File management
- * - LLM configuration
- * - Mode management (stateful vs stateless)
- * - Multi-turn conversations with prompt caching
- * - Test execution and results
- * - Real-time execution tracking via Supabase Realtime
+ * @interface WorkbenchStore
+ * @description
+ * Complete state management for the ValidAI workbench testing interface.
+ * Handles all aspects of LLM test configuration, execution, and result display.
+ *
+ * ## Core Responsibilities
+ * - **File Management**: Upload and selection of documents for testing
+ * - **LLM Configuration**: Model selection, parameters, and feature toggles
+ * - **Mode Management**: Stateful (conversation) vs stateless (single-shot) modes
+ * - **Conversation History**: Multi-turn dialogue with message preservation
+ * - **Cache Control**: Prompt caching for 90% cost reduction on repeated content
+ * - **Real-time Updates**: WebSocket subscriptions for execution status
+ * - **Advanced Settings**: Fine-grained control over model parameters
+ *
+ * ## State Synchronization
+ * - Uses Zustand for reactive state management
+ * - Integrates with Supabase Realtime for execution updates
+ * - Preserves exact content structures for cache consistency
+ *
+ * ## Performance Features
+ * - Maintains cached document content for repeated use
+ * - Tracks token usage for cost optimization
+ * - Supports cache hit/miss analytics
  */
 export interface WorkbenchStore {
   // Core State
