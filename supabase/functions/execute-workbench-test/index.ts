@@ -1,14 +1,15 @@
 /**
  * Execute Workbench Test Edge Function
  *
- * Executes LLM test calls for the workbench interface using Anthropic's Claude API.
+ * Executes LLM test calls for the workbench interface using Vercel AI SDK with Anthropic provider.
  * Supports prompt caching, extended thinking, citations, and multi-turn conversations.
  *
- * Based on official API documentation: https://docs.claude.com/en/api/messages
+ * Using Vercel AI SDK for unified provider interface and future multi-LLM support.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import Anthropic from 'npm:@anthropic-ai/sdk@0.65.0'
+import { createAnthropic } from 'npm:@ai-sdk/anthropic'
+import { generateText } from 'npm:ai'
 
 // CORS headers for client requests
 const corsHeaders = {
@@ -145,10 +146,8 @@ serve(async (req) => {
       }
     }
 
-    // Initialize Anthropic client
-    const anthropic = new Anthropic({
-      apiKey
-    })
+    // Initialize Anthropic provider with API key using createAnthropic factory
+    const anthropicProvider = createAnthropic({ apiKey })
 
     // Build system message based on user toggles
     let system: any = undefined
@@ -221,21 +220,6 @@ serve(async (req) => {
       messages.push({ role: 'user', content: contentBlocks })
     }
 
-    // Build request parameters
-    const requestParams: any = {
-      model: modelToUse,
-      max_tokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-      messages
-    }
-
-    // Add optional parameters
-    if (system) requestParams.system = system
-    if (body.settings.temperature !== undefined) requestParams.temperature = body.settings.temperature
-    if (body.settings.top_p !== undefined) requestParams.top_p = body.settings.top_p
-    if (body.settings.top_k !== undefined) requestParams.top_k = body.settings.top_k
-    if (body.settings.stop_sequences) requestParams.stop_sequences = body.settings.stop_sequences
-    if (body.settings.thinking) requestParams.thinking = body.settings.thinking
-
     // Update status to processing
     await supabase
       .from('workbench_executions')
@@ -245,32 +229,65 @@ serve(async (req) => {
       })
       .eq('id', executionId)
 
-    // Execute Anthropic Messages API call
+    // Execute LLM call using Vercel AI SDK
     // Tracks execution time for performance metrics
     const startTime = Date.now()
 
     try {
-      const response = await anthropic.messages.create(requestParams)
+      // Call Vercel AI SDK's generateText with Anthropic provider
+      const response = await generateText({
+        model: anthropicProvider(modelToUse),
+        messages,
+        system,
+        maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+        temperature: body.settings.temperature,
+        topP: body.settings.top_p,
+        topK: body.settings.top_k,
+        stopSequences: body.settings.stop_sequences,
+        // Pass Anthropic-specific options through experimental_providerMetadata
+        experimental_providerMetadata: {
+          anthropic: {
+            // Pass thinking mode if enabled
+            ...(body.settings.thinking ? { thinking: body.settings.thinking } : {}),
+            // Note: Cache control is already embedded in system and document blocks
+            // Citations are also handled in document blocks directly
+          }
+        }
+      })
       const executionTime = Date.now() - startTime
 
       // Extract response content and special blocks
-      // Anthropic API returns content as array of blocks with different types:
-      // - "text": Normal response text
-      // - "thinking": Extended thinking blocks (if thinking mode enabled)
-      // - "citation": Citation references (if citations enabled)
-      let responseText = ''
+      // Vercel AI SDK provides the text directly in response.text
+      const responseText = response.text || ''
+
+      // Extract special blocks from provider metadata if available
       const thinkingBlocks: any[] = []
       const citations: any[] = []
 
-      response.content.forEach((block: any) => {
-        if (block.type === 'text') {
-          responseText += block.text
-        } else if (block.type === 'thinking') {
-          thinkingBlocks.push(block)
-        } else if (block.type === 'citation') {
-          citations.push(block)
+      // Check if Anthropic returned additional content blocks in metadata
+      if (response.experimental_providerMetadata?.anthropic?.content) {
+        const content = response.experimental_providerMetadata.anthropic.content
+        if (Array.isArray(content)) {
+          content.forEach((block: any) => {
+            if (block.type === 'thinking') {
+              thinkingBlocks.push(block)
+            } else if (block.type === 'citation') {
+              citations.push(block)
+            }
+          })
         }
-      })
+      }
+
+      // Alternative: Check rawResponse for additional content types
+      if (response.rawResponse && response.rawResponse.content) {
+        response.rawResponse.content.forEach((block: any) => {
+          if (block.type === 'thinking') {
+            thinkingBlocks.push(block)
+          } else if (block.type === 'citation') {
+            citations.push(block)
+          }
+        })
+      }
 
       // Build result payload for client with metadata
       // Includes execution_id for real-time subscription tracking
@@ -286,18 +303,18 @@ serve(async (req) => {
           fileSent: body.send_file && !!body.file_content,
           thinkingEnabled: !!body.settings.thinking,
           citationsEnabled: body.settings.citations_enabled || false,
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-          cachedReadTokens: response.usage.cache_read_input_tokens,
-          cachedWriteTokens: response.usage.cache_creation_input_tokens,
+          inputTokens: response.usage?.promptTokens || 0,
+          outputTokens: response.usage?.completionTokens || 0,
+          cachedReadTokens: response.experimental_providerMetadata?.anthropic?.cacheReadTokens || 0,
+          cachedWriteTokens: response.experimental_providerMetadata?.anthropic?.cacheCreationTokens || 0,
           executionTimeMs: executionTime
         },
         tokensUsed: {
-          input: response.usage.input_tokens,
-          output: response.usage.output_tokens,
-          cached_read: response.usage.cache_read_input_tokens,  // Cost savings from cache hits
-          cached_write: response.usage.cache_creation_input_tokens,  // One-time cost to create cache
-          total: response.usage.input_tokens + response.usage.output_tokens
+          input: response.usage?.promptTokens || 0,
+          output: response.usage?.completionTokens || 0,
+          cached_read: response.experimental_providerMetadata?.anthropic?.cacheReadTokens || 0,  // Cost savings from cache hits
+          cached_write: response.experimental_providerMetadata?.anthropic?.cacheCreationTokens || 0,  // One-time cost to create cache
+          total: (response.usage?.promptTokens || 0) + (response.usage?.completionTokens || 0)
         },
         executionTime,
         timestamp: new Date().toISOString(),
@@ -330,21 +347,21 @@ serve(async (req) => {
         }
       )
     } catch (apiError: any) {
-      // Anthropic API rejected the request (e.g., unsupported feature, invalid parameters)
+      // LLM API rejected the request (e.g., unsupported feature, invalid parameters)
       // Return this as a successful response so it displays in the Output section
       const executionTime = Date.now() - startTime
 
-      // Extract detailed error message from Anthropic SDK
+      // Extract detailed error message from Vercel AI SDK
       let errorMessage = 'API Error: '
-      if (apiError.error && apiError.error.message) {
-        errorMessage += apiError.error.message
-      } else if (apiError.message) {
+      if (apiError instanceof Error) {
         errorMessage += apiError.message
+      } else if (typeof apiError === 'string') {
+        errorMessage += apiError
       } else {
-        errorMessage += apiError.toString()
+        errorMessage += JSON.stringify(apiError)
       }
 
-      console.log('Anthropic API error (returning as assistant message):', errorMessage)
+      console.log('LLM API error (returning as assistant message):', errorMessage)
 
       const result = {
         execution_id: executionId,
