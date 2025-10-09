@@ -33,7 +33,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
-import { generateText } from 'npm:ai'
+import { generateText, generateObject } from 'npm:ai'
+import { z } from 'npm:zod'
 
 /**
  * CORS headers configuration for cross-origin requests
@@ -50,6 +51,7 @@ const corsHeaders = {
  * @interface WorkbenchTestRequest
  * @property {string} processor_id - UUID of the processor to test
  * @property {'stateful' | 'stateless'} mode - Conversation mode (stateful maintains history)
+ * @property {string} operation_type - Type of operation determining output structure
  * @property {string} [system_prompt] - System instructions for the AI
  * @property {boolean} send_system_prompt - Whether to include system prompt in request
  * @property {boolean} send_file - Whether to include uploaded file in request
@@ -62,6 +64,7 @@ const corsHeaders = {
 interface WorkbenchTestRequest {
   processor_id: string
   mode: 'stateful' | 'stateless'
+  operation_type: 'generic' | 'validation' | 'extraction' | 'rating' | 'classification' | 'analysis'
   system_prompt?: string
   send_system_prompt: boolean
   send_file: boolean
@@ -405,41 +408,90 @@ serve(async (req) => {
       })
       .eq('id', executionId)
 
+    // Define operation type schemas
+    // These schemas enforce structured output formats for non-generic operations
+    const validationSchema = z.object({
+      result: z.boolean().describe('The validation result (true/false)'),
+      comment: z.string().describe('Reasoning and explanation for the decision')
+    })
+
+    // Determine if this operation uses structured output
+    const useStructuredOutput = body.operation_type === 'validation'
+    const outputSchema = body.operation_type === 'validation' ? validationSchema : null
+
     // Execute LLM call using Vercel AI SDK
     // Tracks execution time for performance metrics
     const startTime = Date.now()
 
     try {
-      // Call Vercel AI SDK's generateText with Anthropic provider
-      const response = await generateText({
-        model: anthropicProvider(modelToUse),
-        messages,
-        // system is now included in messages array with cache control
-        maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-        temperature: body.settings.temperature,
-        topP: body.settings.top_p,
-        topK: body.settings.top_k,
-        stopSequences: body.settings.stop_sequences,
-        // Pass Anthropic-specific options through providerOptions
-        providerOptions: {
-          anthropic: {
-            // Pass thinking mode if enabled - convert budget_tokens to budgetTokens
-            ...(body.settings.thinking ? {
-              thinking: {
-                type: body.settings.thinking.type,
-                budgetTokens: body.settings.thinking.budget_tokens  // Map budget_tokens to budgetTokens
-              }
-            } : {}),
-            // Note: Cache control is already embedded in system and document blocks
-            // Citations are also handled in document blocks directly
+      // Conditional execution: generateObject for structured operations, generateText for generic
+      let response: any
+      let structuredOutput: any = null
+
+      if (useStructuredOutput && outputSchema) {
+        // Use generateObject for structured output operations
+        response = await generateObject({
+          model: anthropicProvider(modelToUse),
+          schema: outputSchema,
+          messages,
+          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+          temperature: body.settings.temperature,
+          topP: body.settings.top_p,
+          topK: body.settings.top_k,
+          stopSequences: body.settings.stop_sequences,
+          providerOptions: {
+            anthropic: {
+              ...(body.settings.thinking ? {
+                thinking: {
+                  type: body.settings.thinking.type,
+                  budgetTokens: body.settings.thinking.budget_tokens
+                }
+              } : {}),
+            }
           }
-        }
-      })
+        })
+
+        // Store structured output
+        structuredOutput = response.object
+      } else {
+        // Use generateText for generic operations (default behavior)
+        response = await generateText({
+          model: anthropicProvider(modelToUse),
+          messages,
+          // system is now included in messages array with cache control
+          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+          temperature: body.settings.temperature,
+          topP: body.settings.top_p,
+          topK: body.settings.top_k,
+          stopSequences: body.settings.stop_sequences,
+          // Pass Anthropic-specific options through providerOptions
+          providerOptions: {
+            anthropic: {
+              // Pass thinking mode if enabled - convert budget_tokens to budgetTokens
+              ...(body.settings.thinking ? {
+                thinking: {
+                  type: body.settings.thinking.type,
+                  budgetTokens: body.settings.thinking.budget_tokens  // Map budget_tokens to budgetTokens
+                }
+              } : {}),
+              // Note: Cache control is already embedded in system and document blocks
+              // Citations are also handled in document blocks directly
+            }
+          }
+        })
+      }
+
       const executionTime = Date.now() - startTime
 
       // Extract response content and special blocks
       // Vercel AI SDK provides the text directly in response.text
-      const responseText = response.text || ''
+      // For structured outputs, also format the object as text
+      let responseText = response.text || ''
+
+      if (structuredOutput) {
+        // For structured outputs, create human-readable text representation
+        responseText = JSON.stringify(structuredOutput, null, 2)
+      }
 
       // Extract thinking/reasoning blocks - Vercel AI SDK returns these as top-level fields
       const thinkingBlocks: any[] = []
@@ -470,6 +522,7 @@ serve(async (req) => {
       const result = {
         execution_id: executionId,  // Client subscribes to this ID for status updates
         response: responseText,
+        structured_output: structuredOutput,  // Include structured data for visualization
         thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
         citations: citations.length > 0 ? citations : undefined,
         metadata: {
@@ -543,6 +596,7 @@ serve(async (req) => {
       const result = {
         execution_id: executionId,
         response: errorMessage,  // Display error as assistant response
+        structured_output: null,  // No structured output on error
         metadata: {
           mode: body.mode,
           cacheCreated: body.settings.create_cache || false,

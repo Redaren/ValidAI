@@ -1,21 +1,23 @@
 # LLM Workbench Architecture
 
-The LLM Workbench is a testing environment for operations that integrates with LLM providers through the Vercel AI SDK, featuring message composition controls, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Currently configured for Anthropic's Claude models with the foundation for multi-provider support.
+The LLM Workbench is a testing environment for operations that integrates with LLM providers through the Vercel AI SDK, featuring message composition controls, structured output generation, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Currently configured for Anthropic's Claude models with the foundation for multi-provider support.
 
-**Implementation:** Phase 2.0 (Vercel AI SDK Migration)
-**Documentation Date:** 2025-10-06
+**Implementation:** Phase 2.1 (Structured Outputs with Operation Types)
+**Documentation Date:** 2025-10-09
 **Based on:** Vercel AI SDK (https://ai-sdk.dev) with Anthropic provider
 
 ## Overview
 
 The Workbench provides a sandboxed environment where users can:
+- Select operation types to control output structure (Generic text or Structured validation)
 - Compose messages with explicit control over what gets sent (system prompt, file, cache markers)
 - Test operations with real LLM responses in two distinct modes (stateful/stateless)
+- Generate structured outputs with automatic schema validation (True/False, future: Extraction, Rating, etc.)
 - Leverage prompt caching for cost optimization (90% savings)
 - Enable extended thinking for complex reasoning tasks
 - Use citations for document grounding
 - Track execution progress in real-time
-- View comprehensive per-message metadata
+- View comprehensive per-message metadata with structured output visualization
 - Monitor context window usage (Claude Sonnet 4.5 context awareness)
 
 **Key Characteristics:**
@@ -30,6 +32,7 @@ The Workbench provides a sandboxed environment where users can:
 ## Message Composition System
 
 The Workbench uses **explicit toggles** to compose each API message. Users have full control over:
+- Which operation type to use (determines output structure)
 - What content to send (system prompt, file)
 - Whether to create a cache
 - Which mode (stateful/stateless) controls conversation history
@@ -38,6 +41,7 @@ The Workbench uses **explicit toggles** to compose each API message. Users have 
 
 | Setting | Effect |
 |---------|--------|
+| **Operation type** | Determines execution mode (`generateObject` vs `generateText`) and response structure |
 | **Mode: Stateful** | Include conversation history in messages array |
 | **Mode: Stateless** | No conversation history (independent messages) |
 | **Send system prompt** | Include `system` field in API request |
@@ -130,6 +134,173 @@ Message 2 (after create cache auto-reset):
 - Create cache: OFF
 
 Result: Cache hit, no conversation history sent
+```
+
+## Operation Types & Structured Outputs
+
+The Workbench supports multiple operation types that determine how the LLM processes requests and structures responses. This is achieved through Vercel AI SDK's dual execution modes: `generateText()` for free-form responses and `generateObject()` for schema-validated structured data.
+
+### Available Operation Types
+
+| Type | Display Name | Status | Output Structure | Use Case |
+|------|-------------|--------|------------------|----------|
+| `generic` | Generic | ✅ Active | Free-form text | General analysis, open-ended questions |
+| `validation` | True / False | ✅ Active | `{result: boolean, comment: string}` | Binary validation, compliance checks |
+| `extraction` | Extraction | 🔜 Planned | Structured key-value pairs | Data extraction from documents |
+| `rating` | Rating | 🔜 Planned | Numeric score with rationale | Quality assessment, scoring |
+| `classification` | Classification | 🔜 Planned | Category with confidence | Document categorization |
+| `analysis` | Analysis | 🔜 Planned | Structured findings | Comprehensive analysis |
+
+### Operation Type Selection
+
+**UI Component:** `components/workbench/operation-type-sheet.tsx`
+
+Users select operation types via a Sheet modal (same pattern as model selector):
+- Click "Operation type" label to open selector
+- View all types with descriptions and icons
+- Active types show "Structured" badge
+- Planned types show "Coming Soon" badge
+- Selection persists in workbench store
+
+### Execution Strategy
+
+**Configuration:** `lib/operation-types/index.ts`
+
+Each operation type has a configuration defining:
+```typescript
+interface OperationTypeConfig {
+  id: OperationType                    // Database enum value
+  displayName: string                   // User-facing name
+  description: string                   // What this operation does
+  icon: string                          // Emoji for UI
+  useStructuredOutput: boolean          // generateObject vs generateText
+  schema: z.ZodSchema | null           // Validation schema (null for generic)
+  promptGuidance: string                // Help text for users
+}
+```
+
+**Edge Function Logic:**
+```typescript
+// Determine execution mode based on operation type
+const useStructuredOutput = body.operation_type === 'validation'
+const outputSchema = body.operation_type === 'validation' ? validationSchema : null
+
+if (useStructuredOutput && outputSchema) {
+  // Structured output with schema validation
+  response = await generateObject({
+    model: anthropicProvider(modelToUse),
+    schema: outputSchema,  // Zod schema
+    messages,
+    maxTokens,
+    temperature,
+    // ...other settings
+  })
+
+  structuredOutput = response.object  // Validated object
+  responseText = JSON.stringify(response.object, null, 2)
+} else {
+  // Generic free-form text
+  response = await generateText({
+    model: anthropicProvider(modelToUse),
+    messages,
+    maxTokens,
+    temperature,
+    // ...other settings
+  })
+
+  responseText = response.text
+}
+
+return {
+  execution_id,
+  response: responseText,
+  structured_output: structuredOutput,  // Only present for structured types
+  // ...metadata
+}
+```
+
+### Structured Output Schemas
+
+**Location:** `lib/operation-types/schemas.ts`
+
+**Validation Schema (True/False):**
+```typescript
+export const validationOutputSchema = z.object({
+  result: z.boolean().describe('The validation result (true/false)'),
+  comment: z.string().describe('Reasoning and explanation for the decision')
+})
+```
+
+Example output:
+```json
+{
+  "result": true,
+  "comment": "The document meets GDPR requirements because it includes explicit consent mechanisms, data processing explanations, and user rights information as required by Articles 6, 13, and 15."
+}
+```
+
+### Output Visualization
+
+**Component:** `components/workbench/structured-output-visualizer.tsx`
+
+Structured outputs are automatically detected and rendered with:
+- Traffic-light visualization for boolean results (🟢 Green = true, 🔴 Red = false)
+- Formatted JSON display with syntax highlighting
+- Toggle between formatted and raw JSON views
+- XML structure visualization
+- Copy to clipboard functionality
+
+**Detection Logic in workbench-output.tsx:**
+```typescript
+const hasStructuredOutput = !!assistantMsg.structured_output
+
+if (hasStructuredOutput) {
+  // Render with visualizer
+  return (
+    <StructuredOutputVisualizer
+      data={assistantMsg.structured_output}
+      originalType="json"
+      showRawToggle={true}
+    />
+  )
+}
+```
+
+### Future Operation Types
+
+**Extraction:**
+```typescript
+// Extract specific fields from documents
+schema: z.object({
+  extracted_data: z.record(z.string(), z.any()),
+  confidence: z.number().min(0).max(1)
+})
+```
+
+**Rating:**
+```typescript
+// Numeric scoring with qualitative feedback
+schema: z.object({
+  score: z.number(),
+  max_score: z.number().optional(),
+  rationale: z.string(),
+  strengths: z.array(z.string()).optional(),
+  improvements: z.array(z.string()).optional()
+})
+```
+
+**Classification:**
+```typescript
+// Categorization with confidence scores
+schema: z.object({
+  category: z.string(),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+  alternative_categories: z.array(z.object({
+    category: z.string(),
+    confidence: z.number()
+  })).optional()
+})
 ```
 
 ## Architecture Layers
@@ -394,9 +565,10 @@ interface WorkbenchStore {
   sendSystemPrompt: boolean
   sendFile: boolean
 
-  // File & Model Selection
+  // File, Model & Operation Type Selection
   selectedFile: SelectedFile
   selectedModel: string
+  selectedOperationType: OperationType  // 'generic' | 'validation' | 'extraction' | etc.
 
   // Prompts
   systemPrompt: string
@@ -419,6 +591,7 @@ interface WorkbenchStore {
 
   // Actions
   setMode: (mode: 'stateful' | 'stateless') => void
+  setOperationType: (operationType: OperationType) => void
   toggleSystemPrompt: () => void
   toggleSendFile: () => void
   toggleCreateCache: () => void
@@ -466,7 +639,7 @@ if (createCache) {
 ├──────────────────────────────────────┤
 │ Mode              [Stateful] [Stateless] │
 │ Send system prompt     [Toggle]      │  ← Only if prompt exists
-│ Operation type         Generic       │
+│ Operation type         True / False  │  ← Clickable, opens type selector
 │ File                   test.pdf / 3.5 mb │
 │   Send file            [Toggle]      │  ← Indented, only if file selected
 │ Model                  Claude 3.5 Haiku │
@@ -875,7 +1048,7 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - Live status updates
 - Execution audit trail
 
-### ✅ Phase C: Mode-Based Architecture (Current)
+### ✅ Phase C: Mode-Based Architecture
 - Stateful mode (document testing with caching)
 - Stateless mode (independent queries)
 - Mode validation in Edge Function
@@ -884,6 +1057,17 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - Per-message metadata display
 - System prompt toggle
 - Auto-managed caching per mode
+
+### ✅ Phase D: Operation Types & Structured Outputs (Current)
+- Operation type configuration system (`lib/operation-types/`)
+- Generic operation type (free-form text via `generateText`)
+- True/False validation type (structured output via `generateObject`)
+- Zod schema validation for structured outputs
+- Operation type selector UI (Sheet modal pattern)
+- Automatic structured output visualization
+- Traffic-light display for boolean results
+- Extensible architecture for 4 additional operation types
+- Database enum support for all 6 operation types
 
 ## Bug Fixes
 
@@ -1080,11 +1264,11 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-06
-**Phase:** 2.0 Complete (Vercel AI SDK Migration)
-**Architecture:** Unified LLM provider interface via Vercel AI SDK
-**Next Phase:** 2.1 - Multi-Provider Support (OpenAI, Mistral, Google)
-**Edge Function Version:** 17 (Vercel AI SDK with thinking/reasoning support)
+**Last Updated:** 2025-10-09
+**Phase:** 2.1 Complete (Structured Outputs with Operation Types)
+**Architecture:** Unified LLM provider interface via Vercel AI SDK with dual execution modes
+**Next Phase:** 2.2 - Additional Operation Types (Extraction, Rating, Classification, Analysis)
+**Edge Function Version:** 25 (Vercel AI SDK with `generateObject` support for structured outputs)
 
 ## Benefits of Vercel AI SDK Architecture
 

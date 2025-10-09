@@ -70,6 +70,42 @@ export type Database = {
           },
         ]
       }
+      llm_global_settings: {
+        Row: {
+          configuration: Json | null
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          model_name: string
+          provider: string
+          updated_at: string
+        }
+        Insert: {
+          configuration?: Json | null
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          model_name: string
+          provider: string
+          updated_at?: string
+        }
+        Update: {
+          configuration?: Json | null
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          model_name?: string
+          provider?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       operations: {
         Row: {
           area: string
@@ -163,6 +199,7 @@ export type Database = {
           created_at: string | null
           created_by: string
           id: string
+          llm_configuration: Json | null
           name: string
           plan_type: string | null
           slug: string
@@ -172,6 +209,7 @@ export type Database = {
           created_at?: string | null
           created_by: string
           id?: string
+          llm_configuration?: Json | null
           name: string
           plan_type?: string | null
           slug: string
@@ -181,6 +219,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string
           id?: string
+          llm_configuration?: Json | null
           name?: string
           plan_type?: string | null
           slug?: string
@@ -277,6 +316,81 @@ export type Database = {
         }
         Relationships: []
       }
+      workbench_executions: {
+        Row: {
+          citations: Json | null
+          created_at: string
+          error_message: string | null
+          execution_time_ms: number | null
+          id: string
+          model_used: string | null
+          organization_id: string
+          partial_response: string | null
+          processor_id: string
+          prompt: string
+          response: string | null
+          settings: Json
+          status: string
+          thinking_blocks: Json | null
+          tokens_used: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          citations?: Json | null
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          organization_id: string
+          partial_response?: string | null
+          processor_id: string
+          prompt: string
+          response?: string | null
+          settings?: Json
+          status: string
+          thinking_blocks?: Json | null
+          tokens_used?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          citations?: Json | null
+          created_at?: string
+          error_message?: string | null
+          execution_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          organization_id?: string
+          partial_response?: string | null
+          processor_id?: string
+          prompt?: string
+          response?: string | null
+          settings?: Json
+          status?: string
+          thinking_blocks?: Json | null
+          tokens_used?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workbench_executions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workbench_executions_processor_id_fkey"
+            columns: ["processor_id"]
+            isOneToOne: false
+            referencedRelation: "processors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -306,9 +420,29 @@ export type Database = {
           processor_status: Database["public"]["Enums"]["processor_status"]
         }[]
       }
+      decrypt_api_key: {
+        Args: { p_ciphertext: string; p_org_id: string }
+        Returns: string
+      }
+      delete_processor_area: {
+        Args: {
+          p_area_name: string
+          p_processor_id: string
+          p_target_area?: string
+        }
+        Returns: undefined
+      }
+      encrypt_api_key: {
+        Args: { p_org_id: string; p_plaintext: string }
+        Returns: string
+      }
       generate_unique_org_slug: {
         Args: { base_name: string }
         Returns: string
+      }
+      get_available_llm_models: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_current_organization: {
         Args: Record<PropertyKey, never>
@@ -326,6 +460,12 @@ export type Database = {
       get_current_organization_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_llm_config_for_run: {
+        Args:
+          | { p_processor_id?: string }
+          | { p_processor_id?: string; p_user_id?: string }
+        Returns: Json
       }
       get_ordered_operations: {
         Args: { p_processor_id: string }
@@ -446,6 +586,18 @@ export type Database = {
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }[]
       }
+      rename_processor_area: {
+        Args: { p_new_name: string; p_old_name: string; p_processor_id: string }
+        Returns: undefined
+      }
+      set_organization_llm_config: {
+        Args: {
+          p_api_keys: Json
+          p_available_models: Json
+          p_default_model_id?: string
+        }
+        Returns: Json
+      }
       storage_check_document_access: {
         Args: { file_path: string }
         Returns: boolean
@@ -466,6 +618,7 @@ export type Database = {
         | "rating"
         | "classification"
         | "analysis"
+        | "generic"
       processor_status: "draft" | "published" | "archived"
       processor_visibility: "personal" | "organization"
     }
@@ -601,6 +754,7 @@ export const Constants = {
         "rating",
         "classification",
         "analysis",
+        "generic",
       ],
       processor_status: ["draft", "published", "archived"],
       processor_visibility: ["personal", "organization"],

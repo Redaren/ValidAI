@@ -23,6 +23,8 @@ import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import { useWorkbenchTest } from "@/hooks/use-workbench-test"
 import { cn } from "@/lib/utils"
+import { OperationTypeSheet } from "@/components/workbench/operation-type-sheet"
+import { getOperationTypeConfig } from "@/lib/operation-types"
 
 /**
  * Props for WorkbenchInput component
@@ -62,15 +64,17 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
  * @component
  * @description
  * Primary interface for configuring and executing LLM tests in the ValidAI workbench.
- * Provides comprehensive controls for model selection, prompt configuration, and feature toggles.
+ * Provides comprehensive controls for operation types, model selection, prompt configuration, and feature toggles.
  *
  * ## Features
+ * - **Operation Type Selection**: Choose between Generic (text) and True/False (structured validation)
  * - **Mode Selection**: Toggle between stateful (conversation) and stateless (single-shot) modes
  * - **File Upload**: Support for PDF and text documents with automatic format detection
  * - **Model Selection**: Dynamic list of available models based on organization config
  * - **Feature Toggles**: Control prompt caching, thinking mode, citations, and more
  * - **Real-time Validation**: Disabled state management for running tests
  * - **Cache Control**: Manual toggle for creating cache breakpoints (auto-resets after use)
+ * - **Structured Outputs**: Automatic schema validation for validation operation type
  *
  * ## State Management
  * Uses Zustand store for centralized state management across workbench components
@@ -84,6 +88,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   const {
     selectedFile,
     selectedModel,
+    selectedOperationType,
     systemPrompt,
     operationPrompt,
     mode,
@@ -187,7 +192,26 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   }
 
   /**
+   * Get display name for currently selected operation type
+   *
+   * Retrieves user-friendly display name from operation type configuration.
+   * Used in the settings panel to show current selection.
+   *
+   * @returns {string} Operation type display name (e.g., "Generic", "True / False")
+   * @example
+   * // When selectedOperationType is 'validation'
+   * getOperationTypeDisplay() // Returns: "True / False"
+   */
+  const getOperationTypeDisplay = () => {
+    const config = getOperationTypeConfig(selectedOperationType)
+    return config.displayName
+  }
+
+  /**
    * Execute workbench test with current settings
+   *
+   * Sends test request to Edge Function with selected operation type, model, and configuration.
+   * Operation type determines execution mode (generateText vs generateObject) and response structure.
    *
    * @async
    * @function handleRunTest
@@ -229,6 +253,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
       const result = await workbenchTest.mutateAsync({
         processor_id: processor.processor_id,
         mode: mode,
+        operation_type: selectedOperationType,
         system_prompt: systemPrompt,
         send_system_prompt: sendSystemPrompt,
         send_file: sendFile,
@@ -306,6 +331,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           metadata: result.metadata,
           thinking_blocks: result.thinking_blocks,
           citations: result.citations,
+          structured_output: result.structured_output,
           tokensUsed: result.tokensUsed  // Keep for backward compatibility
         })
       } else {
@@ -338,6 +364,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
           metadata: result.metadata,
           thinking_blocks: result.thinking_blocks,
           citations: result.citations,
+          structured_output: result.structured_output,
           tokensUsed: result.tokensUsed
         })
       }
@@ -505,13 +532,12 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
 
             {/* Operation Type */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
-              <span
-                className="cursor-pointer hover:underline"
-                onClick={() => {/* Future: open operation type selector */}}
-              >
-                Operation type
-              </span>
-              <span>Generic</span>
+              <OperationTypeSheet>
+                <span className="cursor-pointer hover:underline">
+                  Operation type
+                </span>
+              </OperationTypeSheet>
+              <span>{getOperationTypeDisplay()}</span>
             </div>
 
             {/* File */}

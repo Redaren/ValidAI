@@ -24,14 +24,24 @@ import { StructuredOutputVisualizer } from "@/components/workbench/structured-ou
  * @description
  * Comprehensive display interface for LLM test results with advanced visualization features.
  * Handles both simple text responses and complex structured outputs with proper formatting.
+ * Automatically detects and visualizes structured outputs from generateObject operations.
  *
  * ## Features
  * - **Conversation History**: Full message thread with user/assistant alternation
+ * - **Structured Outputs**: Automatic detection and visualization from operation types (True/False validation)
+ * - **Traffic-Light Display**: Boolean results shown with green (✓ true) or red (✗ false) indicators
  * - **Token Analytics**: Real-time token usage with cache performance metrics
  * - **Structured Data**: Auto-detection and visualization of JSON/XML responses
  * - **Special Blocks**: Renders thinking blocks, citations, and cache indicators
  * - **Export Function**: Download conversations as JSON for analysis
  * - **Performance Metrics**: Execution time, cache hit rates, cost savings
+ *
+ * ## Structured Output Rendering
+ * When a message contains `structured_output` field (from generateObject):
+ * - Automatically renders with StructuredOutputVisualizer component
+ * - Bypasses manual JSON/XML parsing logic
+ * - Shows formatted JSON with syntax highlighting
+ * - Provides toggle between formatted and raw views
  *
  * ## Cache Performance Display
  * - 🔷 Cache Created: Indicates new cache breakpoint (25% extra cost)
@@ -579,6 +589,30 @@ export function WorkbenchOutput() {
                         const messageIndex = conversationHistory.indexOf(assistantMsg)
                         const isParsed = manuallyParsedMessages.has(messageIndex)
 
+                        /**
+                         * Structured Output Detection
+                         *
+                         * Check if this message contains structured output from generateObject.
+                         * When present, render with StructuredOutputVisualizer for automatic
+                         * formatting, syntax highlighting, and traffic-light boolean display.
+                         *
+                         * This takes precedence over manual JSON/XML parsing to ensure
+                         * schema-validated outputs are properly displayed.
+                         */
+                        const hasStructuredOutput = !!assistantMsg.structured_output
+
+                        if (hasStructuredOutput) {
+                          // Display structured output with visualizer (always shown for structured operations)
+                          return (
+                            <StructuredOutputVisualizer
+                              data={assistantMsg.structured_output}
+                              originalType="json"
+                              showRawToggle={true}
+                            />
+                          )
+                        }
+
+                        // For non-structured operations, use existing parsing logic
                         // Determine if we should parse structured content
                         const shouldParse =
                           // Always parse in non-advanced mode (backward compatibility)

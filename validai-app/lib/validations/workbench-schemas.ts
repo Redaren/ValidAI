@@ -63,6 +63,7 @@ export const conversationMessageSchema = z.object({
   metadata: messageMetadataSchema.optional(),
   thinking_blocks: z.array(z.any()).optional(),
   citations: z.array(z.any()).optional(),
+  structured_output: z.any().optional(),  // Structured data from generateObject
   // Legacy field for backward compatibility
   tokensUsed: z.object({
     input: z.number(),
@@ -184,6 +185,11 @@ export const workbenchTestSchema = z.object({
   mode: z
     .enum(['stateful', 'stateless'])
     .describe('Execution mode: stateful (cached conversation) or stateless (independent)'),
+  operation_type: z
+    .enum(['generic', 'validation', 'extraction', 'rating', 'classification', 'analysis'])
+    .optional()
+    .default('generic')
+    .describe('Operation type determining output structure'),
   system_prompt: z.string().optional(),
   send_system_prompt: z
     .boolean()
@@ -253,6 +259,7 @@ export type WorkbenchTestInput = z.infer<typeof workbenchTestSchema>
 export const workbenchTestResponseSchema = z.object({
   execution_id: z.string().uuid(),  // For real-time subscription
   response: z.string(),
+  structured_output: z.any().optional(),  // Structured data from generateObject
   thinking_blocks: z.array(z.any()).optional(),
   citations: z.array(z.any()).optional(),
   metadata: messageMetadataSchema,  // Execution metadata

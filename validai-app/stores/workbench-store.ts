@@ -8,6 +8,7 @@ import { devtools } from 'zustand/middleware'
 import type { ConversationMessage, WorkbenchExecution } from '@/lib/validations'
 import { createClient } from '@/lib/supabase/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import type { OperationType } from '@/lib/operation-types'
 
 /**
  * Test result from running an operation test
@@ -114,7 +115,8 @@ export type SelectedFile = {
  *
  * ## Core Responsibilities
  * - **File Management**: Upload and selection of documents for testing
- * - **LLM Configuration**: Model selection, parameters, and feature toggles
+ * - **LLM Configuration**: Model and operation type selection, parameters, and feature toggles
+ * - **Operation Types**: Structured output control (Generic text vs. Validation boolean)
  * - **Mode Management**: Stateful (conversation) vs stateless (single-shot) modes
  * - **Conversation History**: Multi-turn dialogue with message preservation
  * - **Cache Control**: Prompt caching for 90% cost reduction on repeated content
@@ -135,6 +137,14 @@ export interface WorkbenchStore {
   // Core State
   selectedFile: SelectedFile
   selectedModel: string
+  /**
+   * Selected operation type determining output structure and execution mode
+   * - 'generic': Free-form text via generateText()
+   * - 'validation': Structured boolean+comment via generateObject()
+   * - Future types: extraction, rating, classification, analysis
+   * @default 'generic'
+   */
+  selectedOperationType: OperationType
   systemPrompt: string
   operationPrompt: string
 
@@ -171,6 +181,12 @@ export interface WorkbenchStore {
   // Actions
   setFile: (file: SelectedFile) => void
   setModel: (modelId: string) => void
+  /**
+   * Set the operation type for the next test execution
+   * Determines whether Edge Function uses generateText (generic) or generateObject (validation)
+   * @param operationType - The operation type enum value
+   */
+  setOperationType: (operationType: OperationType) => void
   setSystemPrompt: (prompt: string) => void
   updateOperationPrompt: (prompt: string) => void
   setMode: (mode: 'stateful' | 'stateless') => void
@@ -237,6 +253,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       // Initial state
       selectedFile: null,
       selectedModel: 'claude-3-5-haiku-20241022',
+      selectedOperationType: 'generic',  // Default to generic (backward compatible)
       systemPrompt: '',
       operationPrompt: '',
       mode: 'stateful',  // Default to stateful mode
@@ -270,6 +287,10 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       setModel: (modelId) => {
         set({ selectedModel: modelId })
+      },
+
+      setOperationType: (operationType) => {
+        set({ selectedOperationType: operationType })
       },
 
       setSystemPrompt: (prompt) => {
@@ -643,6 +664,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         set({
           selectedFile: null,
           selectedModel: 'claude-3-5-haiku-20241022',
+          selectedOperationType: 'generic',
           systemPrompt: '',
           operationPrompt: '',
           mode: 'stateful',
