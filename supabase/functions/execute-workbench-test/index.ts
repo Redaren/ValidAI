@@ -46,6 +46,24 @@ const corsHeaders = {
 }
 
 /**
+ * Environment flag to control workbench_executions audit logging
+ *
+ * TODO: Review if workbench_executions audit trail is needed.
+ * Currently adds ~500-1000ms latency per execution with 3 database roundtrips.
+ * Data is never read by frontend - no history viewer, analytics, or replay features exist.
+ *
+ * Performance impact when disabled:
+ * - Removes INSERT (pending status) before LLM call
+ * - Removes UPDATE (processing status) before LLM call
+ * - Removes UPDATE (completed/failed status) after LLM call
+ *
+ * Set ENABLE_WORKBENCH_AUDIT_LOG=true in Supabase Edge Function secrets to enable.
+ *
+ * @default false
+ */
+const ENABLE_WORKBENCH_AUDIT_LOG = Deno.env.get('ENABLE_WORKBENCH_AUDIT_LOG') === 'true'
+
+/**
  * Request payload structure for workbench test execution
  *
  * @interface WorkbenchTestRequest
@@ -144,37 +162,7 @@ serve(async (req) => {
       throw new Error('Invalid user token')
     }
 
-    // Get organization ID from JWT
-    const { data: orgData } = await supabase.rpc('get_llm_config_for_run', {
-      p_processor_id: body.processor_id,
-      p_user_id: user.id
-    })
-
-    if (!orgData) {
-      throw new Error('Could not determine organization')
-    }
-
-    // Create initial execution record
-    const { data: execution, error: execError } = await supabase
-      .from('workbench_executions')
-      .insert({
-        processor_id: body.processor_id,
-        user_id: user.id,
-        organization_id: orgData.organization_id,
-        status: 'pending',
-        prompt: body.new_prompt,
-        settings: body.settings
-      })
-      .select()
-      .single()
-
-    if (execError || !execution) {
-      throw new Error(`Failed to create execution record: ${execError?.message}`)
-    }
-
-    executionId = execution.id
-
-    // Resolve LLM configuration for the processor
+    // Resolve LLM configuration for the processor (includes organization_id)
     const { data: llmConfig, error: llmError } = await supabase.rpc('get_llm_config_for_run', {
       p_processor_id: body.processor_id,
       p_user_id: user.id
@@ -182,6 +170,28 @@ serve(async (req) => {
 
     if (llmError || !llmConfig) {
       throw new Error(`Failed to resolve LLM config: ${llmError?.message || 'Unknown error'}`)
+    }
+
+    // Create initial execution record (if audit logging enabled)
+    if (ENABLE_WORKBENCH_AUDIT_LOG) {
+      const { data: execution, error: execError } = await supabase
+        .from('workbench_executions')
+        .insert({
+          processor_id: body.processor_id,
+          user_id: user.id,
+          organization_id: llmConfig.organization_id,
+          status: 'pending',
+          prompt: body.new_prompt,
+          settings: body.settings
+        })
+        .select()
+        .single()
+
+      if (execError || !execution) {
+        throw new Error(`Failed to create execution record: ${execError?.message}`)
+      }
+
+      executionId = execution.id
     }
 
     // Use model from request or fallback to resolved config
@@ -399,14 +409,16 @@ serve(async (req) => {
       messages.push({ role: 'user', content: contentBlocks })
     }
 
-    // Update status to processing
-    await supabase
-      .from('workbench_executions')
-      .update({
-        status: 'processing',
-        model_used: modelToUse
-      })
-      .eq('id', executionId)
+    // Update status to processing (if audit logging enabled)
+    if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
+      await supabase
+        .from('workbench_executions')
+        .update({
+          status: 'processing',
+          model_used: modelToUse
+        })
+        .eq('id', executionId)
+    }
 
     // Define operation type schemas
     // These schemas enforce structured output formats for non-generic operations
@@ -553,19 +565,20 @@ serve(async (req) => {
         system_sent: messages[0]?.role === 'system' ? messages[0].content : undefined
       }
 
-      // Update execution record with completion status
-      // This triggers Supabase Realtime update to subscribed clients
-      await supabase
-        .from('workbench_executions')
-        .update({
-          status: 'completed',
-          response: responseText,
-          thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : null,
-          citations: citations.length > 0 ? citations : null,
-          tokens_used: result.tokensUsed,
-          execution_time_ms: executionTime
-        })
-        .eq('id', executionId)
+      // Update execution record with completion status (if audit logging enabled)
+      if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
+        await supabase
+          .from('workbench_executions')
+          .update({
+            status: 'completed',
+            response: responseText,
+            thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : null,
+            citations: citations.length > 0 ? citations : null,
+            tokens_used: result.tokensUsed,
+            execution_time_ms: executionTime
+          })
+          .eq('id', executionId)
+      }
 
       return new Response(
         JSON.stringify(result),
@@ -620,15 +633,17 @@ serve(async (req) => {
         system_sent: messages[0]?.role === 'system' ? messages[0].content : undefined
       }
 
-      // Mark as COMPLETED (not failed) so it shows in Output section
-      await supabase
-        .from('workbench_executions')
-        .update({
-          status: 'completed',
-          response: errorMessage,
-          execution_time_ms: executionTime
-        })
-        .eq('id', executionId)
+      // Mark as COMPLETED (not failed) so it shows in Output section (if audit logging enabled)
+      if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
+        await supabase
+          .from('workbench_executions')
+          .update({
+            status: 'completed',
+            response: errorMessage,
+            execution_time_ms: executionTime
+          })
+          .eq('id', executionId)
+      }
 
       // Return 200 OK so frontend treats this as a valid response
       return new Response(
@@ -645,8 +660,8 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in execute-workbench-test:', error)
 
-    // Update execution record with error if we have an execution ID
-    if (executionId) {
+    // Update execution record with error if we have an execution ID (if audit logging enabled)
+    if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL')!
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!

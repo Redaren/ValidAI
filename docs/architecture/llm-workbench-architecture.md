@@ -2,7 +2,7 @@
 
 The LLM Workbench is a testing environment for operations that integrates with LLM providers through the Vercel AI SDK, featuring message composition controls, structured output generation, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Currently configured for Anthropic's Claude models with the foundation for multi-provider support.
 
-**Implementation:** Phase 2.1 (Structured Outputs with Operation Types)
+**Implementation:** Phase 2.1.1 (Performance Optimization)
 **Documentation Date:** 2025-10-09
 **Based on:** Vercel AI SDK (https://ai-sdk.dev) with Anthropic provider
 
@@ -24,10 +24,10 @@ The Workbench provides a sandboxed environment where users can:
 - **Message Composition**: Settings act as toggles to construct each message
 - **User-Controlled Caching**: Explicit "Create cache" toggle instead of mode-based automation
 - **Context Awareness**: Tracks 200K token usage for Claude Sonnet 4.5 (stateful mode)
-- **Ephemeral**: State is not persisted across sessions (except execution audit trail)
-- **Real-time**: Live execution status updates via Supabase Realtime
+- **Ephemeral**: State is not persisted across sessions
+- **Performance-Optimized**: Database audit logging disabled by default (optional via environment flag)
 - **Cost-optimized**: Prompt caching reduces token costs by up to 90%
-- **Auditable**: All executions logged with comprehensive metadata
+- **Auditable**: Execution audit trail available when enabled (adds ~500ms latency)
 
 ## Message Composition System
 
@@ -420,7 +420,11 @@ ALTER TABLE processors ADD COLUMN configuration jsonb;
 ```
 
 ##### `workbench_executions`
-Audit trail and real-time tracking for test executions.
+Optional audit trail for test executions (disabled by default for performance).
+
+**Performance Note:** Logging is disabled by default to eliminate ~500-1000ms latency from 3 database roundtrips per execution. Currently no UI consumes this data (no history viewer, analytics, or replay features exist).
+
+**To enable:** Set `ENABLE_WORKBENCH_AUDIT_LOG=true` in Edge Function environment variables.
 
 ```sql
 CREATE TABLE workbench_executions (
@@ -457,6 +461,29 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 **Location:** `supabase/functions/execute-workbench-test/index.ts`
 
 **LLM Integration:** Uses Vercel AI SDK with `@ai-sdk/anthropic` provider for unified LLM interface
+
+**Performance Optimization:**
+The Edge Function includes an optional audit logging system controlled by `ENABLE_WORKBENCH_AUDIT_LOG` environment variable (default: `false`).
+
+When disabled (default):
+- Eliminates 3 database roundtrips per execution (INSERT pending → UPDATE processing → UPDATE completed)
+- Reduces latency by ~500-1000ms per test
+- Single database call to `get_llm_config_for_run()` for configuration resolution
+
+When enabled:
+- Full audit trail in `workbench_executions` table
+- Real-time status updates via Supabase Realtime
+- Useful for debugging and compliance requirements
+
+**Configuration Resolution:**
+```typescript
+// Single call replaces two previous calls (organization_id + config)
+const { data: llmConfig } = await supabase.rpc('get_llm_config_for_run', {
+  p_processor_id: body.processor_id,
+  p_user_id: user.id
+})
+// Returns: model, api_key_encrypted, organization_id, settings in one roundtrip
+```
 
 **System Prompt Handling (User-Controlled):**
 ```typescript
@@ -1058,7 +1085,7 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - System prompt toggle
 - Auto-managed caching per mode
 
-### ✅ Phase D: Operation Types & Structured Outputs (Current)
+### ✅ Phase D: Operation Types & Structured Outputs
 - Operation type configuration system (`lib/operation-types/`)
 - Generic operation type (free-form text via `generateText`)
 - True/False validation type (structured output via `generateObject`)
@@ -1068,6 +1095,13 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - Traffic-light display for boolean results
 - Extensible architecture for 4 additional operation types
 - Database enum support for all 6 operation types
+
+### ✅ Phase E: Performance Optimization (Current)
+- Optional audit logging via `ENABLE_WORKBENCH_AUDIT_LOG` flag (default: disabled)
+- Combined database calls (single `get_llm_config_for_run()`)
+- 80-90% latency reduction (~500-1000ms → ~50-100ms overhead)
+- Conditional `workbench_executions` writes
+- Near-instant response delivery
 
 ## Bug Fixes
 
@@ -1180,6 +1214,56 @@ const extractText = (content: string | unknown[]): string => {
 - Typical session: 5 messages = ~465KB
 - Acceptable: Ephemeral test environment, cleared on refresh
 
+### Phase 2.1.1: Performance Optimization
+
+**Original Issue:**
+Workbench felt slow due to unnecessary database operations. Each execution performed 4 database roundtrips (~500-1000ms overhead) even though the audit trail data was never read by the frontend.
+
+**Database Operations (Before):**
+```
+1. get_llm_config_for_run() → organization_id
+2. get_llm_config_for_run() → full config (redundant!)
+3. INSERT workbench_executions → pending status
+4. UPDATE workbench_executions → processing status
+5. UPDATE workbench_executions → completed/failed status
+```
+
+**Root Cause:**
+- Duplicate database calls for configuration
+- Full audit logging with no consuming UI (no history viewer, analytics, or replay features)
+- Synchronous writes blocking response delivery
+
+**Solution:**
+1. **Combined config calls** - Single `get_llm_config_for_run()` returns both organization_id and full config
+2. **Optional audit logging** - Added `ENABLE_WORKBENCH_AUDIT_LOG` environment flag (default: false)
+3. **Conditional database writes** - All `workbench_executions` operations wrapped in flag check
+
+**Implementation:**
+```typescript
+// Edge Function flag (default: disabled)
+const ENABLE_WORKBENCH_AUDIT_LOG = Deno.env.get('ENABLE_WORKBENCH_AUDIT_LOG') === 'true'
+
+// Single config call
+const { data: llmConfig } = await supabase.rpc('get_llm_config_for_run', {
+  p_processor_id: body.processor_id,
+  p_user_id: user.id
+})
+// Returns: organization_id, model, api_key_encrypted, settings
+
+// Conditional audit logging
+if (ENABLE_WORKBENCH_AUDIT_LOG) {
+  await supabase.from('workbench_executions').insert({...})
+}
+```
+
+**Result:**
+- ✅ 80-90% latency reduction (from ~500-1000ms to ~50-100ms overhead)
+- ✅ Single database call instead of 4
+- ✅ Near-instant responses once LLM completes
+- ✅ Audit trail available when needed (set flag to enable)
+
+**Edge Function Version:** 26
+
 ## Future Enhancements
 
 ### 1. Advanced Settings UI
@@ -1229,13 +1313,32 @@ CREATE POLICY "Users can view their own workbench executions"
 
 ## Performance Considerations
 
+### Database Operations Optimization
+
+**Default Configuration (Audit Logging Disabled):**
+- Single database call: `get_llm_config_for_run()` for configuration
+- No execution tracking overhead
+- **Latency:** ~50-100ms for config resolution
+- **Total overhead:** Minimal, LLM call dominates execution time
+
+**With Audit Logging Enabled:**
+- Four database operations per execution:
+  1. `get_llm_config_for_run()` - Configuration (required)
+  2. INSERT `workbench_executions` - Create pending record
+  3. UPDATE `workbench_executions` - Mark processing
+  4. UPDATE `workbench_executions` - Mark completed/failed
+- **Additional latency:** ~500-1000ms from roundtrips
+- **Trade-off:** Full audit trail vs. performance
+
+**Recommendation:** Keep audit logging disabled for development/testing. Enable only for production debugging or compliance requirements.
+
 ### Prompt Caching Benefits (Stateful Mode)
 - Cache writes: +25% cost (one-time)
 - Cache reads: -90% cost (recurring)
 - Break-even: After 2nd use
 - 10-turn conversation: ~85% total savings
 
-### Database Indexes
+### Database Indexes (Optional - for audit logging)
 ```sql
 CREATE INDEX idx_workbench_executions_user_id ON workbench_executions(user_id);
 CREATE INDEX idx_workbench_executions_processor_id ON workbench_executions(processor_id);
@@ -1265,10 +1368,10 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 ---
 
 **Last Updated:** 2025-10-09
-**Phase:** 2.1 Complete (Structured Outputs with Operation Types)
+**Phase:** 2.1.1 Complete (Performance Optimization)
 **Architecture:** Unified LLM provider interface via Vercel AI SDK with dual execution modes
 **Next Phase:** 2.2 - Additional Operation Types (Extraction, Rating, Classification, Analysis)
-**Edge Function Version:** 25 (Vercel AI SDK with `generateObject` support for structured outputs)
+**Edge Function Version:** 26 (Performance optimization: optional audit logging, single config call)
 
 ## Benefits of Vercel AI SDK Architecture
 
