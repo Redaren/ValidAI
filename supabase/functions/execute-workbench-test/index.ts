@@ -21,19 +21,26 @@
  * - Preserves cache control metadata across conversation turns
  * - Properly reconstructs complex message structures from stored conversations
  *
+ * ## Known Issues & Workarounds
+ * - **Thinking + Structured Output Bug**: Vercel AI SDK issue #7220 - When using generateObject()
+ *   with thinking mode enabled, the SDK forces tool_choice which conflicts with Anthropic's
+ *   thinking mode. WORKAROUND: Uses generateText() with manual tool definition when both
+ *   thinking and structured output are enabled. This can be removed once the SDK is fixed.
+ *   See: https://github.com/vercel/ai/issues/7220
+ *
  * ## Error Handling
  * - Graceful fallbacks for malformed conversation history
  * - API errors returned as assistant messages for better UX
  * - Comprehensive error logging and status tracking
  *
- * @version 2.0.0
+ * @version 2.1.0
  * @since 2025-10-06
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
-import { generateText, generateObject } from 'npm:ai'
+import { generateText, generateObject, jsonSchema } from 'npm:ai'
 import { z } from 'npm:zod'
 
 /**
@@ -440,8 +447,114 @@ serve(async (req) => {
       let response: any
       let structuredOutput: any = null
 
-      if (useStructuredOutput && outputSchema) {
-        // Use generateObject for structured output operations
+      // Check if we need the hybrid approach (thinking + structured output)
+      // This works around the Vercel AI SDK bug where thinking conflicts with forced tool use
+      const useHybridApproach = useStructuredOutput && outputSchema && body.settings.thinking
+
+      if (useHybridApproach) {
+        // WORKAROUND: Use generateText with manual tool definition when thinking is enabled
+        // This avoids the "Thinking may not be enabled when tool_choice forces tool use" error
+
+        // Add instruction to use the JSON tool after thinking
+        const hybridMessages = [...messages]
+        const lastMessage = hybridMessages[hybridMessages.length - 1]
+
+        // Append instruction to the last user message
+        if (typeof lastMessage.content === 'string') {
+          hybridMessages[hybridMessages.length - 1] = {
+            ...lastMessage,
+            content: lastMessage.content + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.'
+          }
+        } else if (Array.isArray(lastMessage.content)) {
+          // Find the last text block and append to it
+          const contentCopy = [...lastMessage.content]
+          for (let i = contentCopy.length - 1; i >= 0; i--) {
+            if (contentCopy[i].type === 'text') {
+              contentCopy[i] = {
+                ...contentCopy[i],
+                text: contentCopy[i].text + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.'
+              }
+              break
+            }
+          }
+          hybridMessages[hybridMessages.length - 1] = {
+            ...lastMessage,
+            content: contentCopy
+          }
+        }
+
+        // Use generateText with manual tool definition
+        response = await generateText({
+          model: anthropicProvider(modelToUse),
+          messages: hybridMessages,
+          tools: {
+            json_response: {
+              description: 'Provide the structured validation response',
+              // AI SDK v5 uses inputSchema instead of parameters
+              inputSchema: jsonSchema({
+                type: "object",
+                properties: {
+                  result: {
+                    type: "boolean",
+                    description: "The validation result (true/false)"
+                  },
+                  comment: {
+                    type: "string",
+                    description: "Reasoning and explanation for the decision"
+                  }
+                },
+                required: ["result", "comment"]
+              })
+            }
+          },
+          toolChoice: 'auto', // Allow the model to choose when to use the tool
+          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+          temperature: body.settings.temperature,
+          topP: body.settings.top_p,
+          topK: body.settings.top_k,
+          stopSequences: body.settings.stop_sequences,
+          providerOptions: {
+            anthropic: {
+              thinking: {
+                type: body.settings.thinking.type,
+                budgetTokens: body.settings.thinking.budget_tokens
+              }
+            }
+          }
+        })
+
+        // Extract structured output from tool calls
+        if (response.toolCalls && response.toolCalls.length > 0) {
+          // Find the json_response tool call
+          const jsonToolCall = response.toolCalls.find((tc: any) => tc.toolName === 'json_response')
+          if (jsonToolCall && jsonToolCall.args) {
+            // Validate the extracted data against our schema
+            try {
+              structuredOutput = validationSchema.parse(jsonToolCall.args)
+            } catch (validationError) {
+              console.error('Failed to validate tool response against schema:', validationError)
+              // Fallback: try to use the raw args if they match the expected structure
+              structuredOutput = jsonToolCall.args
+            }
+          }
+        }
+
+        // If no tool was called (shouldn't happen with our prompt), try to extract from text
+        if (!structuredOutput && response.text) {
+          // Try to find JSON in the response text
+          const jsonMatch = response.text.match(/\{[\s\S]*"result"[\s\S]*"comment"[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0])
+              structuredOutput = validationSchema.parse(parsed)
+            } catch (e) {
+              console.error('Failed to extract structured output from text:', e)
+            }
+          }
+        }
+
+      } else if (useStructuredOutput && outputSchema) {
+        // Normal path: Use generateObject when thinking is NOT enabled
         response = await generateObject({
           model: anthropicProvider(modelToUse),
           schema: outputSchema,
@@ -453,12 +566,7 @@ serve(async (req) => {
           stopSequences: body.settings.stop_sequences,
           providerOptions: {
             anthropic: {
-              ...(body.settings.thinking ? {
-                thinking: {
-                  type: body.settings.thinking.type,
-                  budgetTokens: body.settings.thinking.budget_tokens
-                }
-              } : {}),
+              // Note: No thinking here since it conflicts with generateObject
             }
           }
         })

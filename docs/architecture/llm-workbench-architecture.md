@@ -2,9 +2,9 @@
 
 The LLM Workbench is a testing environment for operations that integrates with LLM providers through the Vercel AI SDK, featuring message composition controls, structured output generation, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Currently configured for Anthropic's Claude models with the foundation for multi-provider support.
 
-**Implementation:** Phase 2.1.1 (Performance Optimization)
-**Documentation Date:** 2025-10-09
-**Based on:** Vercel AI SDK (https://ai-sdk.dev) with Anthropic provider
+**Implementation:** Phase 2.1.2 (Thinking + Structured Output Workaround)
+**Documentation Date:** 2025-10-13
+**Based on:** Vercel AI SDK v5 (https://ai-sdk.dev) with Anthropic provider
 
 ## Overview
 
@@ -185,39 +185,54 @@ interface OperationTypeConfig {
 const useStructuredOutput = body.operation_type === 'validation'
 const outputSchema = body.operation_type === 'validation' ? validationSchema : null
 
-if (useStructuredOutput && outputSchema) {
-  // Structured output with schema validation
+// Workaround for Vercel AI SDK issue #7220
+// When both thinking and structured output are needed, use generateText with tools
+const useHybridApproach = useStructuredOutput && outputSchema && body.settings.thinking
+
+if (useHybridApproach) {
+  // Use generateText with manual tool definition to avoid thinking+tool_choice conflict
+  response = await generateText({
+    model: anthropicProvider(modelToUse),
+    messages,
+    tools: {
+      json_response: {
+        description: 'Provide the structured validation response',
+        inputSchema: jsonSchema({...})  // AI SDK v5 format
+      }
+    },
+    toolChoice: 'auto',
+    providerOptions: { anthropic: { thinking: {...} } }
+  })
+  // Extract structured output from tool calls
+  structuredOutput = response.toolCalls.find(tc => tc.toolName === 'json_response')?.args
+} else if (useStructuredOutput && outputSchema) {
+  // Standard structured output (no thinking)
   response = await generateObject({
     model: anthropicProvider(modelToUse),
-    schema: outputSchema,  // Zod schema
+    schema: outputSchema,
     messages,
-    maxTokens,
-    temperature,
-    // ...other settings
+    // ...settings
   })
-
-  structuredOutput = response.object  // Validated object
-  responseText = JSON.stringify(response.object, null, 2)
+  structuredOutput = response.object
 } else {
   // Generic free-form text
   response = await generateText({
     model: anthropicProvider(modelToUse),
     messages,
-    maxTokens,
-    temperature,
-    // ...other settings
+    // ...settings
   })
-
-  responseText = response.text
 }
 
 return {
   execution_id,
   response: responseText,
-  structured_output: structuredOutput,  // Only present for structured types
+  structured_output: structuredOutput,
+  thinking_blocks: thinkingBlocks,  // Extracted from response.reasoning array
   // ...metadata
 }
 ```
+
+**Known Issue:** Vercel AI SDK [#7220](https://github.com/vercel/ai/issues/7220) - `generateObject()` forces `tool_choice` which conflicts with Anthropic's thinking mode. The hybrid approach works around this by using `generateText()` with manual tool definition and `toolChoice: 'auto'` when both features are needed.
 
 ### Structured Output Schemas
 
@@ -1000,7 +1015,19 @@ providerOptions: {
 ```
 
 **Response Extraction:**
-The Vercel AI SDK returns reasoning in `response.reasoning`, which is formatted for frontend display.
+The Vercel AI SDK returns reasoning in `response.reasoning` as an array of `ReasoningPart` objects. The edge function passes this array to the frontend, which extracts and concatenates the text for display:
+
+```typescript
+// Frontend: workbench-output.tsx
+if (Array.isArray(block.thinking)) {
+  return block.thinking
+    .filter((part: any) => part.type === 'reasoning' && part.text)
+    .map((part: any) => part.text)
+    .join('\n\n')
+}
+```
+
+This follows proper separation of concerns - backend provides raw data, frontend handles presentation.
 
 ### 3. Citations
 
@@ -1096,12 +1123,20 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - Extensible architecture for 4 additional operation types
 - Database enum support for all 6 operation types
 
-### ✅ Phase E: Performance Optimization (Current)
+### ✅ Phase E: Performance Optimization
 - Optional audit logging via `ENABLE_WORKBENCH_AUDIT_LOG` flag (default: disabled)
 - Combined database calls (single `get_llm_config_for_run()`)
 - 80-90% latency reduction (~500-1000ms → ~50-100ms overhead)
 - Conditional `workbench_executions` writes
 - Near-instant response delivery
+
+### ✅ Phase F: Thinking + Structured Output (Current)
+- Hybrid execution approach for thinking mode with structured outputs
+- Workaround for Vercel AI SDK issue #7220 (thinking conflicts with forced tool_choice)
+- Uses `generateText()` with manual tools when both features enabled
+- AI SDK v5 compatibility (`inputSchema` + `jsonSchema` helper)
+- Frontend handling of `response.reasoning` array format
+- No breaking changes to existing functionality
 
 ## Bug Fixes
 
@@ -1262,8 +1297,6 @@ if (ENABLE_WORKBENCH_AUDIT_LOG) {
 - ✅ Near-instant responses once LLM completes
 - ✅ Audit trail available when needed (set flag to enable)
 
-**Edge Function Version:** 26
-
 ## Future Enhancements
 
 ### 1. Advanced Settings UI
@@ -1367,11 +1400,11 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-09
-**Phase:** 2.1.1 Complete (Performance Optimization)
+**Last Updated:** 2025-10-13
+**Phase:** 2.1.2 Complete (Thinking + Structured Output Workaround)
 **Architecture:** Unified LLM provider interface via Vercel AI SDK with dual execution modes
 **Next Phase:** 2.2 - Additional Operation Types (Extraction, Rating, Classification, Analysis)
-**Edge Function Version:** 26 (Performance optimization: optional audit logging, single config call)
+**Edge Function Version:** 33 (Thinking + structured output hybrid approach, AI SDK v5 compatibility)
 
 ## Benefits of Vercel AI SDK Architecture
 

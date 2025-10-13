@@ -575,7 +575,23 @@ export function WorkbenchOutput() {
                         {assistantMsg.thinking_blocks.map((block: Record<string, unknown>, idx: number) => (
                           <div key={idx} className="mt-2">
                             <pre className="text-sm whitespace-pre-wrap break-words font-sans text-muted-foreground italic">
-                              {String(block.thinking || block.text || JSON.stringify(block))}
+                              {(() => {
+                                // Handle thinking field - can be string or array of ReasoningPart objects from Vercel AI SDK
+                                if (block.thinking) {
+                                  if (Array.isArray(block.thinking)) {
+                                    // Extract text from reasoning array (Vercel AI SDK format)
+                                    // Each ReasoningPart has: { type: 'reasoning', text: '...' }
+                                    return block.thinking
+                                      .filter((part: any) => part.type === 'reasoning' && part.text)
+                                      .map((part: any) => part.text)
+                                      .join('\n\n')
+                                  }
+                                  // If thinking is already a string, use it directly
+                                  return String(block.thinking)
+                                }
+                                // Fallback to text field or JSON stringify
+                                return String(block.text || JSON.stringify(block))
+                              })()}
                             </pre>
                           </div>
                         ))}
