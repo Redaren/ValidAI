@@ -6,7 +6,6 @@
 "use client"
 
 import React, { useState } from "react"
-import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,10 +17,12 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import { Loader2 } from "lucide-react"
+import { Loader2, Save } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import { useWorkbenchTest } from "@/hooks/use-workbench-test"
+import { useUpdateOperationFromWorkbench } from "@/app/queries/operations/use-operations"
 import { cn } from "@/lib/utils"
 import { OperationTypeSheet } from "@/components/workbench/operation-type-sheet"
 import { getOperationTypeConfig } from "@/lib/operation-types"
@@ -30,12 +31,14 @@ import { getOperationTypeConfig } from "@/lib/operation-types"
  * Props for WorkbenchInput component
  *
  * @interface WorkbenchInputProps
- * @property {any} processor - Current processor data from database
- * @property {any[]} operations - Operations configured for this processor (future use)
+ * @property processor - Current processor data from database
  */
 interface WorkbenchInputProps {
-  processor: any
-  operations: any[]
+  processor: {
+    processor_id: string
+    [key: string]: unknown
+  }
+  operations?: unknown[]
 }
 
 /**
@@ -89,7 +92,8 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
  * @param {WorkbenchInputProps} props - Component props
  * @returns {JSX.Element} Rendered workbench input interface
  */
-export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
+export function WorkbenchInput({ processor }: WorkbenchInputProps) {
+  const router = useRouter()
   const [isModelSheetOpen, setIsModelSheetOpen] = useState(false)
 
   const {
@@ -105,10 +109,9 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
     toolUse,
     createCache,
     sendFile,
-    isRunning,
-    executionStatus,
     conversationHistory,
     advancedSettings,
+    editOperationId,
     setFile,
     setModel,
     updateOperationPrompt,
@@ -126,6 +129,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
 
   const { data: availableModels, isLoading: modelsLoading } = useAvailableLLMModels()
   const workbenchTest = useWorkbenchTest()
+  const updateOperationMutation = useUpdateOperationFromWorkbench()
 
   /**
    * Opens native file picker dialog for document upload
@@ -468,6 +472,35 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
   }
 
   /**
+   * Handles saving operation changes back to the database
+   * Only available in edit mode (when editOperationId is set)
+   *
+   * @async
+   * @function handleSaveOperation
+   * @description
+   * Saves the current prompt and operation type to the operation in the database,
+   * then redirects back to the processor detail page.
+   */
+  const handleSaveOperation = async () => {
+    if (!editOperationId) return
+
+    try {
+      await updateOperationMutation.mutateAsync({
+        id: editOperationId,
+        processorId: processor.processor_id,
+        prompt: operationPrompt,
+        operation_type: selectedOperationType
+      })
+
+      // Redirect back to processor detail page after successful save
+      router.push(`/proc/${processor.processor_id}`)
+    } catch (error) {
+      console.error('Failed to save operation:', error)
+      // Error will be visible in the UI through the mutation state
+    }
+  }
+
+  /**
    * Read file content using FileReader API
    *
    * Handles both text and binary files:
@@ -712,7 +745,7 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
             onChange={(e) => updateOperationPrompt(e.target.value)}
             className="min-h-[200px] resize-none"
           />
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-end gap-2">
             <Button
               onClick={handleRunTest}
               disabled={workbenchTest.isPending || !operationPrompt}
@@ -726,6 +759,27 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
                 'Test'
               )}
             </Button>
+
+            {/* Save to Operation button - only shown in edit mode */}
+            {editOperationId && (
+              <Button
+                variant="default"
+                onClick={handleSaveOperation}
+                disabled={updateOperationMutation.isPending || !operationPrompt}
+              >
+                {updateOperationMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save to Operation
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </div>

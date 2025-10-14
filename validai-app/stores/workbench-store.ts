@@ -148,6 +148,10 @@ export interface WorkbenchStore {
   systemPrompt: string
   operationPrompt: string
 
+  // Edit Mode State (for operation editing via workbench)
+  editOperationId: string | null
+  editOperationName: string | null
+
   // Mode Management
   mode: 'stateful' | 'stateless'
   sendSystemPrompt: boolean
@@ -189,6 +193,16 @@ export interface WorkbenchStore {
   setOperationType: (operationType: OperationType) => void
   setSystemPrompt: (prompt: string) => void
   updateOperationPrompt: (prompt: string) => void
+  /**
+   * Enter edit mode for a specific operation
+   * @param operationId - The operation UUID being edited
+   * @param operationName - The operation name for display in header
+   */
+  setEditOperation: (operationId: string, operationName: string) => void
+  /**
+   * Exit edit mode and return to standalone workbench mode
+   */
+  clearEditOperation: () => void
   setMode: (mode: 'stateful' | 'stateless') => void
   toggleSystemPrompt: () => void
   toggleFeature: (feature: 'thinking' | 'citations' | 'toolUse') => void
@@ -256,6 +270,8 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       selectedOperationType: 'generic',  // Default to generic (backward compatible)
       systemPrompt: '',
       operationPrompt: '',
+      editOperationId: null,
+      editOperationName: null,
       mode: 'stateful',  // Default to stateful mode
       sendSystemPrompt: true,  // Default to sending system prompt
       thinkingMode: false,
@@ -299,6 +315,20 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
       updateOperationPrompt: (prompt) => {
         set({ operationPrompt: prompt })
+      },
+
+      setEditOperation: (operationId, operationName) => {
+        set({
+          editOperationId: operationId,
+          editOperationName: operationName
+        })
+      },
+
+      clearEditOperation: () => {
+        set({
+          editOperationId: null,
+          editOperationName: null
+        })
       },
 
       setMode: (mode) => {
@@ -667,6 +697,8 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           selectedOperationType: 'generic',
           systemPrompt: '',
           operationPrompt: '',
+          editOperationId: null,
+          editOperationName: null,
           mode: 'stateful',
           sendSystemPrompt: true,
           thinkingMode: false,

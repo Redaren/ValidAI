@@ -130,6 +130,66 @@ export function useUpdateOperation() {
 }
 
 /**
+ * Hook for updating operation prompt and type from workbench
+ *
+ * Specialized mutation for the workbench edit mode that updates
+ * only the prompt and operation_type fields of an operation.
+ *
+ * @example
+ * ```tsx
+ * const updateOperationFromWorkbench = useUpdateOperationFromWorkbench()
+ *
+ * updateOperationFromWorkbench.mutate({
+ *   id: operationId,
+ *   processorId: processorId,
+ *   prompt: 'New prompt text',
+ *   operation_type: 'validation'
+ * })
+ * ```
+ */
+export function useUpdateOperationFromWorkbench() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      processorId,
+      prompt,
+      operation_type
+    }: {
+      id: string
+      processorId: string
+      prompt: string
+      operation_type: string
+    }) => {
+      const { data, error } = await supabase
+        .from('operations')
+        .update({
+          prompt,
+          operation_type
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return { data, processorId }
+    },
+    onSuccess: ({ processorId }) => {
+      // Invalidate processor detail to refresh operations list
+      queryClient.invalidateQueries({
+        queryKey: ['processor', processorId],
+      })
+      console.log('Operation updated from workbench successfully')
+    },
+    onError: (error) => {
+      console.error('Failed to update operation from workbench:', error)
+    },
+  })
+}
+
+/**
  * Hook for deleting an operation
  *
  * @example

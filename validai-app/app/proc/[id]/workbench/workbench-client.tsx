@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { FlaskConical, MoreHorizontal, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -20,6 +21,7 @@ import { WorkbenchOutput } from "@/components/workbench/workbench-output"
 import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-advanced-settings"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import type { Database } from "@/lib/database.types"
+import type { Operation } from "@/app/queries/processors/use-processor-detail"
 
 /**
  * Type alias for processor data with operations
@@ -42,16 +44,28 @@ interface WorkbenchClientProps {
  * Workbench Client Component
  *
  * Main orchestrator for the testbench interface.
+ * Supports two modes:
+ * - Standalone mode: Generic testing environment (no query params)
+ * - Edit mode: Load and edit specific operation (?op=<operation-id>)
+ *
  * Manages layout and coordination between settings, input, and output sections.
  */
 export function WorkbenchClient({
   processorId,
   initialProcessor
 }: WorkbenchClientProps) {
+  const searchParams = useSearchParams()
+  const operationId = searchParams.get('op')
+
   const [isExpanded, setIsExpanded] = useState(false)
   const {
     advancedMode,
+    editOperationName,
     setSystemPrompt,
+    setOperationType,
+    updateOperationPrompt,
+    setEditOperation,
+    clearEditOperation,
     toggleAdvancedMode,
     reset
   } = useWorkbenchStore()
@@ -60,11 +74,29 @@ export function WorkbenchClient({
   useEffect(() => {
     setSystemPrompt(initialProcessor.system_prompt || "")
 
+    // Check if we're in edit mode (operation ID in query param)
+    if (operationId && initialProcessor.operations) {
+      const operations = (Array.isArray(initialProcessor.operations)
+        ? initialProcessor.operations
+        : []) as unknown as Operation[]
+
+      const operation = operations.find((op) => op.id === operationId)
+      if (operation) {
+        // Enter edit mode
+        setEditOperation(operation.id, operation.name)
+        setOperationType(operation.operation_type)
+        updateOperationPrompt(operation.prompt)
+      }
+    } else {
+      // Ensure we're in standalone mode
+      clearEditOperation()
+    }
+
     // Cleanup on unmount
     return () => {
       reset()
     }
-  }, [initialProcessor, setSystemPrompt, reset])
+  }, [initialProcessor, operationId, setSystemPrompt, setOperationType, updateOperationPrompt, setEditOperation, clearEditOperation, reset])
 
   // Collapse Advanced Settings when Advanced Mode is turned off
   useEffect(() => {
@@ -93,7 +125,7 @@ export function WorkbenchClient({
                   </h1>
                 </div>
                 <p className="text-muted-foreground text-sm truncate">
-                  Test generic operations with different prompts and settings
+                  {editOperationName || "Test generic operations with different prompts and settings"}
                 </p>
               </div>
             </CollapsibleTrigger>
@@ -106,7 +138,7 @@ export function WorkbenchClient({
                 </h1>
               </div>
               <p className="text-muted-foreground text-sm truncate">
-                Test generic operations with different prompts and settings
+                {editOperationName || "Test generic operations with different prompts and settings"}
               </p>
             </div>
           )}
