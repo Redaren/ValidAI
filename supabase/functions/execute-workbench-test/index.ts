@@ -8,7 +8,9 @@
  *
  * ## Features
  * - **Multi-turn Conversations**: Maintains conversation context in stateful mode
- * - **Prompt Caching**: Reduces costs by 90% for repeated content using Anthropic's cache control
+ * - **Prompt Caching with Separate File Messages**: Reduces costs by 90% for repeated content
+ *   by sending files as separate user messages positioned before conversation history,
+ *   ensuring cache prefix remains identical across turns for consistent cache hits
  * - **PDF Support**: Handles PDF document uploads with proper buffer reconstruction
  * - **Extended Thinking**: Supports Claude's reasoning mode with configurable token budgets
  * - **Citations**: Extracts and returns citation blocks from AI responses
@@ -18,8 +20,9 @@
  * ## Architecture
  * - Uses Vercel AI SDK for unified LLM interface (future multi-provider support)
  * - Handles both organization-specific and global API keys with encryption
- * - Preserves cache control metadata across conversation turns
- * - Properly reconstructs complex message structures from stored conversations
+ * - Separate file message architecture: Files sent as standalone user messages BEFORE
+ *   conversation history to maintain cache prefix consistency across conversation turns
+ * - User-controlled caching: Users keep "Send file" toggle ON for cache hits
  *
  * ## Known Issues & Workarounds
  * - **Thinking + Structured Output Bug**: Vercel AI SDK issue #7220 - When using generateObject()
@@ -33,14 +36,14 @@
  * - API errors returned as assistant messages for better UX
  * - Comprehensive error logging and status tracking
  *
- * @version 2.1.0
- * @since 2025-10-06
+ * @version 2.1.3
+ * @since 2025-10-14
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
-import { generateText, generateObject, jsonSchema } from 'npm:ai'
+import { generateText, generateObject, jsonSchema, convertToModelMessages } from 'npm:ai'
 import { z } from 'npm:zod'
 
 /**
@@ -129,8 +132,12 @@ interface WorkbenchTestRequest {
  * Processes workbench test requests through the following steps:
  * 1. **Authentication**: Validates JWT token and extracts user/org context
  * 2. **Configuration**: Resolves LLM settings and API keys (org-specific or global)
- * 3. **Message Construction**: Builds properly formatted messages with cache control
- * 4. **Conversation History**: Reconstructs previous messages with file/cache preservation
+ * 3. **Message Construction**: Builds messages with separate file message architecture
+ *    - System message (if enabled, no cache control)
+ *    - File message (separate user message WITH cache control, positioned before history)
+ *    - Conversation history (text exchanges only, files excluded)
+ *    - Current prompt (separate user message, no cache control)
+ * 4. **Cache Consistency**: Separate file positioning ensures identical prefix across turns
  * 5. **LLM Execution**: Calls Anthropic via Vercel AI SDK with all settings
  * 6. **Response Processing**: Extracts text, thinking blocks, citations, and token usage
  * 7. **Real-time Updates**: Publishes status to Supabase for live UI updates
@@ -145,8 +152,41 @@ serve(async (req) => {
 
   let executionId: string | null = null
 
+  /**
+   * Convert Buffer objects in content blocks back to base64 strings
+   * This ensures the client receives the same format it originally sent,
+   * maintaining cache consistency across conversation turns
+   */
+  const convertBuffersToBase64 = (content: any): any => {
+    if (typeof content === 'string') return content
+    if (!Array.isArray(content)) return content
+
+    return content.map((block: any) => {
+      if (block.type === 'file' && block.data && Buffer.isBuffer(block.data)) {
+        return {
+          ...block,
+          data: block.data.toString('base64')
+        }
+      }
+      return block
+    })
+  }
+
   try {
     const body: WorkbenchTestRequest = await req.json()
+
+    // Log request configuration for debugging
+    console.log('=== Workbench Test Request ===')
+    console.log(`Mode: ${body.mode}`)
+    console.log(`Operation Type: ${body.operation_type}`)
+    console.log(`Model: ${body.settings.model_id || 'default'}`)
+    console.log(`Features: ${[
+      body.settings.create_cache && 'caching',
+      body.settings.thinking && 'thinking',
+      body.settings.citations_enabled && 'citations',
+      body.send_system_prompt && 'system_prompt',
+      body.send_file && 'file'
+    ].filter(Boolean).join(', ') || 'none'}`)
 
     // Get Supabase client with service role key
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
@@ -179,6 +219,10 @@ serve(async (req) => {
       throw new Error(`Failed to resolve LLM config: ${llmError?.message || 'Unknown error'}`)
     }
 
+    // Use model from request or fallback to resolved config
+    // Moved earlier so we can use it for cache token calculations
+    const modelToUse = body.settings.model_id || llmConfig.model
+
     // Create initial execution record (if audit logging enabled)
     if (ENABLE_WORKBENCH_AUDIT_LOG) {
       const { data: execution, error: execError } = await supabase
@@ -200,9 +244,6 @@ serve(async (req) => {
 
       executionId = execution.id
     }
-
-    // Use model from request or fallback to resolved config
-    const modelToUse = body.settings.model_id || llmConfig.model
 
     // Get API key: use organization key if configured, otherwise use global env var
     let apiKey: string | null = null
@@ -231,27 +272,105 @@ serve(async (req) => {
     // Initialize Anthropic provider with API key using createAnthropic factory
     const anthropicProvider = createAnthropic({ apiKey })
 
-    // Build messages array based on mode and user toggles
+    // Build messages array
     const messages: any[] = []
 
-    // Add system message if enabled
-    // Vercel AI SDK supports system messages in the messages array with cache control
+    // System message handling
+    // IMPORTANT: For cache control to work, system messages MUST be in the messages array,
+    // NOT passed as the system parameter. The system parameter cannot have cache control.
+    let system: string | undefined = undefined
+
+    // Detect if we're in stateful mode with previously cached content
+    // This is crucial for maintaining cache consistency across messages
+    const hasPreviousCachedContent = body.mode === 'stateful' &&
+      body.conversation_history.some(msg =>
+        msg.metadata?.cacheCreated || msg.metadata?.cachedWriteTokens > 0
+      )
+
+    // Check if a file was previously cached (we need to preserve it for cache hits)
+    const cachedFileMetadata = body.mode === 'stateful' ?
+      body.conversation_history.find(msg =>
+        msg.metadata?.cacheCreated && msg.metadata?.fileSent
+      )?.metadata : null
+
+    console.log(`=== Cache State Analysis ===`)
+    console.log(`Mode: ${body.mode}`)
+    console.log(`Has previous cached content: ${hasPreviousCachedContent}`)
+    console.log(`Create cache requested: ${body.settings.create_cache}`)
+    console.log(`Has cached file from previous message: ${!!cachedFileMetadata}`)
+    if (hasPreviousCachedContent) {
+      console.log('Previous cache detected - will send cache_control markers for Anthropic to match against existing cache')
+    }
+
+    // Add system message
+    // CRITICAL: For caching with separate file messages:
+    // 1. System messages go in messages array when caching (not system parameter)
+    // 2. System message has NO cache control - cache control is ONLY on the file
+    // 3. File is sent as SEPARATE user message positioned BEFORE conversation history
+    // 4. This ensures prefix (system + file) stays identical across all turns
+    // 5. Anthropic automatically matches cached prefixes when it sees cache_control markers
     if (body.send_system_prompt && body.system_prompt) {
-      if (body.settings.create_cache) {
-        // System message with cache control goes in messages array
-        messages.push({
-          role: 'system',
-          content: body.system_prompt,
-          providerOptions: {
-            anthropic: { cacheControl: { type: 'ephemeral' } }
-          }
-        })
-      } else {
-        // Simple system message without cache
+      if (body.settings.create_cache || hasPreviousCachedContent) {
+        // For ANY caching scenario, system message goes in messages array
+        // but WITHOUT cache control - cache control will be on the file only
         messages.push({
           role: 'system',
           content: body.system_prompt
         })
+        console.log('System message added to messages array (no cache control - file will have cache marker)')
+      } else {
+        // No caching involved - use system parameter for simpler approach
+        system = body.system_prompt
+        console.log('System message using system parameter (no caching)')
+      }
+    }
+
+    // Store preserved file content to add to current user message later
+    // This maintains the exact message structure for cache hits
+    let preservedFileBlock: any = null
+    if (hasPreviousCachedContent && cachedFileMetadata && cachedFileMetadata.fileSent) {
+      // Check if current request is sending a file
+      if (!body.send_file || !body.file_content) {
+        // No new file being sent, but we had a cached file - we need to preserve it!
+        // Look for the original file content in the first user message that had caching enabled
+        const originalMessage = body.conversation_history.find(msg =>
+          msg.role === 'user' && msg.metadata?.cacheCreated && msg.metadata?.fileSent
+        )
+
+        if (originalMessage && originalMessage.original_file_content) {
+          console.log('Will preserve cached file in current user message for cache consistency')
+
+          // Prepare the file block WITH cache control
+          // CRITICAL: cache_control must be at the SAME position on every request for Anthropic to match cached content
+          if (originalMessage.original_file_type === 'application/pdf') {
+            const pdfBuffer = Buffer.from(originalMessage.original_file_content, 'base64')
+            preservedFileBlock = {
+              type: 'file',
+              data: pdfBuffer,
+              mediaType: 'application/pdf',
+              providerOptions: {
+                anthropic: {
+                  cacheControl: { type: 'ephemeral' }
+                }
+              }
+            }
+            console.log(`Cached PDF file will be preserved WITH cache control for cache matching (size: ${pdfBuffer.length} bytes)`)
+          } else {
+            // Text file
+            preservedFileBlock = {
+              type: 'text',
+              text: originalMessage.original_file_content,
+              providerOptions: {
+                anthropic: {
+                  cacheControl: { type: 'ephemeral' }
+                }
+              }
+            }
+            console.log('Cached text file will be preserved WITH cache control for cache matching')
+          }
+        } else {
+          console.warn('Cached file metadata exists but original content not found - cache will miss!')
+        }
       }
     }
 
@@ -260,161 +379,270 @@ serve(async (req) => {
      *
      * @description
      * Reconstructs previous messages from stored conversation history.
-     * Critical for maintaining context and cache consistency across turns.
+     * MUST come AFTER system message AND file message to maintain cache prefix.
+     * With the new architecture, conversation history is simple text exchanges only.
      *
-     * ## Challenges Addressed
-     * - **Buffer Reconstruction**: Stored PDFs have serialized Buffer objects that need rebuilding
-     * - **Cache Preservation**: Maintains providerOptions to ensure cache hits (90% cost savings)
-     * - **Format Compatibility**: Converts stored format to Vercel AI SDK requirements
-     * - **Graceful Degradation**: Falls back to text extraction for malformed blocks
+     * ## New Cache Strategy (Separate File Message)
+     * - System message comes first (no cache control)
+     * - File message comes second (WITH cache control) - SEPARATE user message
+     * - Conversation history comes third (no cache control) - INSERTED HERE
+     * - New prompt comes last (no cache control) - SEPARATE user message
+     * - This ensures the file stays at the SAME position across all turns
      */
     if (body.mode === 'stateful' && body.conversation_history.length > 0) {
-      body.conversation_history.forEach(msg => {
-        // Process content to ensure it's in the correct format for Vercel AI SDK
-        let processedContent = msg.content
+      console.log(`\n=== Processing Conversation History ===`)
+      console.log(`History contains ${body.conversation_history.length} messages`)
 
-        // If content is an array with file blocks, we need to reconstruct it properly
-        if (Array.isArray(msg.content)) {
-          const contentBlocks: any[] = []
+      body.conversation_history.forEach((msg, historyIdx) => {
+        // NEW ARCHITECTURE: Skip file messages entirely from history
+        // The file is now sent as a separate message at the beginning
+        if (msg.metadata?.fileSent) {
+          console.log(`Skipping history message ${historyIdx} (was a file message - file now sent separately)`)
+          return
+        }
 
+        // Extract simple text content only
+        // With separate file messages, history should only contain text exchanges
+        let processedContent: string
+
+        if (typeof msg.content === 'string') {
+          processedContent = msg.content
+        } else if (Array.isArray(msg.content)) {
+          // Extract text from blocks
+          const textParts: string[] = []
           for (const block of msg.content) {
-            if (block.type === 'file' && block.data) {
-              // File blocks from stored conversation have Buffer objects that need reconstruction
-              // For PDFs, reconstruct the file block with proper Buffer
-              if (block.mediaType === 'application/pdf' || block.mimeType === 'application/pdf') {
-                // If data is a Buffer object representation, convert it back
-                let pdfBuffer: Buffer
-                if (block.data.type === 'Buffer' && Array.isArray(block.data.data)) {
-                  // Reconstruct Buffer from array of bytes
-                  pdfBuffer = Buffer.from(block.data.data)
-                } else if (typeof block.data === 'string') {
-                  // If it's a base64 string
-                  pdfBuffer = Buffer.from(block.data, 'base64')
-                } else {
-                  // Already a Buffer
-                  pdfBuffer = block.data
-                }
-
-                const fileBlock: any = {
-                  type: 'file',
-                  data: pdfBuffer,
-                  mediaType: 'application/pdf'
-                }
-
-                // PRESERVE CACHE CONTROL if it exists
-                if (block.providerOptions) {
-                  fileBlock.providerOptions = block.providerOptions
-                }
-
-                contentBlocks.push(fileBlock)
-              } else {
-                // Other file types or malformed blocks - skip for safety
-                console.log('Skipping non-PDF file block in conversation history')
-              }
-            } else if (block.type === 'text' && block.text) {
-              // Text blocks can be passed through
-              const textBlock: any = {
-                type: 'text',
-                text: block.text
-              }
-
-              // PRESERVE CACHE CONTROL if it exists
-              if (block.providerOptions) {
-                textBlock.providerOptions = block.providerOptions
-              }
-
-              contentBlocks.push(textBlock)
-            } else if (block.type === 'document') {
-              // Document blocks with cache control from previous messages
-              // These need special handling but for now we'll skip them
-              console.log('Skipping document block in conversation history - cannot reconstruct')
+            if (block.type === 'text' && block.text) {
+              textParts.push(block.text)
             } else if (typeof block === 'string') {
-              // Plain string content
-              contentBlocks.push({
-                type: 'text',
-                text: block
-              })
+              textParts.push(block)
             }
           }
-
-          // If we have content blocks, use them; otherwise fallback to extracting text
-          if (contentBlocks.length > 0) {
-            processedContent = contentBlocks
-          } else {
-            // Fallback: extract text from the blocks
-            const textBlocks = msg.content.filter((b: any) => b.type === 'text' && b.text)
-            processedContent = textBlocks.length > 0
-              ? textBlocks.map((b: any) => b.text).join(' ')
-              : 'Previous message contained non-text content'
-          }
+          processedContent = textParts.join('\n')
+        } else {
+          // Fallback for unexpected formats
+          processedContent = String(msg.content)
         }
 
         messages.push({
           role: msg.role,
           content: processedContent
         })
+        console.log(`Added history message ${historyIdx}: role=${msg.role}, length=${processedContent.length} chars`)
       })
+
+      console.log(`✅ Processed ${body.conversation_history.length} history messages (files excluded, now sent separately)`)
+      console.log(`===================================\n`)
     }
 
-    // Build current message content
-    const contentBlocks: any[] = []
+    // RESTRUCTURED MESSAGE ARCHITECTURE FOR CACHE HITS
+    // ================================================
+    // CRITICAL INSIGHT: For Anthropic caching to work across conversation turns,
+    // the file must be in a SEPARATE user message BEFORE conversation history.
+    //
+    // Message structure progression:
+    // Turn 1: [system, user(file_with_cache), user(prompt)]
+    // Turn 2: [system, user(file_with_cache), assistant, user(prompt)]
+    // Turn 3: [system, user(file_with_cache), assistant, user, assistant, user(prompt)]
+    //
+    // This ensures the prefix up to and including the file remains IDENTICAL,
+    // allowing Anthropic to match the cached content on every turn.
 
-    // Add file if user toggled "Send file" ON
-    // Vercel AI SDK uses 'file' type for documents/PDFs
+    // FIRST: Add file as SEPARATE user message (if file is being sent)
+    // This positions the file BEFORE any conversation history
     if (body.send_file && body.file_content) {
       if (body.file_type === 'application/pdf') {
-        // PDF files use the 'file' type with base64 data
-        // Convert base64 string to Buffer for Vercel AI SDK
         const pdfBuffer = Buffer.from(body.file_content, 'base64')
-
         const fileBlock: any = {
           type: 'file',
           data: pdfBuffer,
           mediaType: 'application/pdf'
         }
 
-        // Add cache control if enabled
-        if (body.settings.create_cache) {
-          fileBlock.providerOptions = {
-            anthropic: { cacheControl: { type: 'ephemeral' } }
+        // Add cache control whenever caching is enabled
+        if (body.settings.create_cache || hasPreviousCachedContent) {
+          const estimatedTokens = Math.ceil(pdfBuffer.length / 5)
+          const minTokensRequired = modelToUse.includes('haiku') ? 2048 : 1024
+
+          if (estimatedTokens < minTokensRequired) {
+            console.warn(`PDF may be too small for caching (estimated ${estimatedTokens} tokens, minimum ${minTokensRequired} required for ${modelToUse})`)
           }
+
+          fileBlock.providerOptions = {
+            anthropic: {
+              cacheControl: { type: 'ephemeral' }
+            }
+          }
+
+          if (body.settings.create_cache && !hasPreviousCachedContent) {
+            console.log(`PDF file in SEPARATE message WITH cache control - creating cache (size: ${pdfBuffer.length} bytes, ~${estimatedTokens} tokens)`)
+          } else {
+            console.log(`PDF file in SEPARATE message WITH cache control - matching cache (size: ${pdfBuffer.length} bytes, ~${estimatedTokens} tokens)`)
+          }
+        } else {
+          console.log(`PDF file in SEPARATE message WITHOUT cache control (size: ${pdfBuffer.length} bytes)`)
         }
 
-        contentBlocks.push(fileBlock)
+        // Add file as its own user message
+        messages.push({
+          role: 'user',
+          content: [fileBlock]
+        })
+        console.log('✅ File added as SEPARATE user message (will stay in same position across turns)')
+
       } else {
-        // Text files can be sent as text blocks with cache control
+        // Text file
         const textBlock: any = {
           type: 'text',
           text: body.file_content
         }
 
-        // Add cache control for text content if enabled
-        if (body.settings.create_cache) {
-          textBlock.providerOptions = {
-            anthropic: { cacheControl: { type: 'ephemeral' } }
+        if (body.settings.create_cache || hasPreviousCachedContent) {
+          const estimatedTokens = Math.ceil(body.file_content.length / 4)
+          const minTokensRequired = modelToUse.includes('haiku') ? 2048 : 1024
+
+          if (estimatedTokens < minTokensRequired) {
+            console.warn(`Text file may be too small for caching (estimated ${estimatedTokens} tokens, minimum ${minTokensRequired} required for ${modelToUse})`)
           }
+
+          textBlock.providerOptions = {
+            anthropic: {
+              cacheControl: { type: 'ephemeral' }
+            }
+          }
+
+          if (body.settings.create_cache && !hasPreviousCachedContent) {
+            console.log(`Text file in SEPARATE message WITH cache control - creating cache (length: ${body.file_content.length} chars, ~${estimatedTokens} tokens)`)
+          } else {
+            console.log(`Text file in SEPARATE message WITH cache control - matching cache (length: ${body.file_content.length} chars, ~${estimatedTokens} tokens)`)
+          }
+        } else {
+          console.log(`Text file in SEPARATE message WITHOUT cache control (length: ${body.file_content.length} chars)`)
         }
 
-        contentBlocks.push(textBlock)
+        // Add file as its own user message
+        messages.push({
+          role: 'user',
+          content: [textBlock]
+        })
+        console.log('✅ File added as SEPARATE user message (will stay in same position across turns)')
       }
+    } else if (preservedFileBlock && (!body.send_file || !body.file_content)) {
+      // User toggled "Send file" OFF but we need to preserve cached file
+      messages.push({
+        role: 'user',
+        content: [preservedFileBlock]
+      })
+      console.log('✅ Preserved cached file as SEPARATE user message (maintaining cache position)')
     }
 
-    // Add prompt text
-    const promptBlock: any = {
-      type: 'text',
-      text: body.new_prompt
-    }
+    // SECOND: Add the current prompt as SEPARATE user message
+    // This comes AFTER the file message and conversation history
+    messages.push({
+      role: 'user',
+      content: body.new_prompt
+    })
+    console.log('✅ Current prompt added as SEPARATE user message')
 
-    contentBlocks.push(promptBlock)
+    // COMPREHENSIVE LOGGING FOR CACHE DEBUGGING
+    // ==========================================
+    // This detailed logging helps compare message structures between turns
+    // to identify why cache hits succeed or fail
+    console.log('\n=== DETAILED MESSAGE STRUCTURE FOR CACHE DEBUGGING ===')
+    console.log(`Total messages: ${messages.length}`)
+    console.log(`System parameter: ${system ? 'yes (for non-cached request)' : 'no (using messages array)'}`)
+    console.log(`Cache strategy: ${body.settings.create_cache ? 'CREATE NEW CACHE' : hasPreviousCachedContent ? 'USE EXISTING CACHE' : 'NO CACHING'}`)
+    console.log('')
 
-    // Add current message
-    if (contentBlocks.length === 1) {
-      // Only text prompt, send as string
-      messages.push({ role: 'user', content: body.new_prompt })
+    // Generate a prefix signature for comparison across turns
+    const prefixParts: string[] = []
+    let totalCacheMarkers = 0
+    let cacheMarkerPosition = -1
+
+    messages.forEach((msg, idx) => {
+      console.log(`\n--- Message ${idx} ---`)
+      console.log(`Role: ${msg.role}`)
+
+      let messageCacheMarkers = 0
+      let contentSummary = ''
+
+      if (typeof msg.content === 'string') {
+        const preview = msg.content.substring(0, 100)
+        contentSummary = `string (${msg.content.length} chars): "${preview}${msg.content.length > 100 ? '...' : ''}"`
+        console.log(`Content: ${contentSummary}`)
+        prefixParts.push(`${msg.role}:text:${msg.content.length}chars`)
+      } else if (Array.isArray(msg.content)) {
+        console.log(`Content: array with ${msg.content.length} blocks`)
+        const blockTypes: string[] = []
+
+        msg.content.forEach((block: any, blockIdx: number) => {
+          const blockType = block.type || 'unknown'
+          blockTypes.push(blockType)
+
+          console.log(`  Block ${blockIdx}: type=${blockType}`)
+
+          if (blockType === 'text') {
+            const textPreview = block.text ? block.text.substring(0, 80) : 'empty'
+            const textLength = block.text ? block.text.length : 0
+            console.log(`    Text (${textLength} chars): "${textPreview}${textLength > 80 ? '...' : ''}"`)
+            prefixParts.push(`${msg.role}:text:${textLength}chars`)
+          } else if (blockType === 'file') {
+            const fileSize = Buffer.isBuffer(block.data) ? block.data.length : 0
+            const mediaType = block.mediaType || 'unknown'
+            console.log(`    File: type=${mediaType}, size=${fileSize} bytes`)
+            prefixParts.push(`${msg.role}:file:${mediaType}:${fileSize}bytes`)
+          }
+
+          // Check for cache control on this block
+          if (block.providerOptions?.anthropic?.cacheControl) {
+            totalCacheMarkers++
+            messageCacheMarkers++
+            cacheMarkerPosition = idx
+            console.log(`    ✅ CACHE CONTROL: ${JSON.stringify(block.providerOptions.anthropic.cacheControl)}`)
+            prefixParts.push('CACHE_MARKER')
+          }
+        })
+
+        contentSummary = `${msg.content.length} blocks [${blockTypes.join(', ')}]`
+      } else {
+        contentSummary = 'unknown format'
+        console.log(`Content: ${contentSummary}`)
+      }
+
+      // Check for message-level cache control
+      if (msg.providerOptions?.anthropic?.cacheControl) {
+        totalCacheMarkers++
+        messageCacheMarkers++
+        cacheMarkerPosition = idx
+        console.log(`✅ MESSAGE-LEVEL CACHE CONTROL: ${JSON.stringify(msg.providerOptions.anthropic.cacheControl)}`)
+        prefixParts.push('CACHE_MARKER')
+      }
+
+      console.log(`Cache markers in this message: ${messageCacheMarkers}`)
+    })
+
+    // Generate prefix signature for comparison between turns
+    const prefixSignature = prefixParts.join('|')
+    console.log('\n=== PREFIX SIGNATURE FOR COMPARISON ===')
+    console.log(`Signature: ${prefixSignature}`)
+    console.log(`\nInstruction: Compare this signature with previous turns to verify prefix matching`)
+    console.log(`The prefix UP TO AND INCLUDING the cache marker must be IDENTICAL for cache hits`)
+
+    // Cache marker validation
+    console.log('\n=== CACHE MARKER VALIDATION ===')
+    console.log(`Total cache markers: ${totalCacheMarkers}`)
+    if (totalCacheMarkers > 1) {
+      console.warn(`⚠️ WARNING: ${totalCacheMarkers} cache markers detected! Should only have 1.`)
+    } else if (totalCacheMarkers === 1) {
+      console.log(`✅ Single cache marker at message position ${cacheMarkerPosition} (correct)`)
+      console.log(`Expected behavior:`)
+      console.log(`- Turn 1: Anthropic will CACHE everything up to and including this marker`)
+      console.log(`- Turn 2+: If prefix is identical, Anthropic will HIT cache and reuse cached tokens`)
+    } else if (body.settings.create_cache || hasPreviousCachedContent) {
+      console.warn('⚠️ WARNING: Cache requested but no cache markers found!')
     } else {
-      // Has file or other content blocks
-      messages.push({ role: 'user', content: contentBlocks })
+      console.log('No cache markers (caching disabled)')
     }
+    console.log('===================================================\n')
 
     // Update status to processing (if audit logging enabled)
     if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
@@ -452,27 +680,30 @@ serve(async (req) => {
       const useHybridApproach = useStructuredOutput && outputSchema && body.settings.thinking
 
       if (useHybridApproach) {
-        // WORKAROUND: Use generateText with manual tool definition when thinking is enabled
+        // WORKAROUND for Vercel AI SDK issue #7220: Use generateText with manual tool definition when thinking is enabled
         // This avoids the "Thinking may not be enabled when tool_choice forces tool use" error
+        // TODO: Remove this workaround once the SDK is fixed
 
         // Add instruction to use the JSON tool after thinking
         const hybridMessages = [...messages]
         const lastMessage = hybridMessages[hybridMessages.length - 1]
 
-        // Append instruction to the last user message
+        // Append instruction to the last user message while preserving cache control
         if (typeof lastMessage.content === 'string') {
           hybridMessages[hybridMessages.length - 1] = {
             ...lastMessage,
             content: lastMessage.content + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.'
           }
         } else if (Array.isArray(lastMessage.content)) {
-          // Find the last text block and append to it
+          // Find the last text block and append to it while preserving cache control
           const contentCopy = [...lastMessage.content]
           for (let i = contentCopy.length - 1; i >= 0; i--) {
             if (contentCopy[i].type === 'text') {
               contentCopy[i] = {
                 ...contentCopy[i],
-                text: contentCopy[i].text + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.'
+                text: contentCopy[i].text + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.',
+                // Preserve any existing providerOptions (cache control)
+                ...(contentCopy[i].providerOptions ? { providerOptions: contentCopy[i].providerOptions } : {})
               }
               break
             }
@@ -484,7 +715,7 @@ serve(async (req) => {
         }
 
         // Use generateText with manual tool definition
-        response = await generateText({
+        const hybridParams: any = {
           model: anthropicProvider(modelToUse),
           messages: hybridMessages,
           tools: {
@@ -521,7 +752,14 @@ serve(async (req) => {
               }
             }
           }
-        })
+        }
+
+        // Only add system parameter if it's defined and not using messages array for system content
+        if (system) {
+          hybridParams.system = system
+        }
+
+        response = await generateText(hybridParams)
 
         // Extract structured output from tool calls
         if (response.toolCalls && response.toolCalls.length > 0) {
@@ -555,7 +793,7 @@ serve(async (req) => {
 
       } else if (useStructuredOutput && outputSchema) {
         // Normal path: Use generateObject when thinking is NOT enabled
-        response = await generateObject({
+        const objectParams: any = {
           model: anthropicProvider(modelToUse),
           schema: outputSchema,
           messages,
@@ -569,16 +807,22 @@ serve(async (req) => {
               // Note: No thinking here since it conflicts with generateObject
             }
           }
-        })
+        }
+
+        // Only add system parameter if it's defined and not using messages array for system content
+        if (system) {
+          objectParams.system = system
+        }
+
+        response = await generateObject(objectParams)
 
         // Store structured output
         structuredOutput = response.object
       } else {
         // Use generateText for generic operations (default behavior)
-        response = await generateText({
+        const textParams: any = {
           model: anthropicProvider(modelToUse),
           messages,
-          // system is now included in messages array with cache control
           maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
           temperature: body.settings.temperature,
           topP: body.settings.top_p,
@@ -593,15 +837,87 @@ serve(async (req) => {
                   type: body.settings.thinking.type,
                   budgetTokens: body.settings.thinking.budget_tokens  // Map budget_tokens to budgetTokens
                 }
-              } : {}),
-              // Note: Cache control is already embedded in system and document blocks
-              // Citations are also handled in document blocks directly
+              } : {})
             }
           }
-        })
+        }
+
+        // Only add system parameter if it's defined and not using messages array for system content
+        if (system) {
+          textParams.system = system
+        }
+
+        response = await generateText(textParams)
       }
 
       const executionTime = Date.now() - startTime
+
+      // Comprehensive debug logging
+      console.log('=== LLM Response Debug ===')
+      console.log('Response keys:', Object.keys(response))
+      console.log('Usage:', JSON.stringify(response.usage))
+      console.log('Provider metadata:', JSON.stringify(response.providerMetadata))
+
+      // Deep dive into providerMetadata structure
+      if (response.providerMetadata) {
+        console.log('Provider metadata keys:', Object.keys(response.providerMetadata))
+        if (response.providerMetadata.anthropic) {
+          console.log('Anthropic metadata keys:', Object.keys(response.providerMetadata.anthropic))
+          console.log('Full Anthropic metadata:', JSON.stringify(response.providerMetadata.anthropic, null, 2))
+        }
+      }
+
+      // Log cache usage for debugging
+      // Vercel AI SDK v5 returns cache metadata in providerMetadata.anthropic
+      const anthropicMetadata = response.providerMetadata?.anthropic || {}
+
+      if (Object.keys(anthropicMetadata).length > 0) {
+        console.log('✅ Anthropic metadata found:', JSON.stringify(anthropicMetadata))
+      } else {
+        console.log('⚠️ No Anthropic metadata in response')
+      }
+
+      // Vercel AI SDK returns cache data in the usage object with snake_case names
+      const cacheWriteTokens = anthropicMetadata.usage?.cache_creation_input_tokens ||
+                               anthropicMetadata.cacheCreationInputTokens || 0
+      const cacheReadTokens = anthropicMetadata.usage?.cache_read_input_tokens ||
+                              anthropicMetadata.cacheReadInputTokens || 0
+
+      // Calculate actual input tokens
+      // IMPORTANT: Vercel AI SDK's response.usage.inputTokens is the TOTAL including cached tokens
+      // We don't need to add cacheReadTokens to it
+      const totalInputTokens = response.usage?.inputTokens || 0
+
+      // Log to verify our understanding
+      console.log(`Token calculation: usage.inputTokens=${response.usage?.inputTokens}, cacheReadTokens=${cacheReadTokens}, cacheWriteTokens=${cacheWriteTokens}`)
+
+      // Enhanced cache debugging
+      console.log('=== Cache Results ===')
+      if (cacheWriteTokens > 0) {
+        console.log(`✅ CACHE CREATED: ${cacheWriteTokens} tokens cached for future use`)
+        console.log(`   Next identical prefix will get 90% discount on these tokens`)
+      }
+      if (cacheReadTokens > 0) {
+        const cacheHitRate = totalInputTokens > 0 ? Math.round((cacheReadTokens / totalInputTokens) * 100) : 0
+        const tokensSaved = Math.round(cacheReadTokens * 0.9)
+        console.log(`✅ CACHE HIT: ${cacheReadTokens}/${totalInputTokens} tokens (${cacheHitRate}% hit rate)`)
+        console.log(`💰 COST SAVINGS: ~${tokensSaved} tokens (90% discount applied)`)
+      }
+      if (cacheWriteTokens === 0 && cacheReadTokens === 0) {
+        if (body.settings.create_cache) {
+          console.error('❌ CACHE FAILED: Requested to create cache but no tokens were cached')
+          console.error('   Possible causes:')
+          console.error('   - Content too short (needs 1024+ tokens for most models, 2048+ for Haiku)')
+          console.error('   - Cache control not properly sent to API')
+          console.error('   - Multiple cache markers causing conflicts')
+        } else if (hasPreviousCachedContent) {
+          console.error('❌ CACHE MISS: Expected to use existing cache but got no cache hit')
+          console.error('   Possible causes:')
+          console.error('   - Message prefix changed (must be 100% identical)')
+          console.error('   - Cache expired (5 minutes for ephemeral)')
+          console.error('   - Cache control markers in wrong position')
+        }
+      }
 
       // Extract response content and special blocks
       // Vercel AI SDK provides the text directly in response.text
@@ -637,6 +953,11 @@ serve(async (req) => {
         })
       }
 
+      // Extract cache metadata from providerMetadata.anthropic
+      // Using the same variables as calculated above
+      const cachedReadTokens = cacheReadTokens
+      const cachedWriteTokens = cacheWriteTokens
+
       // Build result payload for client with metadata
       // Includes execution_id for real-time subscription tracking
       const result = {
@@ -652,25 +973,26 @@ serve(async (req) => {
           fileSent: body.send_file && !!body.file_content,
           thinkingEnabled: !!body.settings.thinking,
           citationsEnabled: body.settings.citations_enabled || false,
-          inputTokens: response.usage?.inputTokens || 0,
+          inputTokens: totalInputTokens,
           outputTokens: response.usage?.outputTokens || 0,
-          cachedReadTokens: response.usage?.cachedInputTokens || 0,
-          cachedWriteTokens: response.providerMetadata?.anthropic?.cacheCreationInputTokens || 0,
+          cachedReadTokens,
+          cachedWriteTokens,
           executionTimeMs: executionTime
         },
         tokensUsed: {
-          input: response.usage?.inputTokens || 0,
+          input: totalInputTokens,
           output: response.usage?.outputTokens || 0,
-          cached_read: response.usage?.cachedInputTokens || 0,  // Cost savings from cache hits
-          cached_write: response.providerMetadata?.anthropic?.cacheCreationInputTokens || 0,  // One-time cost to create cache
-          total: (response.usage?.inputTokens || 0) + (response.usage?.outputTokens || 0)
+          cached_read: cachedReadTokens,  // Cost savings from cache hits
+          cached_write: cachedWriteTokens,  // One-time cost to create cache
+          total: totalInputTokens + (response.usage?.outputTokens || 0)
         },
         executionTime,
         timestamp: new Date().toISOString(),
         // Return exact content structure sent to Anthropic for cache consistency
-        user_content_sent: messages[messages.length - 1].content,
-        // System message is now first in messages array if it exists
-        system_sent: messages[0]?.role === 'system' ? messages[0].content : undefined
+        // Convert Buffers back to base64 strings for proper serialization
+        user_content_sent: convertBuffersToBase64(messages[messages.length - 1].content),
+        // System message is passed separately in Vercel AI SDK v5
+        system_sent: system
       }
 
       // Update execution record with completion status (if audit logging enabled)
@@ -736,9 +1058,10 @@ serve(async (req) => {
         },
         executionTime,
         timestamp: new Date().toISOString(),
-        user_content_sent: messages[messages.length - 1].content,
-        // System message is now first in messages array if it exists
-        system_sent: messages[0]?.role === 'system' ? messages[0].content : undefined
+        // Convert Buffers back to base64 strings for proper serialization
+        user_content_sent: convertBuffersToBase64(messages[messages.length - 1].content),
+        // System message is passed separately in Vercel AI SDK v5
+        system_sent: system
       }
 
       // Mark as COMPLETED (not failed) so it shows in Output section (if audit logging enabled)

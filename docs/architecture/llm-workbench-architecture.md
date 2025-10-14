@@ -74,19 +74,22 @@ Settings:
 - Send file: ON
 - Create cache: ON
 
-API Request:
+API Request (Separate File Message Architecture):
 {
-  "system": [{ "text": "...", "cache_control": {"type": "ephemeral"} }],
-  "messages": [{
-    "role": "user",
-    "content": [
-      { "type": "document", "source": {...}, "cache_control": {"type": "ephemeral"} },
-      { "type": "text", "text": "Analyze payment terms" }
-    ]
-  }]
+  "messages": [
+    { "role": "system", "content": "..." },  // No cache control
+    {
+      "role": "user",  // SEPARATE file message
+      "content": [{ "type": "file", "data": {...}, "cache_control": {"type": "ephemeral"} }]
+    },
+    {
+      "role": "user",  // Prompt in separate message
+      "content": "Analyze payment terms"
+    }
+  ]
 }
 
-Result: Cache created
+Result: Cache created at file position
 After send: "Create cache" auto-resets to OFF
 ```
 
@@ -95,26 +98,27 @@ After send: "Create cache" auto-resets to OFF
 Settings:
 - Mode: Stateful
 - Send system prompt: ON
-- Send file: ON
+- Send file: ON (MUST keep ON for cache hit)
 - Create cache: OFF
 
-API Request:
+API Request (Cache Hit with Conversation History):
 {
-  "system": [{ "text": "...", "cache_control": {"type": "ephemeral"} }],
   "messages": [
-    { "role": "user", "content": [...] },  // Previous messages
-    { "role": "assistant", "content": "..." },
+    { "role": "system", "content": "..." },  // No cache control - same prefix
     {
-      "role": "user",
-      "content": [
-        { "type": "document", "source": {...}, "cache_control": {"type": "ephemeral"} },
-        { "type": "text", "text": "Check liability clauses" }
-      ]
+      "role": "user",  // SEPARATE file message - SAME position as Turn 1
+      "content": [{ "type": "file", "data": {...}, "cache_control": {"type": "ephemeral"} }]
+    },
+    { "role": "assistant", "content": "..." },  // Previous response
+    {
+      "role": "user",  // New prompt
+      "content": "Check liability clauses"
     }
   ]
 }
 
-Result: Cache hit (90% cost savings)
+Result: Cache hit (90% cost savings) - prefix up to file is identical
+Note: User must keep "Send file" ON for cache to hit
 ```
 
 #### Scenario 3: Independent Operations (Stateless)
@@ -517,56 +521,66 @@ if (body.send_system_prompt && body.system_prompt) {
 }
 ```
 
-**Message Building (Composition-based):**
+**Message Building (Separate File Architecture):**
 ```typescript
-// In stateful mode: Add conversation history first
+// CRITICAL: Separate file message architecture for cache hits
+// Files are sent as standalone user messages BEFORE conversation history
+
+// Step 1: Add system message (no cache control)
+if (body.send_system_prompt && body.system_prompt) {
+  messages.push({
+    role: 'system',
+    content: body.system_prompt
+  })
+}
+
+// Step 2: Add file as SEPARATE user message (WITH cache control)
+// This positions file BEFORE conversation history for consistent cache prefix
+if (body.send_file && body.file_content) {
+  const fileBlock: any = {
+    type: 'file',
+    data: pdfBuffer,
+    mediaType: 'application/pdf'
+  }
+
+  // Add cache_control when caching is enabled
+  if (body.settings.create_cache || hasPreviousCachedContent) {
+    fileBlock.providerOptions = {
+      anthropic: {
+        cacheControl: { type: 'ephemeral' }
+      }
+    }
+  }
+
+  // File gets its own user message
+  messages.push({
+    role: 'user',
+    content: [fileBlock]
+  })
+}
+
+// Step 3: Add conversation history (text exchanges only, files excluded)
 if (body.mode === 'stateful' && body.conversation_history.length > 0) {
   body.conversation_history.forEach(msg => {
+    // Skip file messages - they're sent separately at beginning
+    if (msg.metadata?.fileSent) return
+
     messages.push({
       role: msg.role,
-      content: msg.content
+      content: msg.content  // Text content only
     })
   })
 }
 
-// Build current message content
-const contentBlocks: any[] = []
+// Step 4: Add current prompt as SEPARATE user message
+messages.push({
+  role: 'user',
+  content: body.new_prompt
+})
 
-// Add document if user toggled "Send file" ON
-if (body.send_file && body.file_content) {
-  const documentBlock: any = {
-    type: 'document',
-    source: {
-      type: body.file_type === 'application/pdf' ? 'base64' : 'text',
-      media_type: body.file_type || 'text/plain',
-      data: body.file_content
-    }
-  }
-
-  // Add cache_control if user toggled "Create cache" ON
-  if (body.settings.create_cache) {
-    documentBlock.cache_control = { type: 'ephemeral' }
-  }
-
-  // Add citations if enabled
-  if (body.settings.citations_enabled) {
-    documentBlock.citations = { enabled: true }
-  }
-
-  contentBlocks.push(documentBlock)
-}
-
-// Add prompt text
-contentBlocks.push({ type: 'text', text: body.new_prompt })
-
-// Add current message
-if (contentBlocks.length === 1) {
-  // Only text prompt, send as string
-  messages.push({ role: 'user', content: body.new_prompt })
-} else {
-  // Has document or other content blocks
-  messages.push({ role: 'user', content: contentBlocks })
-}
+// Result: [system, user(file_with_cache), ...history..., user(prompt)]
+// On next turn: [system, user(file_with_cache), assistant, ...history..., user(prompt)]
+// Cache hits because prefix (system + file) remains identical
 ```
 
 **Response with Metadata (Vercel AI SDK):**
@@ -1297,6 +1311,83 @@ if (ENABLE_WORKBENCH_AUDIT_LOG) {
 - ✅ Near-instant responses once LLM completes
 - ✅ Audit trail available when needed (set flag to enable)
 
+### Phase 2.1.3: Separate File Message for Cache Hits
+
+**Original Issue:**
+Cache MISS on follow-up messages in stateful mode despite having cache control markers. New cache created instead of cache hit:
+```
+Message 1: cachedWriteTokens: 5690 ✅ Cache created
+Message 2: cachedWriteTokens: 5810 ❌ New cache created (should be cachedReadTokens!)
+```
+
+**Root Cause:**
+File was embedded in current user message with prompt, so when conversation history (assistant response) was added, it changed the message prefix that Anthropic tries to match:
+
+```typescript
+// Message 1 structure
+[system, user(file+prompt)]  // Creates cache
+
+// Message 2 structure (WRONG - prefix changed!)
+[system, assistant, user(file+prompt)]
+// Assistant message comes BEFORE file, changing the prefix up to cache marker
+// Anthropic doesn't match → creates NEW cache instead of hitting existing one
+```
+
+**Analysis:**
+- Cache prefix must be 100% identical up to and including the cache_control marker
+- When file is embedded with prompt, conversation history inserts BEFORE the file
+- This changes the prefix, breaking cache matching
+- Anthropic requires: `[prefix_content, cached_content]` in same order every time
+
+**Solution:**
+Send file as SEPARATE user message positioned BEFORE conversation history:
+
+```typescript
+// Turn 1: File sent separately
+[system, user(file_with_cache), user(prompt)]
+// Prefix for caching: system + user(file) ✅
+
+// Turn 2: History grows AFTER file (prefix preserved)
+[system, user(file_with_cache), assistant, user(prompt)]
+// Prefix for caching: system + user(file) ✅ IDENTICAL!
+// Cache hit because everything up to cache marker matches
+
+// Turn 3: Conversation continues
+[system, user(file_with_cache), assistant, user, assistant, user(prompt)]
+// Prefix for caching: system + user(file) ✅ STILL IDENTICAL!
+```
+
+**Implementation Changes:**
+
+1. **Message construction order** ([index.ts:429-540](supabase/functions/execute-workbench-test/index.ts#L429-540)):
+   - System message (no cache control)
+   - File message as separate user message (WITH cache control)
+   - Conversation history (text exchanges only, files excluded)
+   - Current prompt as separate user message
+
+2. **Conversation history processing** ([index.ts:384-427](supabase/functions/execute-workbench-test/index.ts#L384-427)):
+   - Skip file messages entirely from history (`if (msg.metadata?.fileSent) return`)
+   - Extract only text content from history messages
+   - File is always sent fresh at beginning, not replayed from history
+
+3. **User control**: Users must keep "Send file" toggle ON for cache hits
+   - Gives users explicit control over caching behavior
+   - Aligns with workbench philosophy: user controls what gets sent
+
+**Comprehensive Logging:**
+Added detailed logging for debugging cache hits/misses ([index.ts:542-641](supabase/functions/execute-workbench-test/index.ts#L542-641)):
+- Message structure breakdown (role, content type, size)
+- Cache marker positions
+- **Prefix signature**: String representation for comparing across turns
+- Expected cache behavior based on structure
+
+**Result:**
+✅ Cache hits on Turn 2+ in stateful mode (90% cost savings)
+✅ Prefix signature stays identical: `system:text → user:file:CACHE_MARKER`
+✅ Conversation history grows AFTER cached content
+✅ User controls caching via "Send file" toggle
+✅ Comprehensive logging for debugging prefix mismatches
+
 ## Future Enhancements
 
 ### 1. Advanced Settings UI
@@ -1400,11 +1491,11 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-13
-**Phase:** 2.1.2 Complete (Thinking + Structured Output Workaround)
-**Architecture:** Unified LLM provider interface via Vercel AI SDK with dual execution modes
+**Last Updated:** 2025-10-14
+**Phase:** 2.1.3 Complete (Separate File Message for Cache Hits)
+**Architecture:** Unified LLM provider interface via Vercel AI SDK with separate file message architecture for cache optimization
 **Next Phase:** 2.2 - Additional Operation Types (Extraction, Rating, Classification, Analysis)
-**Edge Function Version:** 33 (Thinking + structured output hybrid approach, AI SDK v5 compatibility)
+**Edge Function Version:** 34 (Separate file messages, cache hit optimization across conversation turns)
 
 ## Benefits of Vercel AI SDK Architecture
 

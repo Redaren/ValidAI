@@ -76,6 +76,13 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
  * - **Cache Control**: Manual toggle for creating cache breakpoints (auto-resets after use)
  * - **Structured Outputs**: Automatic schema validation for validation operation type
  *
+ * ## Cache Optimization Architecture
+ * - **Separate File Messages**: Files are sent as standalone user messages positioned BEFORE
+ *   conversation history, ensuring the cache prefix (system + file) remains identical across
+ *   all conversation turns for consistent 90% cost savings
+ * - **User Control**: Users must keep "Send file" toggle ON for cache hits on subsequent turns
+ * - **Message Structure**: `[system, user(file_with_cache), ...history..., user(prompt)]`
+ *
  * ## State Management
  * Uses Zustand store for centralized state management across workbench components
  *
@@ -306,9 +313,24 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
 
       // Add to conversation history with metadata (only in stateful mode)
       if (mode === 'stateful') {
+        // Strip file blocks from conversation history to maintain cache position
+        // Files should only be sent on first message to keep cache prefix stable
+        const contentForHistory = (() => {
+          const content = result.user_content_sent
+          if (Array.isArray(content)) {
+            // Filter out file blocks, keep only text blocks
+            const textBlocks = content.filter((block: any) => block.type === 'text')
+            // If we have text blocks, return them; otherwise return just the text
+            if (textBlocks.length > 0) {
+              return textBlocks.length === 1 ? textBlocks[0].text : textBlocks
+            }
+          }
+          return content  // Return as-is if not an array
+        })()
+
         addToConversation({
           role: 'user',
-          content: result.user_content_sent,  // Store exact content structure sent to Anthropic
+          content: contentForHistory,  // Store only text content, no files
           timestamp: new Date().toISOString(),
           metadata: {
             mode: mode,
@@ -319,9 +341,31 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
             citationsEnabled: citations,
             inputTokens: result.metadata.inputTokens,
             outputTokens: 0,
-            cachedReadTokens: result.metadata.cachedReadTokens,
-            cachedWriteTokens: result.metadata.cachedWriteTokens
-          }
+            // Don't store cache statistics here - they're in the assistant message
+            // This prevents double-counting in the UI
+          },
+          // Store original file content when caching is enabled so it can be reconstructed
+          ...(createCache && result.metadata.fileSent && result.user_content_sent ? (() => {
+            // Extract file content from the result
+            if (Array.isArray(result.user_content_sent)) {
+              const fileBlock = result.user_content_sent.find((block: any) => block.type === 'file')
+              if (fileBlock) {
+                return {
+                  original_file_content: fileBlock.data,  // This is base64 string
+                  original_file_type: fileBlock.mediaType || 'application/pdf'
+                }
+              }
+              // Check for text files sent as text blocks (non-PDF files)
+              const firstBlock = result.user_content_sent[0]
+              if (firstBlock?.type === 'text' && result.metadata.fileSent) {
+                return {
+                  original_file_content: firstBlock.text,  // Plain text content
+                  original_file_type: 'text/plain'
+                }
+              }
+            }
+            return {}
+          })() : {})
         })
 
         addToConversation({
@@ -339,9 +383,22 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
         // Output will be cleared on next message (line 171)
         // For now, we could optionally add messages that will be cleared
         // This allows viewing the result before the next test
+
+        // Strip file blocks from conversation history (same as stateful mode)
+        const contentForHistory = (() => {
+          const content = result.user_content_sent
+          if (Array.isArray(content)) {
+            const textBlocks = content.filter((block: any) => block.type === 'text')
+            if (textBlocks.length > 0) {
+              return textBlocks.length === 1 ? textBlocks[0].text : textBlocks
+            }
+          }
+          return content
+        })()
+
         addToConversation({
           role: 'user',
-          content: result.user_content_sent,  // Store exact content structure sent to Anthropic
+          content: contentForHistory,  // Store only text content, no files
           timestamp: new Date().toISOString(),
           metadata: {
             mode: mode,
@@ -352,9 +409,31 @@ export function WorkbenchInput({ processor, operations }: WorkbenchInputProps) {
             citationsEnabled: citations,
             inputTokens: result.metadata.inputTokens,
             outputTokens: 0,
-            cachedReadTokens: result.metadata.cachedReadTokens,
-            cachedWriteTokens: result.metadata.cachedWriteTokens
-          }
+            // Don't store cache statistics here - they're in the assistant message
+            // This prevents double-counting in the UI
+          },
+          // Store original file content when caching is enabled so it can be reconstructed
+          ...(createCache && result.metadata.fileSent && result.user_content_sent ? (() => {
+            // Extract file content from the result
+            if (Array.isArray(result.user_content_sent)) {
+              const fileBlock = result.user_content_sent.find((block: any) => block.type === 'file')
+              if (fileBlock) {
+                return {
+                  original_file_content: fileBlock.data,  // This is base64 string
+                  original_file_type: fileBlock.mediaType || 'application/pdf'
+                }
+              }
+              // Check for text files sent as text blocks (non-PDF files)
+              const firstBlock = result.user_content_sent[0]
+              if (firstBlock?.type === 'text' && result.metadata.fileSent) {
+                return {
+                  original_file_content: firstBlock.text,  // Plain text content
+                  original_file_type: 'text/plain'
+                }
+              }
+            }
+            return {}
+          })() : {})
         })
 
         addToConversation({
