@@ -11,7 +11,7 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { createTypedClient } from '@/lib/supabase/typed-clients'
+import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
 import type { Database } from '@/lib/database.types'
 
 type Document = Database['public']['Tables']['documents']['Row']
@@ -31,7 +31,7 @@ type Document = Database['public']['Tables']['documents']['Row']
  * ```
  */
 export function useDocuments() {
-  const supabase = createTypedClient()
+  const supabase = createTypedBrowserClient()
 
   return useQuery({
     queryKey: ['documents'],

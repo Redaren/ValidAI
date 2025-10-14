@@ -106,6 +106,84 @@ export type Database = {
         }
         Relationships: []
       }
+      operation_results: {
+        Row: {
+          cache_hit: boolean | null
+          completed_at: string | null
+          error_message: string | null
+          error_type: string | null
+          execution_order: number
+          execution_time_ms: number | null
+          id: string
+          model_used: string | null
+          operation_id: string | null
+          operation_snapshot: Json
+          response_text: string | null
+          retry_count: number | null
+          run_id: string
+          started_at: string
+          status: string
+          structured_output: Json | null
+          thinking_blocks: Json | null
+          tokens_used: Json | null
+        }
+        Insert: {
+          cache_hit?: boolean | null
+          completed_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          execution_order: number
+          execution_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          operation_id?: string | null
+          operation_snapshot: Json
+          response_text?: string | null
+          retry_count?: number | null
+          run_id: string
+          started_at?: string
+          status?: string
+          structured_output?: Json | null
+          thinking_blocks?: Json | null
+          tokens_used?: Json | null
+        }
+        Update: {
+          cache_hit?: boolean | null
+          completed_at?: string | null
+          error_message?: string | null
+          error_type?: string | null
+          execution_order?: number
+          execution_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          operation_id?: string | null
+          operation_snapshot?: Json
+          response_text?: string | null
+          retry_count?: number | null
+          run_id?: string
+          started_at?: string
+          status?: string
+          structured_output?: Json | null
+          thinking_blocks?: Json | null
+          tokens_used?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operation_results_operation_id_fkey"
+            columns: ["operation_id"]
+            isOneToOne: false
+            referencedRelation: "operations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operation_results_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operations: {
         Row: {
           area: string
@@ -315,6 +393,82 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      runs: {
+        Row: {
+          completed_at: string | null
+          completed_operations: number
+          deleted_at: string | null
+          document_id: string | null
+          error_message: string | null
+          failed_operations: number
+          id: string
+          organization_id: string
+          processor_id: string | null
+          snapshot: Json
+          started_at: string
+          status: string
+          total_operations: number
+          trigger_type: string
+          triggered_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_operations?: number
+          deleted_at?: string | null
+          document_id?: string | null
+          error_message?: string | null
+          failed_operations?: number
+          id?: string
+          organization_id: string
+          processor_id?: string | null
+          snapshot: Json
+          started_at?: string
+          status?: string
+          total_operations?: number
+          trigger_type?: string
+          triggered_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          completed_operations?: number
+          deleted_at?: string | null
+          document_id?: string | null
+          error_message?: string | null
+          failed_operations?: number
+          id?: string
+          organization_id?: string
+          processor_id?: string | null
+          snapshot?: Json
+          started_at?: string
+          status?: string
+          total_operations?: number
+          trigger_type?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "runs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "runs_processor_id_fkey"
+            columns: ["processor_id"]
+            isOneToOne: false
+            referencedRelation: "processors"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workbench_executions: {
         Row: {
@@ -585,6 +739,10 @@ export type Database = {
           updated_at: string
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }[]
+      }
+      increment_run_progress: {
+        Args: { p_run_id: string; p_status: string }
+        Returns: undefined
       }
       rename_processor_area: {
         Args: { p_new_name: string; p_old_name: string; p_processor_id: string }

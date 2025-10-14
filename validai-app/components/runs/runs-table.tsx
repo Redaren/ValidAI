@@ -157,7 +157,7 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
         <div className="space-y-1">
           <p className="text-sm font-medium">No runs yet</p>
           <p className="text-xs text-muted-foreground">
-            Click "Run Processor" to execute this processor on a document
+            Click &quot;Run Processor&quot; to execute this processor on a document
           </p>
         </div>
       </div>

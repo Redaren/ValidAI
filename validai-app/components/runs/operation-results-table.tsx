@@ -198,7 +198,7 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                       {result.cache_hit && (
                         <Zap
                           className="h-3 w-3 text-yellow-500"
-                          title="Cache hit - reduced cost"
+                          aria-label="Cache hit - reduced cost"
                         />
                       )}
                       {formatTokens(result.tokens_used)}
@@ -270,7 +270,10 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                         {result.structured_output && (
                           <div>
                             <p className="mb-2 text-sm font-medium">Structured Output</p>
-                            <StructuredOutputVisualizer data={result.structured_output} />
+                            <StructuredOutputVisualizer
+                              data={result.structured_output}
+                              originalType="json"
+                            />
                           </div>
                         )}
 

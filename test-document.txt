@@ -1,0 +1,16 @@
+Sample Contract Agreement
+
+This agreement is entered into on January 1, 2024, between Company A and Company B.
+
+Terms:
+1. Service Period: 12 months starting from the effective date
+2. Payment Terms: Net 30 days
+3. Termination Clause: Either party may terminate with 30 days written notice
+4. Confidentiality: All information shared is confidential and proprietary
+5. Liability: Limited to the contract value
+
+Signatures:
+Company A Representative: John Smith
+Company B Representative: Jane Doe
+
+This is a test document for ValidAI processor execution testing.
