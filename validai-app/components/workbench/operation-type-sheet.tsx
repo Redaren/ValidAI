@@ -138,8 +138,7 @@ export function OperationTypeSheet({ children }: OperationTypeSheetProps) {
         {/* Additional info section */}
         <div className="mt-6 p-4 rounded-lg bg-muted/50">
           <p className="text-xs text-muted-foreground">
-            <strong>Tip:</strong> Structured operation types enforce specific output formats
-            using Zod schemas, making it easier to parse and visualize results.
+            <strong>Tip:</strong> Don&apos;t you find what you are looking for? Please let us know!
           </p>
         </div>
       </SheetContent>

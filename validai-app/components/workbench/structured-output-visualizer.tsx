@@ -51,7 +51,7 @@ function inferVisualizationType(data: unknown): VisualizationType {
     return 'card'
   }
 
-  // Check for status/result patterns (traffic light)
+  // Check for status/result patterns (traffic light) - includes validation type
   if (typeof data === 'object' && !Array.isArray(data)) {
     const keys = Object.keys(data as Record<string, unknown>).map(k => k.toLowerCase())
     const statusKeys = ['status', 'result', 'compliant', 'answer', 'has_cap', 'valid', 'success', 'passed', 'failed']
@@ -59,6 +59,26 @@ function inferVisualizationType(data: unknown): VisualizationType {
 
     if (hasStatus) {
       return 'traffic-light'
+    }
+
+    // Check for extraction pattern (items + comment)
+    if (keys.includes('items') && keys.includes('comment')) {
+      return 'badges'
+    }
+
+    // Check for rating pattern (value + comment)
+    if (keys.includes('value') && keys.includes('comment')) {
+      return 'card'
+    }
+
+    // Check for classification pattern (classification + comment)
+    if (keys.includes('classification') && keys.includes('comment')) {
+      return 'card'
+    }
+
+    // Check for analysis pattern (conclusion + comment)
+    if (keys.includes('conclusion') && keys.includes('comment')) {
+      return 'card'
     }
   }
 
@@ -252,8 +272,35 @@ function TableView({ data }: { data: unknown[] }) {
 
 /**
  * Render badge grid for simple arrays
+ * Enhanced for extraction operation type with items + comment
  */
-function BadgeListView({ data }: { data: unknown[] }) {
+function BadgeListView({ data }: { data: unknown[] | unknown }) {
+  // Check for extraction pattern (object with items array and comment)
+  if (typeof data === 'object' && data !== null && !Array.isArray(data)) {
+    const dataObj = data as Record<string, unknown>
+    if ('items' in dataObj && Array.isArray(dataObj.items) && 'comment' in dataObj) {
+      return (
+        <div className="space-y-3">
+          <div className="flex items-start gap-3">
+            <span className="text-3xl mt-0.5">🔍</span>
+            <div className="flex-1">
+              <div className="text-xs text-muted-foreground mb-2">Extracted Items ({dataObj.items.length})</div>
+              <div className="flex flex-wrap gap-2">
+                {dataObj.items.map((item: unknown, idx: number) => (
+                  <Badge key={idx} variant="secondary">
+                    {String(item)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+        </div>
+      )
+    }
+  }
+
+  // Default badge list for plain arrays
   if (!Array.isArray(data) || data.length === 0) {
     return <div className="text-sm text-muted-foreground">Empty list</div>
   }
@@ -271,14 +318,70 @@ function BadgeListView({ data }: { data: unknown[] }) {
 
 /**
  * Render card with key-value pairs
+ * Enhanced for rating, classification, and analysis operation types
  */
 function CardView({ data }: { data: unknown }) {
   if (typeof data !== 'object' || data === null) {
     return <div className="text-sm">{String(data)}</div>
   }
 
-  const entries = Object.entries(data as Record<string, unknown>)
+  const dataObj = data as Record<string, unknown>
+  const entries = Object.entries(dataObj)
 
+  // Special handling for new operation types with prominent display
+  const hasRatingPattern = 'value' in dataObj && 'comment' in dataObj
+  const hasClassificationPattern = 'classification' in dataObj && 'comment' in dataObj
+  const hasAnalysisPattern = 'conclusion' in dataObj && 'comment' in dataObj
+
+  if (hasRatingPattern) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">⭐</span>
+          <div>
+            <div className="font-semibold text-2xl">{String(dataObj.value)}</div>
+            <div className="text-xs text-muted-foreground">Rating</div>
+          </div>
+        </div>
+        <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+      </div>
+    )
+  }
+
+  if (hasClassificationPattern) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🏷️</span>
+          <div>
+            <div className="font-semibold text-lg">{String(dataObj.classification)}</div>
+            <div className="text-xs text-muted-foreground">Classification</div>
+          </div>
+        </div>
+        <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+      </div>
+    )
+  }
+
+  if (hasAnalysisPattern) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">📊</span>
+          <div className="flex-1">
+            <div className="text-xs text-muted-foreground mb-1">Conclusion</div>
+            <div className="font-semibold text-base">{String(dataObj.conclusion)}</div>
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-muted-foreground mb-1">Analysis</div>
+          <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Default card layout for generic key-value pairs
   return (
     <dl className="space-y-2 text-sm">
       {entries.map(([key, value]) => (
@@ -286,7 +389,7 @@ function CardView({ data }: { data: unknown }) {
           <dt className="font-medium text-muted-foreground capitalize min-w-[120px]">
             {key.replace(/_/g, ' ')}:
           </dt>
-          <dd className="flex-1">
+          <dd className="flex-1 whitespace-pre-wrap">
             {typeof value === 'object' && value !== null
               ? JSON.stringify(value, null, 2)
               : String(value)}
@@ -406,7 +509,7 @@ export function StructuredOutputVisualizer({
           <div className="pt-2">
             {visualizationType === 'traffic-light' && <TrafficLightView data={data} />}
             {visualizationType === 'table' && <TableView data={data as unknown[]} />}
-            {visualizationType === 'badges' && <BadgeListView data={data as unknown[]} />}
+            {visualizationType === 'badges' && <BadgeListView data={data} />}
             {visualizationType === 'card' && <CardView data={data} />}
             {visualizationType === 'accordion' && <AccordionView data={data} />}
           </div>

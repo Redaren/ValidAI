@@ -43,7 +43,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
-import { generateText, generateObject, jsonSchema, convertToModelMessages } from 'npm:ai'
+import { generateText, Output } from 'npm:ai'
 import { z } from 'npm:zod'
 
 /**
@@ -655,66 +655,101 @@ serve(async (req) => {
         .eq('id', executionId)
     }
 
-    // Define operation type schemas
-    // These schemas enforce structured output formats for non-generic operations
-    const validationSchema = z.object({
-      result: z.boolean().describe('The validation result (true/false)'),
-      comment: z.string().describe('Reasoning and explanation for the decision')
-    })
+    /**
+     * Get structured output configuration based on operation type
+     * Uses Vercel AI SDK's experimental_output pattern for proper structured data generation
+     *
+     * @param operationType - The type of operation (validation, rating, classification, etc.)
+     * @param customSchema - Optional custom Zod schema for extraction operations
+     * @returns Output configuration or undefined for generic/analysis operations
+     */
+    const getOutputConfig = (operationType: string, customSchema?: any): any => {
+      switch (operationType) {
+        case 'generic':
+          // Simple string response for free-form operations
+          // This eliminates special cases and ensures experimental_output is always present
+          return Output.object({
+            schema: z.object({
+              response: z.string().describe('The AI response text')
+            })
+          })
 
-    // Determine if this operation uses structured output
-    const useStructuredOutput = body.operation_type === 'validation'
-    const outputSchema = body.operation_type === 'validation' ? validationSchema : null
+        case 'validation':
+          return Output.object({
+            schema: z.object({
+              result: z.boolean().describe('The validation result (true/false)'),
+              comment: z.string().describe('Reasoning and explanation for the decision')
+            })
+          })
+
+        case 'rating':
+          return Output.object({
+            schema: z.object({
+              value: z.number().describe('Numerical rating value'),
+              comment: z.string().describe('Rationale and explanation for rating')
+            })
+          })
+
+        case 'classification':
+          return Output.object({
+            schema: z.object({
+              classification: z.string().describe('Assigned category or classification'),
+              comment: z.string().describe('Reasoning for classification decision')
+            })
+          })
+
+        case 'extraction':
+          return Output.object({
+            schema: z.object({
+              items: z.array(z.string()).describe('Array of extracted items'),
+              comment: z.string().describe('Context and explanation of extraction')
+            })
+          })
+
+        case 'analysis':
+          return Output.object({
+            schema: z.object({
+              conclusion: z.string().describe('Main analytical conclusion'),
+              comment: z.string().describe('Supporting analysis and detailed explanation')
+            })
+          })
+
+        default:
+          // Fallback - should never reach here but safety net
+          return Output.object({
+            schema: z.object({
+              response: z.string()
+            })
+          })
+      }
+    }
+
+    // Get structured output configuration for this operation type
+    const outputConfig = getOutputConfig(body.operation_type)
 
     // Execute LLM call using Vercel AI SDK
     // Tracks execution time for performance metrics
     const startTime = Date.now()
 
     try {
-      // Conditional execution: generateObject for structured operations, generateText for generic
       let response: any
-      let structuredOutput: any = null
 
-      // UNIFIED TOOL APPROACH FOR CACHE COMPATIBILITY
-      // Always use generateText with consistent tool definitions to maintain cache across operation types
-      // This ensures the API request structure remains identical regardless of operation type
+      // VERCEL AI SDK PROPER PATTERN FOR STRUCTURED OUTPUT
+      // Uses experimental_output with generateText - the correct way to combine:
+      // - Structured output (for validation, rating, classification, extraction)
+      // - Extended thinking mode
+      // - Prompt caching
+      //
+      // This approach:
+      // - Aligns with Vercel AI SDK's intended architecture
+      // - Scales to all 5 operation types
+      // - Preserves cache (no tools parameter changes)
+      // - Works with thinking mode (no conflicts)
 
-      // Build consistent tool definitions that are always present
-      const universalTools: any = {
-        validation_response: {
-          description: 'Provide a true/false validation response with reasoning',
-          inputSchema: jsonSchema({
-            type: "object",
-            properties: {
-              result: {
-                type: "boolean",
-                description: "The validation result (true/false)"
-              },
-              comment: {
-                type: "string",
-                description: "Reasoning and explanation for the decision"
-              }
-            },
-            required: ["result", "comment"]
-          })
-        }
-        // Future operation types can be added here:
-        // extraction_response: { ... },
-        // rating_response: { ... },
-        // classification_response: { ... },
-        // analysis_response: { ... }
-      }
-
-      // DO NOT modify messages - keep them identical for cache compatibility
-      // CRITICAL: We must keep EVERYTHING identical for cache hits, including toolChoice
-      // Always use 'auto' to let the model decide when to use tools based on context
-
-      // ALWAYS use generateText with consistent tools AND toolChoice for cache compatibility
       const universalParams: any = {
         model: anthropicProvider(modelToUse),
         messages, // Use original messages without modifications
-        tools: universalTools, // Always include the same tools
-        toolChoice: 'auto', // ALWAYS 'auto' to maintain identical API structure for caching
+        experimental_output: outputConfig, // undefined for Generic/Analysis, schema for others
         maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
         temperature: body.settings.temperature,
         topP: body.settings.top_p,
@@ -740,42 +775,14 @@ serve(async (req) => {
 
       response = await generateText(universalParams)
 
-      // Extract structured output from tool calls if present
-      if (useStructuredOutput && response.toolCalls && response.toolCalls.length > 0) {
-        // Find the relevant tool call based on operation type
-        const relevantToolName = body.operation_type === 'validation' ? 'validation_response' : null
+      // Extract structured output using Vercel AI SDK's experimental_output
+      // This is automatically validated against the schema we provided
+      const structuredOutput = response.experimental_output || null
 
-        if (relevantToolName) {
-          const toolCall = response.toolCalls.find((tc: any) => tc.toolName === relevantToolName)
-          if (toolCall && toolCall.args) {
-            // Validate the extracted data against our schema
-            try {
-              if (body.operation_type === 'validation') {
-                structuredOutput = validationSchema.parse(toolCall.args)
-              }
-            } catch (validationError) {
-              console.error('Failed to validate tool response against schema:', validationError)
-              // Fallback: use the raw args if they match the expected structure
-              structuredOutput = toolCall.args
-            }
-          }
-        }
-      }
-
-      // Fallback: try to extract structured output from text if no tool was called
-      if (useStructuredOutput && !structuredOutput && response.text) {
-        if (body.operation_type === 'validation') {
-          // Try to find JSON in the response text
-          const jsonMatch = response.text.match(/\{[\s\S]*"result"[\s\S]*"comment"[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              const parsed = JSON.parse(jsonMatch[0])
-              structuredOutput = validationSchema.parse(parsed)
-            } catch (e) {
-              console.error('Failed to extract structured output from text:', e)
-            }
-          }
-        }
+      if (structuredOutput) {
+        console.log('✅ Structured output generated:', JSON.stringify(structuredOutput))
+      } else if (outputConfig) {
+        console.warn('⚠️ Expected structured output but none was generated')
       }
 
       const executionTime = Date.now() - startTime
@@ -852,10 +859,14 @@ serve(async (req) => {
       // For structured outputs, we need to handle both regular text and structured data
       let responseText = response.text || ''
 
-      // For structured outputs, ensure we have meaningful text for the user
+      // For structured outputs, extract the appropriate text representation
       if (structuredOutput) {
-        // If there's no text response (tool-only response), use the structured output as text
-        if (!responseText || responseText.trim() === '') {
+        if (body.operation_type === 'generic' || body.operation_type === 'analysis') {
+          // For Generic/Analysis, the response field contains the actual text
+          responseText = structuredOutput.response || responseText
+        } else if (!responseText || responseText.trim() === '') {
+          // For other types (validation, rating, etc.), if there's no text response,
+          // use JSON representation of the structured output
           responseText = JSON.stringify(structuredOutput, null, 2)
         }
         // If we have both text (e.g., from thinking) and structured output, keep the text

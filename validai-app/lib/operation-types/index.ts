@@ -8,7 +8,14 @@
  */
 
 import type { OperationTypeConfig, OperationType } from './types'
-import { validationOutputSchema, genericOutputSchema } from './schemas'
+import {
+  validationOutputSchema,
+  genericOutputSchema,
+  extractionOutputSchema,
+  ratingOutputSchema,
+  classificationOutputSchema,
+  analysisOutputSchema
+} from './schemas'
 
 /**
  * Operation Type Registry
@@ -50,71 +57,71 @@ export const OPERATION_TYPES: Record<OperationType, OperationTypeConfig> = {
     icon: '✓✗',
     useStructuredOutput: true,
     schema: validationOutputSchema,
-    promptGuidance: 'Ask a yes/no question that requires validation. Example: "Does this document meet GDPR requirements?"'
+    promptGuidance: 'Ask a yes/no question that requires validation. Example: "Does this document have confidentiality clauses?"'
   },
 
   /**
-   * Future: Extraction Operation Type
+   * Extraction Operation Type
    *
    * Structured data extraction from documents.
-   * Will use generateObject() with custom schema per operation.
+   * Uses generateObject() with array + comment schema.
    */
   extraction: {
     id: 'extraction',
     displayName: 'Extraction',
-    description: 'Extract specific structured data fields from documents',
+    description: 'Extract specific structured information from documents',
     icon: '🔍',
-    useStructuredOutput: false, // Set to true when implementing
-    schema: null, // TODO: Add extraction schema
-    promptGuidance: 'Specify what data fields to extract. Example: "Extract company name, address, and founding date."'
+    useStructuredOutput: true,
+    schema: extractionOutputSchema,
+    promptGuidance: 'Specify what items to extract as a list. Example: "Extract all company names mentioned in the document."'
   },
 
   /**
-   * Future: Rating Operation Type
+   * Rating Operation Type
    *
    * Numerical scoring with qualitative feedback.
-   * Will use generateObject() with rating schema.
+   * Uses generateObject() with value + comment schema.
    */
   rating: {
     id: 'rating',
     displayName: 'Rating',
     description: 'Score content on a numerical scale with reasoning',
     icon: '⭐',
-    useStructuredOutput: false, // Set to true when implementing
-    schema: null, // TODO: Add rating schema
-    promptGuidance: 'Define rating criteria and scale. Example: "Rate document quality on a scale of 1-10."'
+    useStructuredOutput: true,
+    schema: ratingOutputSchema,
+    promptGuidance: 'Define rating criteria and scale. Example: "Rate document quality on a scale of 1-10 based on clarity and completeness."'
   },
 
   /**
-   * Future: Classification Operation Type
+   * Classification Operation Type
    *
-   * Categorization with confidence scores.
-   * Will use generateObject() with classification schema.
+   * Categorization with reasoning.
+   * Uses generateObject() with classification + comment schema.
    */
   classification: {
     id: 'classification',
     displayName: 'Classification',
     description: 'Assign content to predefined categories with confidence scores',
     icon: '🏷️',
-    useStructuredOutput: false, // Set to true when implementing
-    schema: null, // TODO: Add classification schema
-    promptGuidance: 'List possible categories. Example: "Classify as: Contract, Invoice, Report, or Other."'
+    useStructuredOutput: true,
+    schema: classificationOutputSchema,
+    promptGuidance: 'List possible categories. Example: "Classify this document as: Contract, Invoice, Report, or Other."'
   },
 
   /**
-   * Future: Analysis Operation Type
+   * Analysis Operation Type
    *
    * Comprehensive structured analysis.
-   * Will use generateObject() with analysis schema.
+   * Uses generateObject() with conclusion + comment schema.
    */
   analysis: {
     id: 'analysis',
     displayName: 'Analysis',
     description: 'Generate structured analytical insights with key findings',
     icon: '📊',
-    useStructuredOutput: false, // Set to true when implementing
-    schema: null, // TODO: Add analysis schema
-    promptGuidance: 'Specify analysis dimensions. Example: "Analyze risks, opportunities, and recommendations."'
+    useStructuredOutput: true,
+    schema: analysisOutputSchema,
+    promptGuidance: 'Specify analysis dimensions. Example: "Analyze the document for legal risks, compliance issues, and recommendations."'
   }
 }
 
@@ -149,5 +156,18 @@ export function usesStructuredOutput(operationType: OperationType): boolean {
 
 // Re-export types and schemas for convenience
 export type { OperationType, OperationTypeConfig, StructuredOutputResult } from './types'
-export { validationOutputSchema, genericOutputSchema } from './schemas'
-export type { ValidationOutput } from './schemas'
+export {
+  validationOutputSchema,
+  genericOutputSchema,
+  extractionOutputSchema,
+  ratingOutputSchema,
+  classificationOutputSchema,
+  analysisOutputSchema
+} from './schemas'
+export type {
+  ValidationOutput,
+  ExtractionOutput,
+  RatingOutput,
+  ClassificationOutput,
+  AnalysisOutput
+} from './schemas'

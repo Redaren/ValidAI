@@ -36,64 +36,78 @@ export const validationOutputSchema = z.object({
 export const genericOutputSchema = null
 
 /**
- * Future: Extraction Output Schema
+ * Extraction Output Schema
  *
  * For structured data extraction operations.
- * Will extract specific fields from documents.
+ * Extracts array of items with explanatory context.
+ *
+ * @example
+ * {
+ *   items: ["Item 1", "Item 2", "Item 3"],
+ *   comment: "Extracted all payment terms from Section 3..."
+ * }
  */
-// export const extractionOutputSchema = z.object({
-//   extracted_data: z.record(z.string(), z.any()).describe('Extracted key-value pairs'),
-//   confidence: z.number().min(0).max(1).describe('Confidence score for extraction')
-// })
+export const extractionOutputSchema = z.object({
+  items: z.array(z.string()).describe('Array of extracted items'),
+  comment: z.string().describe('Context and explanation of extraction')
+})
 
 /**
- * Future: Rating Output Schema
+ * Rating Output Schema
  *
  * For scoring and rating operations.
- * Returns numeric scores with qualitative feedback.
+ * Returns numeric value with qualitative feedback.
+ *
+ * @example
+ * {
+ *   value: 8.5,
+ *   comment: "Document scored 8.5/10 because it demonstrates..."
+ * }
  */
-// export const ratingOutputSchema = z.object({
-//   score: z.number().describe('Numerical score'),
-//   max_score: z.number().optional().describe('Maximum possible score'),
-//   rationale: z.string().describe('Explanation of the rating'),
-//   strengths: z.array(z.string()).optional().describe('Positive aspects'),
-//   improvements: z.array(z.string()).optional().describe('Areas for improvement')
-// })
+export const ratingOutputSchema = z.object({
+  value: z.number().describe('Numerical rating value'),
+  comment: z.string().describe('Rationale and explanation for rating')
+})
 
 /**
- * Future: Classification Output Schema
+ * Classification Output Schema
  *
  * For categorization operations.
- * Assigns content to predefined categories.
+ * Assigns content to categories with reasoning.
+ *
+ * @example
+ * {
+ *   classification: "Contract - Employment Agreement",
+ *   comment: "Classified as employment agreement due to..."
+ * }
  */
-// export const classificationOutputSchema = z.object({
-//   category: z.string().describe('Assigned category'),
-//   confidence: z.number().min(0).max(1).describe('Classification confidence'),
-//   reasoning: z.string().describe('Why this category was chosen'),
-//   alternative_categories: z.array(z.object({
-//     category: z.string(),
-//     confidence: z.number()
-//   })).optional().describe('Other possible categories')
-// })
+export const classificationOutputSchema = z.object({
+  classification: z.string().describe('Assigned category or classification'),
+  comment: z.string().describe('Reasoning for classification decision')
+})
 
 /**
- * Future: Analysis Output Schema
+ * Analysis Output Schema
  *
  * For comprehensive analysis operations.
- * Provides structured analytical insights.
+ * Provides structured analytical conclusion with supporting detail.
+ *
+ * @example
+ * {
+ *   conclusion: "Document meets compliance requirements with minor issues",
+ *   comment: "Detailed analysis reveals: 1) All required sections present..."
+ * }
  */
-// export const analysisOutputSchema = z.object({
-//   summary: z.string().describe('High-level summary'),
-//   key_findings: z.array(z.string()).describe('Main insights'),
-//   details: z.record(z.string(), z.any()).optional().describe('Detailed analysis sections'),
-//   recommendations: z.array(z.string()).optional().describe('Suggested actions')
-// })
+export const analysisOutputSchema = z.object({
+  conclusion: z.string().describe('Main analytical conclusion'),
+  comment: z.string().describe('Supporting analysis and detailed explanation')
+})
 
 /**
  * TypeScript types inferred from schemas
  */
 export type ValidationOutput = z.infer<typeof validationOutputSchema>
-// export type ExtractionOutput = z.infer<typeof extractionOutputSchema>
-// export type RatingOutput = z.infer<typeof ratingOutputSchema>
-// export type ClassificationOutput = z.infer<typeof classificationOutputSchema>
-// export type AnalysisOutput = z.infer<typeof analysisOutputSchema>
+export type ExtractionOutput = z.infer<typeof extractionOutputSchema>
+export type RatingOutput = z.infer<typeof ratingOutputSchema>
+export type ClassificationOutput = z.infer<typeof classificationOutputSchema>
+export type AnalysisOutput = z.infer<typeof analysisOutputSchema>
