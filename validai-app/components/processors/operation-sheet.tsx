@@ -37,6 +37,19 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ChevronRight } from 'lucide-react'
 
 /**
+ * All available operation types from the database enum.
+ * These represent the different types of operations that can be performed on documents.
+ */
+const OPERATION_TYPES = [
+  'extraction',
+  'validation',
+  'rating',
+  'classification',
+  'analysis',
+  'generic',
+] as const
+
+/**
  * Props for the OperationSheet component
  */
 interface OperationSheetProps {
@@ -297,8 +310,11 @@ export function OperationSheet({
               {/**
                * Operation Type Field - Disabled in both modes for now
                *
+               * Renders all available operation types from the database enum.
+               * Each operation type is treated equally - no special cases.
+               *
                * In edit mode: Shows the existing operation type (read-only)
-               * In create mode: Shows "Generic" (only option for now)
+               * In create mode: Shows "Generic" (default selection)
                */}
               <div className="space-y-2">
                 <Label htmlFor="operation_type">
@@ -312,21 +328,11 @@ export function OperationSheet({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="generic">Generic</SelectItem>
-                    {/* Show other types if editing an operation of that type */}
-                    {isEditMode && operation && (
-                      <SelectItem value={operation.operation_type}>
-                        {operation.operation_type.charAt(0).toUpperCase() +
-                         operation.operation_type.slice(1)}
+                    {OPERATION_TYPES.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type.charAt(0).toUpperCase() + type.slice(1)}
                       </SelectItem>
-                    )}
-                    {/* Future types will be added here:
-                    <SelectItem value="extraction">Extraction</SelectItem>
-                    <SelectItem value="validation">Validation</SelectItem>
-                    <SelectItem value="rating">Rating</SelectItem>
-                    <SelectItem value="classification">Classification</SelectItem>
-                    <SelectItem value="analysis">Analysis</SelectItem>
-                    */}
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
