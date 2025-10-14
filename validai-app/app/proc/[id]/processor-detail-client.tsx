@@ -12,9 +12,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical } from "lucide-react"
+import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical, Play, History } from "lucide-react"
 import Link from "next/link"
 import { ProcessorSettingsSheet } from "@/components/processors/processor-settings-sheet"
+import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 
 /**
  * Props for the ProcessorDetailClient component.
@@ -137,6 +138,23 @@ export function ProcessorDetailClient({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <RunProcessorDialog
+                  processorId={processor.processor_id}
+                  trigger={
+                    <div className="flex w-full cursor-pointer items-center">
+                      <Play className="mr-2 h-4 w-4" />
+                      Run Processor
+                    </div>
+                  }
+                />
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/proc/${processor.processor_id}/runs`}>
+                  <History className="mr-2 h-4 w-4" />
+                  View Runs
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsSettingsSheetOpen(true)}>
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
