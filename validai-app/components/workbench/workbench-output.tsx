@@ -140,6 +140,19 @@ export function WorkbenchOutput() {
     if (typeof content === 'string') return content
 
     return content.map(block => {
+      // Handle file blocks (PDFs, etc.)
+      if (typeof block === 'object' && block !== null &&
+          'type' in block && block.type === 'file' &&
+          'data' in block && typeof block.data === 'string') {
+        // For base64 strings, approximate the byte size
+        const originalSize = Math.ceil(block.data.length * 0.75)
+        return {
+          ...block,
+          data: '[File data truncated for export]',
+          originalSize
+        }
+      }
+      // Handle legacy document blocks if they exist
       if (typeof block === 'object' && block !== null &&
           'type' in block && block.type === 'document' &&
           'source' in block && typeof block.source === 'object' && block.source !== null &&

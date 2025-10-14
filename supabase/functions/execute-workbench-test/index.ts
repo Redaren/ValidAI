@@ -374,66 +374,6 @@ serve(async (req) => {
       }
     }
 
-    /**
-     * Process conversation history for stateful mode
-     *
-     * @description
-     * Reconstructs previous messages from stored conversation history.
-     * MUST come AFTER system message AND file message to maintain cache prefix.
-     * With the new architecture, conversation history is simple text exchanges only.
-     *
-     * ## New Cache Strategy (Separate File Message)
-     * - System message comes first (no cache control)
-     * - File message comes second (WITH cache control) - SEPARATE user message
-     * - Conversation history comes third (no cache control) - INSERTED HERE
-     * - New prompt comes last (no cache control) - SEPARATE user message
-     * - This ensures the file stays at the SAME position across all turns
-     */
-    if (body.mode === 'stateful' && body.conversation_history.length > 0) {
-      console.log(`\n=== Processing Conversation History ===`)
-      console.log(`History contains ${body.conversation_history.length} messages`)
-
-      body.conversation_history.forEach((msg, historyIdx) => {
-        // NEW ARCHITECTURE: Skip file messages entirely from history
-        // The file is now sent as a separate message at the beginning
-        if (msg.metadata?.fileSent) {
-          console.log(`Skipping history message ${historyIdx} (was a file message - file now sent separately)`)
-          return
-        }
-
-        // Extract simple text content only
-        // With separate file messages, history should only contain text exchanges
-        let processedContent: string
-
-        if (typeof msg.content === 'string') {
-          processedContent = msg.content
-        } else if (Array.isArray(msg.content)) {
-          // Extract text from blocks
-          const textParts: string[] = []
-          for (const block of msg.content) {
-            if (block.type === 'text' && block.text) {
-              textParts.push(block.text)
-            } else if (typeof block === 'string') {
-              textParts.push(block)
-            }
-          }
-          processedContent = textParts.join('\n')
-        } else {
-          // Fallback for unexpected formats
-          processedContent = String(msg.content)
-        }
-
-        messages.push({
-          role: msg.role,
-          content: processedContent
-        })
-        console.log(`Added history message ${historyIdx}: role=${msg.role}, length=${processedContent.length} chars`)
-      })
-
-      console.log(`✅ Processed ${body.conversation_history.length} history messages (files excluded, now sent separately)`)
-      console.log(`===================================\n`)
-    }
-
     // RESTRUCTURED MESSAGE ARCHITECTURE FOR CACHE HITS
     // ================================================
     // CRITICAL INSIGHT: For Anthropic caching to work across conversation turns,
@@ -448,7 +388,7 @@ serve(async (req) => {
     // allowing Anthropic to match the cached content on every turn.
 
     // FIRST: Add file as SEPARATE user message (if file is being sent)
-    // This positions the file BEFORE any conversation history
+    // This positions the file BEFORE any conversation history for consistent cache position
     if (body.send_file && body.file_content) {
       if (body.file_type === 'application/pdf') {
         const pdfBuffer = Buffer.from(body.file_content, 'base64')
@@ -535,7 +475,67 @@ serve(async (req) => {
       console.log('✅ Preserved cached file as SEPARATE user message (maintaining cache position)')
     }
 
-    // SECOND: Add the current prompt as SEPARATE user message
+    /**
+     * SECOND: Process conversation history for stateful mode
+     *
+     * @description
+     * Reconstructs previous messages from stored conversation history.
+     * MUST come AFTER system message AND file message to maintain cache prefix.
+     * With the new architecture, conversation history is simple text exchanges only.
+     *
+     * ## Correct Message Order for Cache Hits
+     * - System message comes first (no cache control)
+     * - File message comes second (WITH cache control) - SEPARATE user message at FIXED position
+     * - Conversation history comes third (no cache control) - ADDED HERE
+     * - New prompt comes last (no cache control) - SEPARATE user message
+     * - This ensures the file stays at position 1, allowing cache hits across all turns
+     */
+    if (body.mode === 'stateful' && body.conversation_history.length > 0) {
+      console.log(`\n=== Processing Conversation History ===`)
+      console.log(`History contains ${body.conversation_history.length} messages`)
+
+      body.conversation_history.forEach((msg, historyIdx) => {
+        // NEW ARCHITECTURE: Skip file messages entirely from history
+        // The file is now sent as a separate message at the beginning
+        if (msg.metadata?.fileSent) {
+          console.log(`Skipping history message ${historyIdx} (was a file message - file now sent separately)`)
+          return
+        }
+
+        // Extract simple text content only
+        // With separate file messages, history should only contain text exchanges
+        let processedContent: string
+
+        if (typeof msg.content === 'string') {
+          processedContent = msg.content
+        } else if (Array.isArray(msg.content)) {
+          // Extract text from blocks
+          const textParts: string[] = []
+          for (const block of msg.content) {
+            if (block.type === 'text' && block.text) {
+              textParts.push(block.text)
+            } else if (typeof block === 'string') {
+              textParts.push(block)
+            }
+          }
+          processedContent = textParts.join('\n')
+        } else {
+          // Fallback for unexpected formats
+          processedContent = String(msg.content)
+        }
+
+        messages.push({
+          role: msg.role,
+          content: processedContent
+        })
+        console.log(`Added history message ${historyIdx}: role=${msg.role}, length=${processedContent.length} chars`)
+      })
+
+      console.log(`✅ Processed ${body.conversation_history.length} history messages (files excluded, now sent separately)`)
+      console.log(`===================================\n`)
+    }
+
+    // THIRD: Add the current prompt as SEPARATE user message
     // This comes AFTER the file message and conversation history
     messages.push({
       role: 'user',
@@ -675,110 +675,96 @@ serve(async (req) => {
       let response: any
       let structuredOutput: any = null
 
-      // Check if we need the hybrid approach (thinking + structured output)
-      // This works around the Vercel AI SDK bug where thinking conflicts with forced tool use
-      const useHybridApproach = useStructuredOutput && outputSchema && body.settings.thinking
+      // UNIFIED TOOL APPROACH FOR CACHE COMPATIBILITY
+      // Always use generateText with consistent tool definitions to maintain cache across operation types
+      // This ensures the API request structure remains identical regardless of operation type
 
-      if (useHybridApproach) {
-        // WORKAROUND for Vercel AI SDK issue #7220: Use generateText with manual tool definition when thinking is enabled
-        // This avoids the "Thinking may not be enabled when tool_choice forces tool use" error
-        // TODO: Remove this workaround once the SDK is fixed
-
-        // Add instruction to use the JSON tool after thinking
-        const hybridMessages = [...messages]
-        const lastMessage = hybridMessages[hybridMessages.length - 1]
-
-        // Append instruction to the last user message while preserving cache control
-        if (typeof lastMessage.content === 'string') {
-          hybridMessages[hybridMessages.length - 1] = {
-            ...lastMessage,
-            content: lastMessage.content + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.'
-          }
-        } else if (Array.isArray(lastMessage.content)) {
-          // Find the last text block and append to it while preserving cache control
-          const contentCopy = [...lastMessage.content]
-          for (let i = contentCopy.length - 1; i >= 0; i--) {
-            if (contentCopy[i].type === 'text') {
-              contentCopy[i] = {
-                ...contentCopy[i],
-                text: contentCopy[i].text + '\n\nIMPORTANT: After thinking through your response, you MUST use the "json_response" tool to provide your final answer with the result (true/false) and comment fields.',
-                // Preserve any existing providerOptions (cache control)
-                ...(contentCopy[i].providerOptions ? { providerOptions: contentCopy[i].providerOptions } : {})
+      // Build consistent tool definitions that are always present
+      const universalTools: any = {
+        validation_response: {
+          description: 'Provide a true/false validation response with reasoning',
+          inputSchema: jsonSchema({
+            type: "object",
+            properties: {
+              result: {
+                type: "boolean",
+                description: "The validation result (true/false)"
+              },
+              comment: {
+                type: "string",
+                description: "Reasoning and explanation for the decision"
               }
-              break
-            }
-          }
-          hybridMessages[hybridMessages.length - 1] = {
-            ...lastMessage,
-            content: contentCopy
-          }
+            },
+            required: ["result", "comment"]
+          })
         }
+        // Future operation types can be added here:
+        // extraction_response: { ... },
+        // rating_response: { ... },
+        // classification_response: { ... },
+        // analysis_response: { ... }
+      }
 
-        // Use generateText with manual tool definition
-        const hybridParams: any = {
-          model: anthropicProvider(modelToUse),
-          messages: hybridMessages,
-          tools: {
-            json_response: {
-              description: 'Provide the structured validation response',
-              // AI SDK v5 uses inputSchema instead of parameters
-              inputSchema: jsonSchema({
-                type: "object",
-                properties: {
-                  result: {
-                    type: "boolean",
-                    description: "The validation result (true/false)"
-                  },
-                  comment: {
-                    type: "string",
-                    description: "Reasoning and explanation for the decision"
-                  }
-                },
-                required: ["result", "comment"]
-              })
-            }
-          },
-          toolChoice: 'auto', // Allow the model to choose when to use the tool
-          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-          temperature: body.settings.temperature,
-          topP: body.settings.top_p,
-          topK: body.settings.top_k,
-          stopSequences: body.settings.stop_sequences,
-          providerOptions: {
-            anthropic: {
+      // DO NOT modify messages - keep them identical for cache compatibility
+      // CRITICAL: We must keep EVERYTHING identical for cache hits, including toolChoice
+      // Always use 'auto' to let the model decide when to use tools based on context
+
+      // ALWAYS use generateText with consistent tools AND toolChoice for cache compatibility
+      const universalParams: any = {
+        model: anthropicProvider(modelToUse),
+        messages, // Use original messages without modifications
+        tools: universalTools, // Always include the same tools
+        toolChoice: 'auto', // ALWAYS 'auto' to maintain identical API structure for caching
+        maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+        temperature: body.settings.temperature,
+        topP: body.settings.top_p,
+        topK: body.settings.top_k,
+        stopSequences: body.settings.stop_sequences,
+        providerOptions: {
+          anthropic: {
+            // Pass thinking mode if enabled
+            ...(body.settings.thinking ? {
               thinking: {
                 type: body.settings.thinking.type,
                 budgetTokens: body.settings.thinking.budget_tokens
               }
-            }
+            } : {})
           }
         }
+      }
 
-        // Only add system parameter if it's defined and not using messages array for system content
-        if (system) {
-          hybridParams.system = system
-        }
+      // Only add system parameter if it's defined and not using messages array for system content
+      if (system) {
+        universalParams.system = system
+      }
 
-        response = await generateText(hybridParams)
+      response = await generateText(universalParams)
 
-        // Extract structured output from tool calls
-        if (response.toolCalls && response.toolCalls.length > 0) {
-          // Find the json_response tool call
-          const jsonToolCall = response.toolCalls.find((tc: any) => tc.toolName === 'json_response')
-          if (jsonToolCall && jsonToolCall.args) {
+      // Extract structured output from tool calls if present
+      if (useStructuredOutput && response.toolCalls && response.toolCalls.length > 0) {
+        // Find the relevant tool call based on operation type
+        const relevantToolName = body.operation_type === 'validation' ? 'validation_response' : null
+
+        if (relevantToolName) {
+          const toolCall = response.toolCalls.find((tc: any) => tc.toolName === relevantToolName)
+          if (toolCall && toolCall.args) {
             // Validate the extracted data against our schema
             try {
-              structuredOutput = validationSchema.parse(jsonToolCall.args)
+              if (body.operation_type === 'validation') {
+                structuredOutput = validationSchema.parse(toolCall.args)
+              }
             } catch (validationError) {
               console.error('Failed to validate tool response against schema:', validationError)
-              // Fallback: try to use the raw args if they match the expected structure
-              structuredOutput = jsonToolCall.args
+              // Fallback: use the raw args if they match the expected structure
+              structuredOutput = toolCall.args
             }
           }
         }
+      }
 
-        // If no tool was called (shouldn't happen with our prompt), try to extract from text
-        if (!structuredOutput && response.text) {
+      // Fallback: try to extract structured output from text if no tool was called
+      if (useStructuredOutput && !structuredOutput && response.text) {
+        if (body.operation_type === 'validation') {
           // Try to find JSON in the response text
           const jsonMatch = response.text.match(/\{[\s\S]*"result"[\s\S]*"comment"[\s\S]*\}/);
           if (jsonMatch) {
@@ -790,64 +776,6 @@ serve(async (req) => {
             }
           }
         }
-
-      } else if (useStructuredOutput && outputSchema) {
-        // Normal path: Use generateObject when thinking is NOT enabled
-        const objectParams: any = {
-          model: anthropicProvider(modelToUse),
-          schema: outputSchema,
-          messages,
-          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-          temperature: body.settings.temperature,
-          topP: body.settings.top_p,
-          topK: body.settings.top_k,
-          stopSequences: body.settings.stop_sequences,
-          providerOptions: {
-            anthropic: {
-              // Note: No thinking here since it conflicts with generateObject
-            }
-          }
-        }
-
-        // Only add system parameter if it's defined and not using messages array for system content
-        if (system) {
-          objectParams.system = system
-        }
-
-        response = await generateObject(objectParams)
-
-        // Store structured output
-        structuredOutput = response.object
-      } else {
-        // Use generateText for generic operations (default behavior)
-        const textParams: any = {
-          model: anthropicProvider(modelToUse),
-          messages,
-          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-          temperature: body.settings.temperature,
-          topP: body.settings.top_p,
-          topK: body.settings.top_k,
-          stopSequences: body.settings.stop_sequences,
-          // Pass Anthropic-specific options through providerOptions
-          providerOptions: {
-            anthropic: {
-              // Pass thinking mode if enabled - convert budget_tokens to budgetTokens
-              ...(body.settings.thinking ? {
-                thinking: {
-                  type: body.settings.thinking.type,
-                  budgetTokens: body.settings.thinking.budget_tokens  // Map budget_tokens to budgetTokens
-                }
-              } : {})
-            }
-          }
-        }
-
-        // Only add system parameter if it's defined and not using messages array for system content
-        if (system) {
-          textParams.system = system
-        }
-
-        response = await generateText(textParams)
       }
 
       const executionTime = Date.now() - startTime
@@ -921,12 +849,17 @@ serve(async (req) => {
 
       // Extract response content and special blocks
       // Vercel AI SDK provides the text directly in response.text
-      // For structured outputs, also format the object as text
+      // For structured outputs, we need to handle both regular text and structured data
       let responseText = response.text || ''
 
+      // For structured outputs, ensure we have meaningful text for the user
       if (structuredOutput) {
-        // For structured outputs, create human-readable text representation
-        responseText = JSON.stringify(structuredOutput, null, 2)
+        // If there's no text response (tool-only response), use the structured output as text
+        if (!responseText || responseText.trim() === '') {
+          responseText = JSON.stringify(structuredOutput, null, 2)
+        }
+        // If we have both text (e.g., from thinking) and structured output, keep the text
+        // The structured output will be sent separately in the structured_output field
       }
 
       // Extract thinking/reasoning blocks - Vercel AI SDK returns these as top-level fields

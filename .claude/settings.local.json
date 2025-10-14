@@ -30,7 +30,17 @@
       "Bash(npm run build:*)",
       "Bash(node:*)",
       "Bash(find:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(set SUPABASE_ACCESS_TOKEN=sbp_646a9a0c9d1f841b006b0567bfc515a9754460fa)",
+      "Bash(npx supabase functions deploy:*)",
+      "Bash(npx supabase login:*)",
+      "Bash(npx supabase link:*)",
+      "Bash(curl -X GET \"https://api.supabase.com/v1/projects/xczippkxxdqlvaacjexj/analytics/logs/edge-functions?product=edge_functions&iso_timestamp_start=2025-10-13T19:50:00Z&iso_timestamp_end=2025-10-13T20:00:00Z\" -H \"Authorization: Bearer sbp_646a9a0c9d1f841b006b0567bfc515a9754460fa\")",
+      "Bash(python:*)",
+      "Bash(curl -X POST \"https://api.supabase.com/v1/projects/xczippkxxdqlvaacjexj/logs/query\" -H \"Authorization: Bearer sbp_646a9a0c9d1f841b006b0567bfc515a9754460fa\" -H \"Content-Type: application/json\" -d '{\"\"service\"\":\"\"edge-function\"\",\"\"from\"\":\"\"2025-10-13T19:50:00Z\"\",\"\"to\"\":\"\"2025-10-13T20:00:00Z\"\"}')",
+      "Bash(deno check:*)",
+      "Bash(export SUPABASE_ACCESS_TOKEN=sbp_646a9a0c9d1f841b006b0567bfc515a9754460fa)",
+      "Read(//c/Dev/**)"
     ]
   },
   "enableAllProjectMcpServers": true,
