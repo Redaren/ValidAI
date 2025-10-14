@@ -44,6 +44,20 @@ export const updateProcessorSchema = z.object({
 export type UpdateProcessorInput = z.infer<typeof updateProcessorSchema>
 
 /**
+ * Schema for updating processor settings
+ * Used in: ProcessorSettingsSheet form component
+ */
+export const updateProcessorSettingsSchema = z.object({
+  system_prompt: z
+    .string()
+    .trim()
+    .max(2000, 'System prompt must be less than 2000 characters')
+    .optional(),
+})
+
+export type UpdateProcessorSettingsInput = z.infer<typeof updateProcessorSettingsSchema>
+
+/**
  * Schema for validating processor name (useful for rename operations)
  */
 export const processorNameSchema = nameSchema

@@ -296,3 +296,31 @@ export function useDeleteArea() {
     },
   })
 }
+
+export function useUpdateProcessorSettings() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({
+      processorId,
+      systemPrompt,
+    }: {
+      processorId: string
+      systemPrompt?: string
+    }) => {
+      const { error } = await supabase
+        .from('processors')
+        .update({
+          system_prompt: systemPrompt || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', processorId)
+
+      if (error) throw error
+    },
+    onSuccess: (_, { processorId }) => {
+      queryClient.invalidateQueries({ queryKey: ['processor', processorId] })
+    },
+  })
+}

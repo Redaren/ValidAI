@@ -20,7 +20,6 @@ import {
 import {
   Archive,
   Eye,
-  FlaskConical,
   Lock,
   MoreHorizontal,
   Pencil,
@@ -102,10 +101,6 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="icon" disabled title="Edit">
-            <Pencil className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
-          </Button>
           <Button variant="default" size="icon" disabled title="Run">
             <Play className="h-4 w-4" />
             <span className="sr-only">Run</span>
@@ -118,11 +113,9 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/proc/${processor.processor_id}/workbench`}>
-                  <FlaskConical className="mr-2 h-4 w-4" />
-                  Workbench
-                </Link>
+              <DropdownMenuItem disabled>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem disabled>

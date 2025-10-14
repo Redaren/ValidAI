@@ -12,8 +12,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ArrowLeft, MoreHorizontal, FolderPlus } from "lucide-react"
+import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical } from "lucide-react"
 import Link from "next/link"
+import { ProcessorSettingsSheet } from "@/components/processors/processor-settings-sheet"
 
 /**
  * Props for the ProcessorDetailClient component.
@@ -67,6 +68,7 @@ export function ProcessorDetailClient({
   const { data: processor, isLoading, error } = useProcessorDetail(processorId)
   const createArea = useCreateArea()
   const [isCreateAreaDialogOpen, setIsCreateAreaDialogOpen] = useState(false)
+  const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false)
 
   /**
    * Computed list of existing area names for uniqueness validation.
@@ -135,6 +137,16 @@ export function ProcessorDetailClient({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsSettingsSheetOpen(true)}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href={`/proc/${processor.processor_id}/workbench`}>
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Workbench
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsCreateAreaDialogOpen(true)}>
                 <FolderPlus className="mr-2 h-4 w-4" />
                 New Area
@@ -151,6 +163,12 @@ export function ProcessorDetailClient({
         existingNames={existingAreaNames}
         onCreate={handleCreateArea}
         isLoading={createArea.isPending}
+      />
+
+      <ProcessorSettingsSheet
+        open={isSettingsSheetOpen}
+        onOpenChange={setIsSettingsSheetOpen}
+        processor={processor}
       />
     </div>
   )
