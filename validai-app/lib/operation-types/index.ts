@@ -14,7 +14,8 @@ import {
   extractionOutputSchema,
   ratingOutputSchema,
   classificationOutputSchema,
-  analysisOutputSchema
+  analysisOutputSchema,
+  trafficLightOutputSchema
 } from './schemas'
 
 /**
@@ -122,6 +123,22 @@ export const OPERATION_TYPES: Record<OperationType, OperationTypeConfig> = {
     useStructuredOutput: true,
     schema: analysisOutputSchema,
     promptGuidance: 'Specify analysis dimensions. Example: "Analyze the document for legal risks, compliance issues, and recommendations."'
+  },
+
+  /**
+   * Traffic Light Operation Type
+   *
+   * Risk assessment with red/yellow/green status indicators.
+   * Uses generateObject() with traffic_light + comment schema.
+   */
+  traffic_light: {
+    id: 'traffic_light',
+    displayName: 'Traffic Light',
+    description: 'Risk assessment with red/yellow/green status indicator',
+    icon: '🚦',
+    useStructuredOutput: true,
+    schema: trafficLightOutputSchema,
+    promptGuidance: 'Define risk criteria for red (high risk), yellow (medium risk), green (low risk). Example: "Assess contract risk level based on liability, payment terms, and compliance."'
   }
 }
 
@@ -162,12 +179,14 @@ export {
   extractionOutputSchema,
   ratingOutputSchema,
   classificationOutputSchema,
-  analysisOutputSchema
+  analysisOutputSchema,
+  trafficLightOutputSchema
 } from './schemas'
 export type {
   ValidationOutput,
   ExtractionOutput,
   RatingOutput,
   ClassificationOutput,
-  AnalysisOutput
+  AnalysisOutput,
+  TrafficLightOutput
 } from './schemas'

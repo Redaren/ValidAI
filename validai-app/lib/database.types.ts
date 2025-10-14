@@ -619,6 +619,7 @@ export type Database = {
         | "classification"
         | "analysis"
         | "generic"
+        | "traffic_light"
       processor_status: "draft" | "published" | "archived"
       processor_visibility: "personal" | "organization"
     }
@@ -755,6 +756,7 @@ export const Constants = {
         "classification",
         "analysis",
         "generic",
+        "traffic_light",
       ],
       processor_status: ["draft", "published", "archived"],
       processor_visibility: ["personal", "organization"],

@@ -54,7 +54,7 @@ function inferVisualizationType(data: unknown): VisualizationType {
   // Check for status/result patterns (traffic light) - includes validation type
   if (typeof data === 'object' && !Array.isArray(data)) {
     const keys = Object.keys(data as Record<string, unknown>).map(k => k.toLowerCase())
-    const statusKeys = ['status', 'result', 'compliant', 'answer', 'has_cap', 'valid', 'success', 'passed', 'failed']
+    const statusKeys = ['status', 'result', 'compliant', 'answer', 'has_cap', 'valid', 'success', 'passed', 'failed', 'traffic_light']
     const hasStatus = statusKeys.some(sk => keys.includes(sk))
 
     if (hasStatus) {
@@ -123,18 +123,18 @@ function inferVisualizationType(data: unknown): VisualizationType {
 function getTrafficLightColor(value: unknown): { color: string; emoji: string; label: string } {
   const str = String(value).toLowerCase()
 
-  // Green (positive)
-  if (['pass', 'passed', 'yes', 'true', 'success', 'compliant', 'valid', 'ok'].includes(str)) {
+  // Green (positive) - includes explicit 'green' for traffic_light operation type
+  if (['pass', 'passed', 'yes', 'true', 'success', 'compliant', 'valid', 'ok', 'green'].includes(str)) {
     return { color: 'bg-green-500', emoji: '🟢', label: String(value) }
   }
 
-  // Red (negative)
-  if (['fail', 'failed', 'no', 'false', 'error', 'non-compliant', 'invalid', 'not ok'].includes(str)) {
+  // Red (negative) - includes explicit 'red' for traffic_light operation type
+  if (['fail', 'failed', 'no', 'false', 'error', 'non-compliant', 'invalid', 'not ok', 'red'].includes(str)) {
     return { color: 'bg-red-500', emoji: '🔴', label: String(value) }
   }
 
-  // Yellow (warning/pending)
-  if (['warning', 'pending', 'partial', 'review'].includes(str)) {
+  // Yellow (warning/pending) - includes explicit 'yellow' for traffic_light operation type
+  if (['warning', 'pending', 'partial', 'review', 'yellow'].includes(str)) {
     return { color: 'bg-yellow-500', emoji: '🟡', label: String(value) }
   }
 
@@ -154,7 +154,7 @@ function TrafficLightView({ data }: { data: unknown }) {
   const keys = Object.keys(dataObj)
   const statusKey = keys.find(k => {
     const lower = k.toLowerCase()
-    return ['status', 'result', 'compliant', 'answer', 'has_cap', 'valid', 'success', 'passed', 'failed'].includes(lower)
+    return ['status', 'result', 'compliant', 'answer', 'has_cap', 'valid', 'success', 'passed', 'failed', 'traffic_light'].includes(lower)
   })
 
   if (!statusKey) {

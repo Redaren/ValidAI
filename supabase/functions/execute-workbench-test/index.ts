@@ -714,6 +714,14 @@ serve(async (req) => {
             })
           })
 
+        case 'traffic_light':
+          return Output.object({
+            schema: z.object({
+              traffic_light: z.enum(['red', 'yellow', 'green']).describe('Traffic light status indicator (red=high risk, yellow=medium risk, green=low risk)'),
+              comment: z.string().describe('Explanation for the traffic light status')
+            })
+          })
+
         default:
           // Fallback - should never reach here but safety net
           return Output.object({

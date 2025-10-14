@@ -186,7 +186,7 @@ export const workbenchTestSchema = z.object({
     .enum(['stateful', 'stateless'])
     .describe('Execution mode: stateful (cached conversation) or stateless (independent)'),
   operation_type: z
-    .enum(['generic', 'validation', 'extraction', 'rating', 'classification', 'analysis'])
+    .enum(['generic', 'validation', 'extraction', 'rating', 'classification', 'analysis', 'traffic_light'])
     .optional()
     .default('generic')
     .describe('Operation type determining output structure'),

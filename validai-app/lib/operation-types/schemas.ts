@@ -104,6 +104,23 @@ export const analysisOutputSchema = z.object({
 })
 
 /**
+ * Traffic Light Output Schema
+ *
+ * For risk assessment operations with red/yellow/green status indicators.
+ * Provides visual status with explanatory reasoning.
+ *
+ * @example
+ * {
+ *   traffic_light: "red",
+ *   comment: "High risk identified due to missing liability clauses and insufficient insurance coverage..."
+ * }
+ */
+export const trafficLightOutputSchema = z.object({
+  traffic_light: z.enum(['red', 'yellow', 'green']).describe('Traffic light status indicator (red=high risk, yellow=medium risk, green=low risk)'),
+  comment: z.string().describe('Explanation for the traffic light status')
+})
+
+/**
  * TypeScript types inferred from schemas
  */
 export type ValidationOutput = z.infer<typeof validationOutputSchema>
@@ -111,3 +128,4 @@ export type ExtractionOutput = z.infer<typeof extractionOutputSchema>
 export type RatingOutput = z.infer<typeof ratingOutputSchema>
 export type ClassificationOutput = z.infer<typeof classificationOutputSchema>
 export type AnalysisOutput = z.infer<typeof analysisOutputSchema>
+export type TrafficLightOutput = z.infer<typeof trafficLightOutputSchema>
