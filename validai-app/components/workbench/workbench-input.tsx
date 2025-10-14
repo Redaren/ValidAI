@@ -452,8 +452,10 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
         })
       }
 
-      // Clear the prompt for next message
-      updateOperationPrompt('')
+      // Clear the prompt for next message (but keep it in edit mode for iteration)
+      if (!editOperationId) {
+        updateOperationPrompt('')
+      }
 
       // Auto-reset "Create cache" toggle to OFF after successful send
       if (createCache) {
