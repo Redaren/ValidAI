@@ -107,9 +107,9 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
 }
 
 /**
- * Get truncated comment from response text or structured output
+ * Get full comment from response text or structured output
  */
-function getTruncatedComment(result: OperationResult, maxLength: number = 80): string {
+function getFullComment(result: OperationResult): string {
   if (result.status === 'pending') {
     return 'Waiting to process...'
   }
@@ -121,19 +121,25 @@ function getTruncatedComment(result: OperationResult, maxLength: number = 80): s
   // Try to get comment from structured output first
   const structured = result.structured_output as { comment?: string } | null
   if (structured?.comment) {
-    return structured.comment.length > maxLength
-      ? structured.comment.substring(0, maxLength) + '...'
-      : structured.comment
+    return structured.comment
   }
 
   // Fall back to response text
   if (result.response_text) {
-    return result.response_text.length > maxLength
-      ? result.response_text.substring(0, maxLength) + '...'
-      : result.response_text
+    return result.response_text
   }
 
   return 'No response available'
+}
+
+/**
+ * Get truncated comment from response text or structured output
+ */
+function getTruncatedComment(result: OperationResult, maxLength: number = 80): string {
+  const fullComment = getFullComment(result)
+  return fullComment.length > maxLength
+    ? fullComment.substring(0, maxLength) + '...'
+    : fullComment
 }
 
 /**
@@ -153,6 +159,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
 
   const isPending = result.status === 'pending'
   const isFailed = result.status === 'failed'
+  const fullComment = getFullComment(result)
   const truncatedComment = getTruncatedComment(result)
 
   return (
@@ -163,7 +170,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
         isProcessing && 'bg-blue-50 dark:bg-blue-950/20'
       )}
     >
-      {/* Collapsed Row */}
+      {/* Row */}
       <div
         className={cn(
           'flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50',
@@ -171,6 +178,9 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
         )}
         onClick={() => !isPending && setIsExpanded(!isExpanded)}
       >
+        {/* Indicator - FIRST (far left) */}
+        <div className="shrink-0">{getOperationIndicator(result, isProcessing)}</div>
+
         {/* Expand/Collapse Icon */}
         <button
           className="shrink-0"
@@ -187,68 +197,28 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
           )}
         </button>
 
-        {/* Operation Name and Results */}
+        {/* Operation Name and Comment */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3">
-            <span className={cn('font-medium', isPending && 'text-muted-foreground')}>
+          <div className="flex items-start gap-3">
+            <span className={cn('font-medium shrink-0', isPending && 'text-muted-foreground')}>
               {snapshot.name}
             </span>
 
-            {/* Indicator */}
-            <div className="shrink-0">{getOperationIndicator(result, isProcessing)}</div>
+            <span className="text-muted-foreground shrink-0">|</span>
 
-            <span className="text-muted-foreground">|</span>
             <span
               className={cn(
-                'text-sm flex-1 truncate',
+                'text-sm flex-1',
+                !isExpanded && 'truncate',
                 isPending && 'text-muted-foreground',
                 isFailed && 'text-destructive'
               )}
             >
-              {truncatedComment}
+              {isExpanded ? fullComment : truncatedComment}
             </span>
           </div>
         </div>
       </div>
-
-      {/* Expanded Details */}
-      {isExpanded && (
-        <div className="border-t bg-muted/20 p-4 space-y-3">
-          {/* Operation Name & Description */}
-          <div>
-            <h4 className="font-semibold text-base mb-1">{snapshot.name}</h4>
-            {snapshot.description && (
-              <p className="text-sm text-muted-foreground">{snapshot.description}</p>
-            )}
-          </div>
-
-          {/* Full Response/Answer */}
-          <div>
-            <p className="text-sm font-medium mb-1">Result:</p>
-            <div className="rounded-lg border bg-card p-3">
-              {result.error_message ? (
-                <p className="text-sm text-destructive">{result.error_message}</p>
-              ) : result.response_text ? (
-                <pre className="whitespace-pre-wrap text-sm">{result.response_text}</pre>
-              ) : (
-                <p className="text-sm text-muted-foreground">No response available</p>
-              )}
-            </div>
-          </div>
-
-          {/* Structured Output (if available and interesting) */}
-          {result.structured_output && (
-            <div>
-              <p className="text-sm font-medium mb-1">Details:</p>
-              <div className="rounded-lg border bg-card p-3">
-                <pre className="whitespace-pre-wrap text-sm">
-                  {JSON.stringify(result.structured_output, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
