@@ -861,14 +861,18 @@ ProcessorRunsPage ◄──────────────┘      │
                                  │       │
                                  ▼       ▼
 RunDetailPage ◄──────────────────┴───────┘
-  ├── RunDetailHeader
-  │   ├── Status badge
-  │   ├── Progress bar
-  │   └── Metadata grid
-  └── OperationResultsTable
-      └── TableRow (expandable)
-          ├── Collapsed: Status, time, tokens
-          └── Expanded: Full response, structured output, thinking
+  ├── ViewSwitcher (tabs for Technical/Compliance/Contract Comments)
+  │   └── URL-based: ?view=technical
+  │
+  └── Selected View Component (e.g., TechnicalView)
+      ├── RunDetailHeader
+      │   ├── Status badge
+      │   ├── Progress bar
+      │   └── Metadata grid
+      └── OperationResultsTable
+          └── TableRow (expandable)
+              ├── Collapsed: Status, time, tokens
+              └── Expanded: Full response, structured output, thinking
 ```
 
 ### State Management
@@ -931,7 +935,12 @@ export function useRun(runId: string) {
 |-------|-----------|---------|
 | `/proc/[id]` | ProcessorDetailClient | Processor detail with Run menu |
 | `/proc/[id]/runs` | ProcessorRunsPage | List all runs for processor |
-| `/proc/[id]/runs/[run_id]` | RunDetailPage | Run detail with live updates |
+| `/proc/[id]/runs/[run_id]?view=technical` | RunDetailPage | Run detail with live updates and switchable views |
+
+**View Routing:**
+- URL query param `?view=X` enables shareable view links
+- View selection: URL param > processor default > "technical"
+- Available views: `technical`, `compliance`, `contract-comments`
 
 ## Real-time Updates
 
@@ -1593,8 +1602,13 @@ for (const run of runs) {
 - Table: `components/runs/operation-results-table.tsx` (367 lines)
 - List: `components/runs/runs-table.tsx` (256 lines)
 
+**UI Views:**
+- Technical View: `components/runs/views/technical-view.tsx` (97 lines)
+- View Switcher: `components/runs/views/view-switcher.tsx` (140 lines)
+- View Registry: `components/runs/views/index.tsx` (116 lines)
+
 **UI Pages:**
-- Detail: `app/proc/[id]/runs/[run_id]/page.tsx` (144 lines)
+- Detail: `app/proc/[id]/runs/[run_id]/page.tsx` (156 lines, updated)
 - List: `app/proc/[id]/runs/page.tsx` (116 lines)
 
 **Query Hooks:**
@@ -1603,8 +1617,9 @@ for (const run of runs) {
 
 **Modified:**
 - Processor Detail: `app/proc/[id]/processor-detail-client.tsx` (2 menu items added)
+- Operation Sheet: `components/processors/operation-sheet.tsx` (TypeScript fix)
 
-**Total:** ~2,823 lines of production code
+**Total:** ~3,176 lines of production code
 
 ### References
 
