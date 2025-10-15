@@ -3,16 +3,24 @@
  *
  * @module app/proc/[id]/runs/[run_id]/page
  * @description
- * Displays detailed information about a specific processor run.
+ * Displays detailed information about a specific processor run with support
+ * for multiple visualization views (Technical, Compliance, Contract Comments).
  * Shows real-time progress updates, operation results, and execution metadata.
  *
  * **Features:**
  * - Real-time progress updates via Supabase Realtime
+ * - Multiple view types (URL-based, shareable)
+ * - View switcher UI with tabs
+ * - Processor-specific default views
  * - Run metadata and status
- * - Operation results table with expandable rows
  * - Automatic refetching during processing
  *
- * **Route:** `/proc/[id]/runs/[run_id]`
+ * **Route:** `/proc/[id]/runs/[run_id]?view=technical`
+ *
+ * **View Selection Hierarchy:**
+ * 1. URL query param (`?view=X`) - highest priority
+ * 2. Processor's default view (`configuration.default_view`)
+ * 3. System default (`"technical"`)
  *
  * @since Phase 1.8
  */
@@ -20,9 +28,9 @@
 'use client'
 
 import { use } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useRun, useOperationResults } from '@/app/queries/runs'
-import { RunDetailHeader } from '@/components/runs/run-detail-header'
-import { OperationResultsTable } from '@/components/runs/operation-results-table'
+import { getViewComponent, ViewSwitcher, type ViewType } from '@/components/runs/views'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
@@ -43,15 +51,23 @@ interface RunDetailPageProps {
 /**
  * Run Detail Page Component
  *
- * Client component that fetches and displays run details with real-time updates.
- * Subscribes to database changes for live progress tracking.
+ * Client component that fetches and displays run details with real-time updates
+ * and support for multiple visualization views. Subscribes to database changes
+ * for live progress tracking.
  *
  * **Data Flow:**
- * 1. Fetch run details via useRun hook
- * 2. Subscribe to real-time updates
- * 3. Fetch operation results via useOperationResults hook
- * 4. Render header and results table
- * 5. Auto-refetch on database changes
+ * 1. Parse route params and URL query params
+ * 2. Fetch run details via useRun hook
+ * 3. Subscribe to real-time updates
+ * 4. Fetch operation results via useOperationResults hook
+ * 5. Determine view type (URL > processor default > system default)
+ * 6. Render view switcher and selected view component
+ * 7. Auto-refetch on database changes
+ *
+ * **View Selection Logic:**
+ * - URL query param `?view=X` has highest priority (shareable links)
+ * - Falls back to processor's configured `default_view`
+ * - Finally defaults to "technical" view
  *
  * **Loading States:**
  * - Shows loading spinner while fetching initial data
@@ -62,10 +78,12 @@ interface RunDetailPageProps {
  * - Back to processor button for navigation
  *
  * @param params - Route parameters
- * @returns Run detail page with live updates
+ * @returns Run detail page with live updates and view switcher
  */
 export default function RunDetailPage({ params }: RunDetailPageProps) {
   const { id: processorId, run_id: runId } = use(params)
+  const searchParams = useSearchParams()
+  const router = useRouter()
 
   // Fetch run with real-time updates
   const { data: run, isLoading: isLoadingRun, error: runError } = useRun(runId, {
@@ -76,6 +94,32 @@ export default function RunDetailPage({ params }: RunDetailPageProps) {
   const { data: operationResults, isLoading: isLoadingResults } = useOperationResults(runId, {
     realtime: true,
   })
+
+  // Determine current view type
+  const viewFromUrl = searchParams.get('view') as ViewType | null
+
+  // Extract processor default view from snapshot with type safety
+  const snapshot = run?.snapshot as
+    | {
+        processor?: {
+          configuration?: {
+            default_view?: ViewType
+          }
+        }
+      }
+    | undefined
+  const processorDefaultView = snapshot?.processor?.configuration?.default_view
+
+  const currentView: ViewType = viewFromUrl || processorDefaultView || 'technical'
+
+  // Get the appropriate view component
+  const ViewComponent = getViewComponent(currentView)
+
+  // Handle view switching (updates URL)
+  const handleViewChange = (newView: ViewType) => {
+    const url = `/proc/${processorId}/runs/${runId}?view=${newView}`
+    router.push(url)
+  }
 
   if (isLoadingRun) {
     return (
@@ -108,21 +152,15 @@ export default function RunDetailPage({ params }: RunDetailPageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Run Header */}
-      <RunDetailHeader run={run} />
+      {/* View Switcher */}
+      <ViewSwitcher currentView={currentView} onViewChange={handleViewChange} />
 
-      {/* Operation Results */}
-      <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Operation Results</h2>
-
-        {isLoadingResults ? (
-          <div className="flex min-h-[200px] items-center justify-center rounded-lg border">
-            <p className="text-sm text-muted-foreground">Loading operation results...</p>
-          </div>
-        ) : (
-          <OperationResultsTable results={operationResults || []} />
-        )}
-      </div>
+      {/* Selected View Component */}
+      <ViewComponent
+        run={run}
+        operationResults={operationResults || []}
+        isLoadingResults={isLoadingResults}
+      />
     </div>
   )
 }

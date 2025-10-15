@@ -360,11 +360,12 @@ export function OperationSheet({
                     )}
                   />
                 )}
-                {form.formState.errors.operation_type && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {form.formState.errors.operation_type.message}
-                  </p>
-                )}
+                {'operation_type' in form.formState.errors &&
+                  form.formState.errors.operation_type && (
+                    <p className="text-sm text-destructive" role="alert">
+                      {form.formState.errors.operation_type.message}
+                    </p>
+                  )}
               </div>
 
               {/**
