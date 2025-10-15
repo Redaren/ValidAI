@@ -99,8 +99,8 @@ export function OrganizationSwitcher() {
                 <span className="truncate font-semibold">
                   {currentOrg?.name || 'No Organization'}
                 </span>
-                <span className="truncate text-xs capitalize">
-                  {currentOrg?.plan_type || 'free'} plan
+                <span className="truncate text-xs">
+                  Slogan here
                 </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />
@@ -125,12 +125,7 @@ export function OrganizationSwitcher() {
                 <div className="flex size-6 items-center justify-center rounded-sm border">
                   <Building2 className="size-4 shrink-0" />
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium">{org.name}</span>
-                  <span className="text-xs text-muted-foreground capitalize">
-                    {org.plan_type} plan
-                  </span>
-                </div>
+                <span className="font-medium">{org.name}</span>
                 {currentOrg?.id === org.id && (
                   <div className="ml-auto size-2 rounded-full bg-primary" />
                 )}
