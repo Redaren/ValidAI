@@ -398,9 +398,23 @@ serve(async (req) => {
 
       console.log(`Processing chunk: ${chunk.length} operations (${backgroundBody.start_index} to ${backgroundBody.start_index + chunk.length - 1})`)
 
-      // Get settings from snapshot
-      const settings: ProcessorSettings = snapshot.processor.configuration?.settings_override || {}
+      // Merge LLM config settings with snapshot overrides
+      // Priority: snapshot.settings_override > llmConfig.settings > defaults
+      const settings: ProcessorSettings = {
+        // Start with resolved LLM config settings from get_llm_config_for_run
+        selected_model_id: llmConfig.model,
+        max_tokens: llmConfig.settings?.default_max_tokens,
+        temperature: llmConfig.settings?.default_temperature,
+        top_p: llmConfig.settings?.default_top_p,
+        top_k: llmConfig.settings?.default_top_k,
+
+        // Override with processor-specific settings if present
+        ...(snapshot.processor.configuration?.settings_override || {})
+      }
       const enableCaching = settings.enable_caching !== false // Default: true
+
+      console.log(`Using model: ${settings.selected_model_id}`)
+      console.log(`Settings: temp=${settings.temperature}, max_tokens=${settings.max_tokens}, caching=${enableCaching}`)
 
       for (const [chunkIndex, operation] of chunk.entries()) {
         const operationIndex = backgroundBody.start_index + chunkIndex
@@ -482,12 +496,18 @@ serve(async (req) => {
         } catch (error: any) {
           // Operation failed (after retries)
           console.error(`❌ Operation failed: ${error.message}`)
+          console.error('Full error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+            retryCount: error.retryCount
+          })
 
           await supabase
             .from('operation_results')
             .update({
               status: 'failed',
-              error_message: error.message,
+              error_message: error.message || 'Unknown error occurred',
               error_type: error.name || 'UnknownError',
               retry_count: error.retryCount || 0,
               completed_at: new Date().toISOString()
