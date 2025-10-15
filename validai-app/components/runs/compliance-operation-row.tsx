@@ -54,9 +54,9 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
   if (operationType === 'validation') {
     const structured = result.structured_output as { result?: boolean } | null
     if (structured?.result === true) {
-      return <div className="h-3 w-3 rounded-full bg-green-500" aria-label="True" />
+      return <div className="h-4 w-4 rounded-full bg-green-500" aria-label="True" />
     } else if (structured?.result === false) {
-      return <div className="h-3 w-3 rounded-full bg-red-500" aria-label="False" />
+      return <div className="h-4 w-4 rounded-full bg-red-500" aria-label="False" />
     }
   }
 
@@ -83,18 +83,14 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
     }
   }
 
-  // Extraction
+  // Extraction - NO INDICATOR (value shown in comment)
   if (operationType === 'extraction') {
-    const structured = result.structured_output as { items?: string[] } | null
-    const count = structured?.items?.length || 0
-    if (count > 0) {
-      return <span className="text-sm font-semibold text-blue-600">{count} items</span>
-    }
+    return null
   }
 
-  // Classification
+  // Classification - NO INDICATOR (value shown in comment)
   if (operationType === 'classification') {
-    return <Tag className="h-4 w-4 text-purple-600" />
+    return null
   }
 
   // Analysis
@@ -143,6 +139,59 @@ function getTruncatedComment(result: OperationResult, maxLength: number = 80): s
 }
 
 /**
+ * Truncate text helper
+ */
+function getTruncatedText(text: string, maxLength: number = 80): string {
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
+
+/**
+ * Get extraction items array (only if multiple items)
+ */
+function getExtractionItems(result: OperationResult): string[] | null {
+  const structured = result.structured_output as { items?: string[] } | null
+  return structured?.items && structured.items.length > 1 ? structured.items : null
+}
+
+/**
+ * Get formatted comment with structured value prepended
+ * For extraction and classification, the value is shown first, then the comment
+ */
+function getFormattedComment(result: OperationResult, truncate: boolean = false): string {
+  const snapshot = result.operation_snapshot as { operation_type: string }
+  const operationType = snapshot.operation_type
+  const structured = result.structured_output as any
+  const baseComment = getFullComment(result)
+
+  // Extraction - prepend items to comment
+  if (operationType === 'extraction' && structured?.items) {
+    const items = structured.items as string[]
+    if (items.length === 1) {
+      // Single item: "ItemValue. Comment text..."
+      const combined = `${items[0]}. ${baseComment}`
+      return truncate ? getTruncatedText(combined) : combined
+    } else if (items.length > 1) {
+      // Multiple items in collapsed view: "Item1, Item2, Item3..."
+      if (truncate) {
+        const itemsText = items.join(', ')
+        return getTruncatedText(itemsText)
+      }
+      // In expanded view, items shown as list (handled separately in JSX)
+      return baseComment
+    }
+  }
+
+  // Classification - prepend classification to comment
+  if (operationType === 'classification' && structured?.classification) {
+    const combined = `${structured.classification}. ${baseComment}`
+    return truncate ? getTruncatedText(combined) : combined
+  }
+
+  // Default: just return comment
+  return truncate ? getTruncatedComment(result) : baseComment
+}
+
+/**
  * Compliance Operation Row
  *
  * Displays a single operation result in a compact, business-focused format.
@@ -173,17 +222,19 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
       {/* Row */}
       <div
         className={cn(
-          'flex items-center gap-3 p-3 cursor-pointer hover:bg-muted/50',
+          'flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50',
           isPending && 'opacity-60'
         )}
         onClick={() => !isPending && setIsExpanded(!isExpanded)}
       >
-        {/* Indicator - FIRST (far left) */}
-        <div className="shrink-0">{getOperationIndicator(result, isProcessing)}</div>
+        {/* Indicator - FIRST (far left) with fixed width */}
+        <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+          {getOperationIndicator(result, isProcessing)}
+        </div>
 
         {/* Expand/Collapse Icon */}
         <button
-          className="shrink-0"
+          className="shrink-0 mt-0.5"
           onClick={(e) => {
             e.stopPropagation()
             if (!isPending) setIsExpanded(!isExpanded)
@@ -199,24 +250,86 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
 
         {/* Operation Name and Comment */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-3">
-            <span className={cn('font-medium shrink-0', isPending && 'text-muted-foreground')}>
-              {snapshot.name}
-            </span>
+          {!isExpanded ? (
+            // COLLAPSED VIEW
+            <div className="flex items-center gap-3">
+              {/* Fixed-width name column */}
+              <span
+                className={cn(
+                  'w-48 shrink-0 font-medium truncate',
+                  isPending && 'text-muted-foreground'
+                )}
+              >
+                {snapshot.name}
+              </span>
 
-            <span className="text-muted-foreground shrink-0">|</span>
+              {/* Separator */}
+              <span className="text-muted-foreground shrink-0">|</span>
 
-            <span
-              className={cn(
-                'text-sm flex-1',
-                !isExpanded && 'truncate',
-                isPending && 'text-muted-foreground',
-                isFailed && 'text-destructive'
-              )}
-            >
-              {isExpanded ? fullComment : truncatedComment}
-            </span>
-          </div>
+              {/* Comment (with structured value prepended if applicable) */}
+              <span
+                className={cn(
+                  'text-sm flex-1 truncate',
+                  isPending && 'text-muted-foreground',
+                  isFailed && 'text-destructive'
+                )}
+              >
+                {getFormattedComment(result, true)}
+              </span>
+            </div>
+          ) : (
+            // EXPANDED VIEW
+            <div className="flex flex-col gap-2">
+              <div className="flex items-start gap-3">
+                {/* Fixed-width name column */}
+                <span
+                  className={cn(
+                    'w-48 shrink-0 font-medium',
+                    isPending && 'text-muted-foreground'
+                  )}
+                >
+                  {snapshot.name}
+                </span>
+
+                {/* Separator */}
+                <span className="text-muted-foreground shrink-0">|</span>
+
+                {/* Comment section */}
+                <div className="flex-1">
+                  {(() => {
+                    const items = getExtractionItems(result)
+                    if (items) {
+                      // Multi-item extraction: show as list
+                      return (
+                        <>
+                          <ul className="list-disc list-inside space-y-1 mb-2">
+                            {items.map((item, idx) => (
+                              <li key={idx} className="text-sm">
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-sm">{fullComment}</p>
+                        </>
+                      )
+                    }
+                    // Single item or no items: just show formatted comment
+                    return (
+                      <span
+                        className={cn(
+                          'text-sm',
+                          isPending && 'text-muted-foreground',
+                          isFailed && 'text-destructive'
+                        )}
+                      >
+                        {getFormattedComment(result, false)}
+                      </span>
+                    )
+                  })()}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
