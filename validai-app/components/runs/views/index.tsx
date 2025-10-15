@@ -23,6 +23,7 @@
 
 import type { ComponentType } from 'react'
 import { TechnicalView } from './technical-view'
+import { ComplianceView as ComplianceViewComponent } from './compliance-view'
 import type { ViewType } from './view-switcher'
 import type { Database } from '@/lib/database.types'
 
@@ -79,11 +80,6 @@ const PlaceholderView = ({ title }: { title: string }) => (
 )
 
 /**
- * Compliance view placeholder
- */
-const ComplianceView: RunViewComponent = () => <PlaceholderView title="Compliance View" />
-
-/**
  * Contract comments view placeholder
  */
 const ContractCommentsView: RunViewComponent = () => (
@@ -92,7 +88,7 @@ const ContractCommentsView: RunViewComponent = () => (
 
 export const VIEW_REGISTRY: Record<ViewType, RunViewComponent> = {
   technical: TechnicalView,
-  compliance: ComplianceView,
+  compliance: ComplianceViewComponent,
   'contract-comments': ContractCommentsView,
 }
 
@@ -113,4 +109,5 @@ export function getViewComponent(viewType: ViewType | string): RunViewComponent 
 
 // Re-export common types and components
 export { TechnicalView } from './technical-view'
+export { ComplianceView as ComplianceViewComponent } from './compliance-view'
 export { ViewSwitcher, AVAILABLE_VIEWS, type ViewType } from './view-switcher'
