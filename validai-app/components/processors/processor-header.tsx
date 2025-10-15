@@ -20,6 +20,7 @@ import {
 import {
   Archive,
   Eye,
+  History,
   Lock,
   MoreHorizontal,
   Pencil,
@@ -28,6 +29,7 @@ import {
   Users,
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
+import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
@@ -101,9 +103,20 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="default" size="icon" disabled title="Run">
-            <Play className="h-4 w-4" />
-            <span className="sr-only">Run</span>
+          <RunProcessorDialog
+            processorId={processor.processor_id}
+            trigger={
+              <Button variant="default" size="icon" title="Run">
+                <Play className="h-4 w-4" />
+                <span className="sr-only">Run</span>
+              </Button>
+            }
+          />
+          <Button variant="ghost" size="icon" asChild title="View Runs">
+            <Link href={`/proc/${processor.processor_id}/runs`}>
+              <History className="h-4 w-4" />
+              <span className="sr-only">View Runs</span>
+            </Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

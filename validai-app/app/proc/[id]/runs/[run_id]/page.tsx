@@ -107,17 +107,7 @@ export default function RunDetailPage({ params }: RunDetailPageProps) {
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
-      {/* Back Button */}
-      <div>
-        <Button asChild variant="ghost" size="sm">
-          <Link href={`/proc/${processorId}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Processor
-          </Link>
-        </Button>
-      </div>
-
+    <div className="space-y-6">
       {/* Run Header */}
       <RunDetailHeader run={run} />
 

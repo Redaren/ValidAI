@@ -11,6 +11,7 @@
  * - Click to navigate to run details
  * - Empty state when no runs exist
  * - Back to processor navigation
+ * - Breadcrumb navigation
  *
  * **Route:** `/proc/[id]/runs`
  *
@@ -21,9 +22,10 @@
 
 import { use } from 'react'
 import { useProcessorRuns } from '@/app/queries/runs'
+import { useProcessorDetail } from '@/app/queries/processors/use-processor-detail'
 import { RunsTable } from '@/components/runs/runs-table'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, History } from 'lucide-react'
 import Link from 'next/link'
 
 /**
@@ -62,6 +64,7 @@ export default function ProcessorRunsPage({ params }: ProcessorRunsPageProps) {
   const { id: processorId } = use(params)
 
   const { data: runs, isLoading, error } = useProcessorRuns(processorId)
+  const { data: processor, isLoading: processorLoading } = useProcessorDetail(processorId)
 
   if (isLoading) {
     return (
@@ -93,21 +96,18 @@ export default function ProcessorRunsPage({ params }: ProcessorRunsPageProps) {
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold">Run History</h1>
-          <p className="text-sm text-muted-foreground">
-            View all processor executions and their results
-          </p>
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <History className="h-6 w-6" />
+          <h1 className="text-2xl font-bold">
+            History - {processorLoading ? 'Loading...' : processor?.processor_name || 'Processor'}
+          </h1>
         </div>
-        <Button asChild variant="outline">
-          <Link href={`/proc/${processorId}`}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Processor
-          </Link>
-        </Button>
+        <p className="text-sm text-muted-foreground">
+          View executions and their results
+        </p>
       </div>
 
       {/* Runs Table */}

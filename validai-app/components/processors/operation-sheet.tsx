@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
   createGenericOperationSchema,
@@ -47,6 +47,7 @@ const OPERATION_TYPES = [
   'classification',
   'analysis',
   'generic',
+  'traffic_light',
 ] as const
 
 /**
@@ -308,33 +309,62 @@ export function OperationSheet({
               </h3>
 
               {/**
-               * Operation Type Field - Disabled in both modes for now
+               * Operation Type Field
                *
                * Renders all available operation types from the database enum.
                * Each operation type is treated equally - no special cases.
                *
                * In edit mode: Shows the existing operation type (read-only)
-               * In create mode: Shows "Generic" (default selection)
+               * In create mode: User can select any of the 7 operation types
                */}
               <div className="space-y-2">
                 <Label htmlFor="operation_type">
                   Operation Type <span className="text-destructive">*</span>
                 </Label>
-                <Select
-                  value={isEditMode ? operation?.operation_type : 'generic'}
-                  disabled // Always disabled for now
-                >
-                  <SelectTrigger id="operation_type" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {OPERATION_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type.charAt(0).toUpperCase() + type.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {isEditMode ? (
+                  <Select
+                    value={operation?.operation_type}
+                    disabled
+                  >
+                    <SelectTrigger id="operation_type" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OPERATION_TYPES.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Controller
+                    name="operation_type"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <SelectTrigger id="operation_type" className="w-full">
+                          <SelectValue placeholder="Select operation type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {OPERATION_TYPES.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                )}
+                {form.formState.errors.operation_type && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {form.formState.errors.operation_type.message}
+                  </p>
+                )}
               </div>
 
               {/**

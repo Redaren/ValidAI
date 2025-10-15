@@ -11,7 +11,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { Lock, Users, Eye, MoreHorizontal } from "lucide-react"
+import { Lock, Users, Eye, History, MoreHorizontal } from "lucide-react"
 import { formatDistanceToNow } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -133,6 +133,16 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 }}
               >
                 <Eye className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  router.push(`/proc/${processor.processor_id}/runs`)
+                }}
+              >
+                <History className="h-4 w-4" />
               </Button>
 
               <DropdownMenu>

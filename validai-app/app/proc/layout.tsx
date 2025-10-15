@@ -26,17 +26,22 @@ export default function ProcessorsLayout({
 }) {
   const pathname = usePathname()
 
-  // Extract processor ID from pathname if on detail or workbench page
-  const processorIdMatch = pathname.match(/^\/proc\/([^\/]+)(?:\/workbench)?$/)
-  const processorId = processorIdMatch ? processorIdMatch[1] : null
-  const isWorkbenchPage = pathname.includes('/workbench')
+  // Extract processor ID from pathname for detail, workbench, or runs pages
+  const detailMatch = pathname.match(/^\/proc\/([^\/]+)$/)
+  const workbenchMatch = pathname.match(/^\/proc\/([^\/]+)\/workbench$/)
+  const runsMatch = pathname.match(/^\/proc\/([^\/]+)\/runs(?:\/([^\/]+))?$/)
 
-  // Fetch processor data only if on detail or workbench page
+  const processorId = detailMatch?.[1] || workbenchMatch?.[1] || runsMatch?.[1] || null
+  const isWorkbenchPage = !!workbenchMatch
+  const isRunsPage = !!runsMatch && !runsMatch[2] // runs list page
+  const isRunDetailPage = !!runsMatch?.[2] // specific run detail page
+
+  // Fetch processor data for all processor-related pages
   const { data: processor } = useProcessorDetail(processorId || "", {
     enabled: !!processorId,
   })
 
-  const isDetailPage = !!processorId && !isWorkbenchPage
+  const isDetailPage = !!detailMatch
   const hasProcessor = !!processorId
 
   return (
@@ -69,7 +74,7 @@ export default function ProcessorsLayout({
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      {isWorkbenchPage ? (
+                      {isWorkbenchPage || isRunsPage || isRunDetailPage ? (
                         <BreadcrumbLink href={`/proc/${processorId}`}>
                           {processor?.processor_name || "Loading..."}
                         </BreadcrumbLink>
@@ -86,6 +91,28 @@ export default function ProcessorsLayout({
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
                       <BreadcrumbPage>Workbench</BreadcrumbPage>
+                    </BreadcrumbItem>
+                  </>
+                )}
+                {(isRunsPage || isRunDetailPage) && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      {isRunDetailPage ? (
+                        <BreadcrumbLink href={`/proc/${processorId}/runs`}>
+                          History
+                        </BreadcrumbLink>
+                      ) : (
+                        <BreadcrumbPage>History</BreadcrumbPage>
+                      )}
+                    </BreadcrumbItem>
+                  </>
+                )}
+                {isRunDetailPage && (
+                  <>
+                    <BreadcrumbSeparator />
+                    <BreadcrumbItem>
+                      <BreadcrumbPage>Run Detail</BreadcrumbPage>
                     </BreadcrumbItem>
                   </>
                 )}

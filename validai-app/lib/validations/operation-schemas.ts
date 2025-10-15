@@ -46,13 +46,13 @@ export const operationPromptSchema = z
 /**
  * Generic operation creation schema
  *
- * Used for creating Generic type operations which are flexible
- * operations used during development to test LLM behavior.
+ * Used for creating operations of any type. All operation types currently
+ * share the same validation rules (name, description, prompt).
  *
  * Fields:
  * - name: The operation identifier (required)
  * - description: What the operation does (optional)
- * - operation_type: Fixed as 'generic'
+ * - operation_type: Any of the 7 supported operation types
  * - prompt: Instructions for the AI (required)
  *
  * Note: area, position, processor_id are NOT included here
@@ -61,7 +61,15 @@ export const operationPromptSchema = z
 export const createGenericOperationSchema = z.object({
   name: operationNameSchema,
   description: operationDescriptionSchema,
-  operation_type: z.literal('generic'),
+  operation_type: z.enum([
+    'extraction',
+    'validation',
+    'rating',
+    'classification',
+    'analysis',
+    'generic',
+    'traffic_light',
+  ]),
   prompt: operationPromptSchema,
 })
 
