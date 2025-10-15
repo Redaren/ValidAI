@@ -349,19 +349,22 @@ export function useUpdateProcessor() {
       tags?: string[] | null
       default_run_view?: 'technical' | 'compliance' | 'contract-comments'
     }) => {
-      // Get current configuration to merge default_run_view
-      const { data: current } = await supabase
-        .from('processors')
-        .select('configuration')
-        .eq('id', processorId)
-        .single()
+      // Only fetch and update configuration if default_run_view is provided
+      let updatedConfig: Record<string, unknown> | undefined = undefined
+      if (default_run_view !== undefined) {
+        const { data: current } = await supabase
+          .from('processors')
+          .select('configuration')
+          .eq('id', processorId)
+          .single()
 
-      if (!current) throw new Error('Processor not found')
+        if (!current) throw new Error('Processor not found')
 
-      // Merge default_run_view into configuration
-      const updatedConfig = {
-        ...(current.configuration || {}),
-        ...(default_run_view !== undefined ? { default_run_view } : {}),
+        // Properly merge: preserve ALL existing fields, only update default_run_view
+        updatedConfig = {
+          ...(current.configuration as Record<string, unknown> || {}),
+          default_run_view,
+        }
       }
 
       // Build update object with only provided fields
@@ -384,7 +387,8 @@ export function useUpdateProcessor() {
       if (visibility !== undefined) updates.visibility = visibility
       if (system_prompt !== undefined) updates.system_prompt = system_prompt
       if (tags !== undefined) updates.tags = tags
-      if (default_run_view !== undefined) updates.configuration = updatedConfig
+      // Only update configuration if it was explicitly modified
+      if (updatedConfig !== undefined) updates.configuration = updatedConfig
 
       const { error } = await supabase
         .from('processors')
