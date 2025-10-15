@@ -324,3 +324,114 @@ export function useUpdateProcessorSettings() {
     },
   })
 }
+
+export function useUpdateProcessor() {
+  const queryClient = useQueryClient()
+  const supabase = createClient()
+
+  return useMutation({
+    mutationFn: async ({
+      processorId,
+      name,
+      description,
+      usage_description,
+      visibility,
+      system_prompt,
+      tags,
+      default_run_view,
+    }: {
+      processorId: string
+      name?: string
+      description?: string | null
+      usage_description?: string | null
+      visibility?: 'personal' | 'organization'
+      system_prompt?: string | null
+      tags?: string[] | null
+      default_run_view?: 'technical' | 'compliance' | 'contract-comments'
+    }) => {
+      // Get current configuration to merge default_run_view
+      const { data: current } = await supabase
+        .from('processors')
+        .select('configuration')
+        .eq('id', processorId)
+        .single()
+
+      if (!current) throw new Error('Processor not found')
+
+      // Merge default_run_view into configuration
+      const updatedConfig = {
+        ...(current.configuration || {}),
+        ...(default_run_view !== undefined ? { default_run_view } : {}),
+      }
+
+      // Build update object with only provided fields
+      const updates: {
+        name?: string
+        description?: string | null
+        usage_description?: string | null
+        visibility?: 'personal' | 'organization'
+        system_prompt?: string | null
+        tags?: string[] | null
+        configuration?: unknown
+        updated_at: string
+      } = {
+        updated_at: new Date().toISOString(),
+      }
+
+      if (name !== undefined) updates.name = name
+      if (description !== undefined) updates.description = description
+      if (usage_description !== undefined) updates.usage_description = usage_description
+      if (visibility !== undefined) updates.visibility = visibility
+      if (system_prompt !== undefined) updates.system_prompt = system_prompt
+      if (tags !== undefined) updates.tags = tags
+      if (default_run_view !== undefined) updates.configuration = updatedConfig
+
+      const { error } = await supabase
+        .from('processors')
+        .update(updates)
+        .eq('id', processorId)
+
+      if (error) throw error
+    },
+    onMutate: async ({ processorId, name, description, visibility, default_run_view }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['processor', processorId] })
+
+      // Snapshot previous value
+      const previousProcessor = queryClient.getQueryData<ProcessorDetail>([
+        'processor',
+        processorId,
+      ])
+
+      // Optimistically update
+      if (previousProcessor) {
+        queryClient.setQueryData<ProcessorDetail>(['processor', processorId], {
+          ...previousProcessor,
+          ...(name !== undefined ? { processor_name: name } : {}),
+          ...(description !== undefined ? { processor_description: description } : {}),
+          ...(visibility !== undefined ? { visibility } : {}),
+          ...(default_run_view !== undefined
+            ? {
+                configuration: {
+                  ...(previousProcessor.configuration || {}),
+                  default_run_view,
+                },
+              }
+            : {}),
+        })
+      }
+
+      return { previousProcessor }
+    },
+    onError: (err, { processorId }, context) => {
+      // Rollback on error
+      if (context?.previousProcessor) {
+        queryClient.setQueryData(['processor', processorId], context.previousProcessor)
+      }
+    },
+    onSuccess: (_, { processorId }) => {
+      queryClient.invalidateQueries({ queryKey: ['processor', processorId] })
+      queryClient.invalidateQueries({ queryKey: ['processors'] }) // Refresh list
+    },
+  })
+}

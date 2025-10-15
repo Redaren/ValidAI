@@ -30,6 +30,7 @@ import {
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
+import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
@@ -37,6 +38,7 @@ interface ProcessorHeaderProps {
 
 export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
 
   const getStatusColor = (status: string) => {
@@ -126,7 +128,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled>
+              <DropdownMenuItem onClick={() => setIsEditSheetOpen(true)}>
                 <Pencil className="mr-2 h-4 w-4" />
                 Edit
               </DropdownMenuItem>
@@ -253,6 +255,12 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
           </div>
         </div>
       </CollapsibleContent>
+
+      <EditProcessorSheet
+        open={isEditSheetOpen}
+        onOpenChange={setIsEditSheetOpen}
+        processor={processor}
+      />
     </Collapsible>
   )
 }

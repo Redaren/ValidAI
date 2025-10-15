@@ -30,6 +30,7 @@ export type CreateProcessorInput = z.infer<typeof createProcessorSchema>
 /**
  * Schema for updating an existing processor
  * All fields optional (partial update)
+ * Used in: EditProcessorSheet form component
  */
 export const updateProcessorSchema = z.object({
   name: nameSchema.optional(),
@@ -39,6 +40,7 @@ export const updateProcessorSchema = z.object({
   usage_description: descriptionSchema,
   system_prompt: z.string().trim().max(2000).optional(),
   tags: tagsSchema,
+  default_run_view: z.enum(['technical', 'compliance', 'contract-comments']).optional(),
 })
 
 export type UpdateProcessorInput = z.infer<typeof updateProcessorSchema>
