@@ -51,7 +51,7 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
   const operationType = snapshot.operation_type
 
   // True/False validation
-  if (operationType === 'true_false') {
+  if (operationType === 'validation') {
     const structured = result.structured_output as { result?: boolean } | null
     if (structured?.result === true) {
       return <CheckCircle2 className="h-4 w-4 text-green-600" />

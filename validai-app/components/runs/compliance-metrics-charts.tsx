@@ -39,7 +39,7 @@ interface ComplianceMetricsChartsProps {
 function calculateValidationMetrics(results: OperationResult[]) {
   const validationResults = results.filter((r) => {
     const snapshot = r.operation_snapshot as { operation_type: string }
-    return snapshot.operation_type === 'true_false' && r.status === 'completed'
+    return snapshot.operation_type === 'validation' && r.status === 'completed'
   })
 
   if (validationResults.length === 0) {
