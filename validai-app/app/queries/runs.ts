@@ -71,7 +71,9 @@ export function useCreateRun() {
         body: { processor_id, document_id },
       })
 
-      if (error) throw error
+      if (error) {
+        throw new Error(error.message || 'Failed to create processor run')
+      }
       return data as { run_id: string; status: string; message: string }
     },
     onSuccess: (data, variables) => {

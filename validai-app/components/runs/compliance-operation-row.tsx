@@ -18,7 +18,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Loader2, CheckCircle2, XCircle, Circle } from 'lucide-react'
+import { ChevronRight, ChevronDown, Loader2, CheckCircle2, XCircle, Circle, Tag, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Database } from '@/lib/database.types'
 
@@ -52,38 +52,57 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
 
   // True/False validation
   if (operationType === 'true_false') {
-    const structured = result.structured_output as { answer?: boolean } | null
-    if (structured?.answer === true) {
+    const structured = result.structured_output as { result?: boolean } | null
+    if (structured?.result === true) {
       return <CheckCircle2 className="h-4 w-4 text-green-600" />
-    } else if (structured?.answer === false) {
+    } else if (structured?.result === false) {
       return <XCircle className="h-4 w-4 text-red-600" />
     }
   }
 
   // Traffic Light
   if (operationType === 'traffic_light') {
-    const structured = result.structured_output as { status?: string } | null
-    if (structured?.status === 'green') {
+    const structured = result.structured_output as { traffic_light?: string } | null
+    if (structured?.traffic_light === 'green') {
       return <div className="h-4 w-4 rounded-full bg-green-500" aria-label="Green" />
-    } else if (structured?.status === 'yellow') {
+    } else if (structured?.traffic_light === 'yellow') {
       return <div className="h-4 w-4 rounded-full bg-yellow-500" aria-label="Yellow" />
-    } else if (structured?.status === 'red') {
+    } else if (structured?.traffic_light === 'red') {
       return <div className="h-4 w-4 rounded-full bg-red-500" aria-label="Red" />
     }
   }
 
   // Rating
   if (operationType === 'rating') {
-    const structured = result.structured_output as { rating?: number } | null
-    if (structured?.rating !== undefined) {
-      const rating = structured.rating
+    const structured = result.structured_output as { value?: number } | null
+    if (structured?.value !== undefined) {
+      const rating = structured.value
       const color =
         rating >= 4 ? 'text-green-600' : rating >= 3 ? 'text-yellow-600' : 'text-red-600'
       return <span className={cn('text-sm font-semibold', color)}>{rating}/5</span>
     }
   }
 
-  // Default: Checkmark for completed
+  // Extraction
+  if (operationType === 'extraction') {
+    const structured = result.structured_output as { items?: string[] } | null
+    const count = structured?.items?.length || 0
+    if (count > 0) {
+      return <span className="text-sm font-semibold text-blue-600">{count} items</span>
+    }
+  }
+
+  // Classification
+  if (operationType === 'classification') {
+    return <Tag className="h-4 w-4 text-purple-600" />
+  }
+
+  // Analysis
+  if (operationType === 'analysis') {
+    return <FileText className="h-4 w-4 text-blue-600" />
+  }
+
+  // Default: Checkmark for completed (generic and other types)
   return <CheckCircle2 className="h-4 w-4 text-green-600" />
 }
 

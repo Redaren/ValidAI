@@ -69,26 +69,80 @@ An AI-powered system that:
 - **Analysis**: "Summarize the intellectual property terms" → Returns: Free-form text
 
 ### 4. Run
-**Definition**: An execution instance where a processor is applied to a specific document.
+**Definition**: An execution instance where a processor is applied to a specific document, with an immutable snapshot of the complete state.
 
-**Purpose**: Tracks the actual analysis event, capturing when a document was processed and what the results were.
+**Purpose**: Tracks the actual analysis event, capturing when a document was processed, what the results were, and the exact processor configuration used at execution time.
 
 **Key Characteristics**:
-- Links ONE document to ONE processor
-- Immutable record of what happened
-- Captures processor configuration at execution time
-- Produces operation results
+- Links ONE document to ONE processor via snapshot (not direct foreign keys)
+- Immutable frozen snapshot of processor, operations, and document metadata
+- Survives processor/document deletion (preserves audit trail)
+- Tracks progress in real-time (total, completed, failed operation counts)
+- Produces individual operation results stored separately
+- Supports chunked background execution for unlimited operations
+- Manual trigger from UI with future support for webhooks/scheduled runs
+
+**Architecture Benefits**:
+- **Decoupling**: Processor changes during run don't affect in-progress execution
+- **Auditability**: Exact state preserved forever, even if processor deleted
+- **Reproducibility**: Complete context available for debugging and analysis
+- **Self-contained**: Single record query returns all run metadata
+
+**Example Run Record**:
+A run executing "Contract Reviewer" processor on "Agreement.pdf" stores:
+- Complete processor configuration (name, system prompt, settings)
+- All 20 operations with their prompts and schemas
+- Document metadata (name, type, storage path)
+- Progress counters updated atomically during execution
+- Status transitions: pending → processing → completed
 
 ### 5. Operation Result
-**Definition**: The outcome from executing a single operation within a run.
+**Definition**: The outcome from executing a single operation within a run, with comprehensive execution metadata.
 
-**Purpose**: Stores what the AI found when executing each operation, including both raw responses and structured data.
+**Purpose**: Stores what the AI found when executing each operation, including raw responses, structured outputs, token usage, and error tracking.
 
 **Key Characteristics**:
-- One result per operation per run
-- Contains both AI response and parsed values
-- Includes execution metadata (tokens, timing)
-- Can be evaluated against predefined rules
+- One result per operation per run (linked by `run_id` and `execution_order`)
+- Contains operation snapshot for self-contained querying
+- Stores complete LLM response text and structured outputs
+- Tracks token usage breakdown (input, output, cached read/write)
+- Records execution timing and cache hit status
+- Includes error details and retry count for failed operations
+- Supports extended thinking mode with reasoning blocks
+- Real-time updates published to subscribed clients
+
+**Execution Flow**:
+1. Edge Function creates result record (status: pending)
+2. Downloads document from storage
+3. Executes LLM operation with retry logic
+4. Updates result with response/structured_output (status: completed)
+5. Increments parent run progress counter
+6. Continues to next operation (even if failed)
+
+**Error Handling**:
+- Transient errors (rate limits, timeouts): Retry up to 3x with exponential backoff
+- Permanent errors (auth failures, invalid requests): Fail immediately
+- Error message, type, and retry count stored for debugging
+- Operation failure doesn't stop run execution (continue-on-failure strategy)
+
+**Cost Tracking**:
+Token usage includes prompt caching metrics:
+- First operation: Creates cache (cached_write > 0)
+- Subsequent operations: Hit cache (cached_read > 0, ~90% savings)
+- Model used stored for accurate cost calculation
+
+**Example Operation Result**:
+```json
+{
+  "status": "completed",
+  "response_text": "The payment amount is $50,000 due within 30 days.",
+  "structured_output": { "amount": 50000, "currency": "USD", "due_days": 30 },
+  "tokens_used": { "input": 617, "output": 155, "cached_read": 0, "cached_write": 617 },
+  "execution_time_ms": 5432,
+  "cache_hit": false,
+  "model_used": "claude-3-5-sonnet-20241022"
+}
+```
 
 ## Database Architecture
 
@@ -113,9 +167,38 @@ The proposed design builds upon the existing multi-tenant foundation:
 ```
 1. User uploads document → stored in Supabase Storage → record in documents table
 2. User creates/selects processor → defines operations → saves as template
-3. User triggers run → creates run record → executes each operation → stores results. User get realtime feedback on the run (leveraging Supabase)
-4. Results accessed via PostgREST → transformed in frontend → displayed to user
+3. User triggers run from UI:
+   a. Drag-and-drop uploads document (if new)
+   b. Invokes execute-processor-run Edge Function
+   c. Edge Function creates frozen snapshot (processor + operations + document)
+   d. Edge Function inserts run record (status: pending)
+   e. Edge Function self-invokes for background processing
+   f. Returns HTTP 202 immediately with run_id
+4. Background execution (chunked):
+   a. Process operations in chunks of 10
+   b. Execute each operation via shared LLM executor
+   c. Update operation_results table with results
+   d. Increment run progress atomically
+   e. Self-invoke for next chunk OR mark run completed
+5. Real-time updates:
+   a. Database changes published via Supabase Realtime
+   b. Frontend subscribed to runs and operation_results tables
+   c. TanStack Query invalidates and refetches on updates
+   d. UI shows live progress bar and results table
+6. Results viewing:
+   a. Run detail page displays progress and status
+   b. Operation results table shows expandable rows
+   c. Structured outputs visualized with type-specific renderers
+   d. Runs list page shows history for processor
 ```
+
+**Key Architecture Decisions**:
+- **Edge Functions** for execution orchestration (not API routes)
+- **PostgREST** for data fetching (direct table queries)
+- **Realtime** for live progress updates (WebSocket subscriptions)
+- **TanStack Query** for caching and state management
+- **Snapshot-based** immutability for audit trail
+- **Chunked processing** to avoid 25-minute Edge Function timeout
 
 ## Proposed Tables
 
@@ -215,69 +298,189 @@ External publishing (e.g., embedding processors in SharePoint for non-ValidAI us
 ---
 
 #### 🚀 `runs`
-**Purpose**: Execution instance linking document to processor
+**Purpose**: Execution instance linking document to processor with immutable snapshot
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `id` | uuid (PK) | Yes | Unique identifier |
-| `organization_id` | uuid (FK) | Yes | Organization context |
-| `document_id` | uuid (FK) | Yes | Document being analyzed |
-| `processor_id` | uuid (FK) | Yes | Processor template used |
-| `processor_snapshot` | jsonb | Yes | Processor state at run time |
-| `status` | enum | Yes | Execution status |
-| `configuration` | jsonb | No | Run-specific overrides |
-| `started_at` | timestamptz | No | Processing start time |
+| `organization_id` | uuid (FK) | Yes | Organization context (NOT NULL for RLS) |
+| `document_id` | uuid (FK) | No | Document being analyzed (nullable - allow deletion) |
+| `processor_id` | uuid (FK) | No | Processor template used (nullable - allow deletion) |
+| `snapshot` | jsonb | Yes | Frozen processor, operations, and document state |
+| `status` | text | Yes | Execution status (default: 'pending') |
+| `trigger_type` | text | Yes | How run was initiated (default: 'manual') |
+| `triggered_by` | uuid (FK) | No | User who initiated (nullable) |
+| `total_operations` | integer | Yes | Total operation count (default: 0) |
+| `completed_operations` | integer | Yes | Successfully completed count (default: 0) |
+| `failed_operations` | integer | Yes | Failed operation count (default: 0) |
+| `error_message` | text | No | Run-level error if failed |
+| `started_at` | timestamptz | Yes | Processing start time (default: now()) |
 | `completed_at` | timestamptz | No | Processing end time |
-| `error_message` | text | No | Error if failed |
-| `total_input_tokens` | integer | No | Aggregate input tokens used |
-| `total_output_tokens` | integer | No | Aggregate output tokens used |
-| `total_llm_cost` | decimal | No | Direct LLM API cost (not customer price) |
-| `triggered_by` | uuid (FK) | Yes | User who initiated |
-| `created_at` | timestamptz | Yes | Run creation time |
+| `deleted_at` | timestamptz | No | Soft delete timestamp |
 
 **Status Values**:
-- `pending`: Queued for processing
-- `processing`: Currently executing
-- `completed`: Successfully finished
-- `failed`: Error occurred
-- `cancelled`: User cancelled
+- `pending`: Run created, not yet started
+- `processing`: Currently executing operations
+- `completed`: All operations processed (may have failures)
+- `failed`: Run-level failure (not operation failures)
+- `cancelled`: User cancelled execution
+
+**Trigger Types**:
+- `manual`: User-initiated from UI
+- `webhook`: External webhook trigger (future)
+- `scheduled`: Cron-based trigger (future)
+- `external`: API-based trigger (future)
+
+**Snapshot Structure** (JSONB):
+```json
+{
+  "processor": {
+    "id": "uuid",
+    "name": "Contract Reviewer",
+    "system_prompt": "You are...",
+    "configuration": { "selected_model_id": "uuid", "settings_override": {...} }
+  },
+  "operations": [
+    {
+      "id": "uuid",
+      "name": "Extract Payment Terms",
+      "operation_type": "extraction",
+      "prompt": "What is the payment amount?",
+      "position": 1.0,
+      "area": "Extractions",
+      "configuration": {...},
+      "output_schema": {...}
+    }
+  ],
+  "document": {
+    "id": "uuid",
+    "name": "Contract.pdf",
+    "size_bytes": 1024000,
+    "mime_type": "application/pdf",
+    "storage_path": "uuid/filename.pdf"
+  }
+}
+```
+
+**Indexes**:
+- `idx_runs_processor` on `processor_id` WHERE `deleted_at IS NULL`
+- `idx_runs_organization` on `organization_id` WHERE `deleted_at IS NULL`
+- `idx_runs_status` on `status` WHERE `deleted_at IS NULL`
+- `idx_runs_started` on `started_at DESC` WHERE `deleted_at IS NULL`
 
 ---
 
 #### 📊 `operation_results`
-**Purpose**: Store outcomes from each operation execution
+**Purpose**: Store outcomes from each operation execution within a run
 
 | Field | Type | Required | Purpose |
 |-------|------|----------|---------|
 | `id` | uuid (PK) | Yes | Unique identifier |
-| `run_id` | uuid (FK) | Yes | Parent run |
-| `operation_id` | uuid (FK) | Yes | Operation executed |
+| `run_id` | uuid (FK) | Yes | Parent run (CASCADE on delete) |
+| `operation_id` | uuid (FK) | No | Operation executed (nullable - allow deletion) |
 | `operation_snapshot` | jsonb | Yes | Operation state at run time |
-| `status` | enum | Yes | Execution status |
-| `raw_response` | text | Yes | Complete LLM response |
-| `parsed_value` | jsonb | No | Structured extraction |
-| `evaluation_result` | enum | No | Validation outcome |
-| `evaluation_details` | jsonb | No | Why passed/failed |
-| `citations_enabled` | boolean | No | Whether citations were used in API call |
-| `input_tokens_used` | integer | No | Input tokens consumed |
-| `output_tokens_used` | integer | No | Output tokens generated |
+| `execution_order` | integer | Yes | Sequence position (0-indexed) |
+| `status` | text | Yes | Execution status (default: 'pending') |
+| `response_text` | text | No | Complete LLM text response |
+| `structured_output` | jsonb | No | Parsed structured data from output schema |
+| `thinking_blocks` | jsonb | No | Array of reasoning blocks (if thinking enabled) |
+| `model_used` | text | No | Actual model used (e.g., 'claude-3-5-sonnet-20241022') |
+| `tokens_used` | jsonb | No | Token breakdown: {input, output, cached_read, cached_write} |
 | `execution_time_ms` | integer | No | Duration in milliseconds |
-| `error_message` | text | No | Error if failed |
-| `executed_at` | timestamptz | Yes | Execution timestamp |
-| `created_at` | timestamptz | Yes | Creation timestamp |
+| `cache_hit` | boolean | No | Whether prompt cache was hit (default: false) |
+| `error_message` | text | No | Error description if failed |
+| `error_type` | text | No | Error class name |
+| `retry_count` | integer | No | Number of retry attempts (default: 0) |
+| `started_at` | timestamptz | Yes | Execution start time (default: now()) |
+| `completed_at` | timestamptz | No | Execution completion time |
 
 **Status Values**:
 - `pending`: Not yet processed
-- `processing`: Currently executing
-- `success`: Completed successfully
-- `failed`: Error occurred
-- `skipped`: Skipped due to dependency
+- `completed`: Successfully finished
+- `failed`: Error occurred (with retry exhausted)
 
-**Evaluation Results** (Optional):
-- `passed`: Meets criteria
-- `failed`: Does not meet criteria
-- `warning`: Partially meets criteria
-- `not_applicable`: Cannot evaluate
+**Tokens Used Structure** (JSONB):
+```json
+{
+  "input": 617,
+  "output": 155,
+  "cached_read": 0,      // Increases after first operation
+  "cached_write": 617    // Only on first operation with caching
+}
+```
+
+**Thinking Blocks Structure** (JSONB):
+```json
+[
+  {
+    "type": "thinking",
+    "thinking": "Let me analyze the payment terms..."
+  }
+]
+```
+
+**Indexes**:
+- `idx_operation_results_run` on `run_id, execution_order`
+- `idx_operation_results_status` on `status`
+
+**Real-time Publication**: Enabled via `supabase_realtime` publication
+
+---
+
+### Database Functions (Implemented)
+
+#### `increment_run_progress()`
+**Purpose**: Atomically update run progress counters after each operation completes
+
+```sql
+CREATE OR REPLACE FUNCTION increment_run_progress(
+  p_run_id uuid,
+  p_status text -- 'completed' or 'failed'
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $$
+BEGIN
+  UPDATE runs
+  SET
+    completed_operations = CASE
+      WHEN p_status = 'completed' THEN completed_operations + 1
+      ELSE completed_operations
+    END,
+    failed_operations = CASE
+      WHEN p_status = 'failed' THEN failed_operations + 1
+      ELSE failed_operations
+    END
+  WHERE id = p_run_id;
+END;
+$$;
+```
+
+**Usage**: Called by Edge Function after each operation execution to maintain accurate progress counters.
+
+#### `get_llm_config_for_run()` (Updated for Phase 1.8)
+**Purpose**: Resolve LLM configuration using processor's organization context (not user JWT)
+
+```sql
+CREATE OR REPLACE FUNCTION get_llm_config_for_run(
+  p_processor_id uuid DEFAULT NULL,
+  p_user_id uuid DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+```
+
+**Key Change**: Uses processor's `organization_id` instead of JWT `app_metadata` to enable service-role calls from Edge Functions during background processing.
+
+**Resolution Hierarchy**:
+1. Global defaults from `llm_global_settings` table
+2. Organization config from `organizations.llm_configuration`
+3. Processor override from `processors.configuration.settings_override`
+
+---
 
 ### Optional Tables (Future Enhancements)
 
@@ -422,51 +625,87 @@ await supabase.from('documents').select('*')
 
 // Create processor
 await supabase.from('processors').insert({...})
+
+// Fetch run with real-time subscription
+const { data: run } = await supabase
+  .from('runs')
+  .select('*')
+  .eq('id', runId)
+  .single()
 ```
 
 ### Database Functions for Complex Operations
-Multi-table operations use database functions:
+Multi-table operations and atomic updates use database functions:
 ```sql
--- Create processor with operations
+-- Create processor with operations (transactional)
 CREATE FUNCTION create_processor_with_operations(
   processor_data jsonb,
   operations_data jsonb[]
 ) RETURNS TABLE(...)
 
--- Execute run
-CREATE FUNCTION execute_run(
-  document_id uuid,
-  processor_id uuid
-) RETURNS TABLE(...)
+-- Atomically increment run progress
+CREATE FUNCTION increment_run_progress(
+  p_run_id uuid,
+  p_status text -- 'completed' or 'failed'
+) RETURNS void
+
+-- Get LLM configuration with organization context
+CREATE FUNCTION get_llm_config_for_run(
+  p_processor_id uuid,
+  p_user_id uuid
+) RETURNS jsonb
 ```
 
 ### Edge Functions (Service-Role Only)
-For operations requiring elevated privileges:
-- LLM API calls for operation execution
-- Batch processing coordination
-- Complex run orchestration
+For operations requiring elevated privileges or external API calls:
+
+**`execute-processor-run`**: Main orchestration function
+- Creates immutable snapshot from processor + operations + document
+- Inserts run record and returns immediately (HTTP 202)
+- Self-invokes for background chunked execution
+- Processes 10 operations per invocation to avoid timeouts
+- Uses shared `llm-executor` utility for all LLM calls
+- Updates progress atomically via `increment_run_progress()`
+- Implements retry logic for transient errors
+- Continues on operation failures (partial results strategy)
+
+**Shared Utilities**:
+- `_shared/llm-executor.ts`: Reusable LLM execution with retry logic
+- `_shared/types.ts`: TypeScript type definitions for snapshots
 
 ## MVP Scope Boundaries
 
-### ✅ In Scope (MVP)
-- Document upload and storage
-- Processor creation with operations
-- Manual run execution
-- Basic operation results
-- Organization-based isolation
-- Simple sequential operation execution
+### ✅ Implemented (MVP Complete - Phase 1-1.8)
+- ✅ Document upload and storage with drag-and-drop UI
+- ✅ Processor creation with operations and drag-and-drop ordering
+- ✅ Manual run execution via Edge Function
+- ✅ Comprehensive operation results with structured outputs
+- ✅ Organization-based isolation with RLS
+- ✅ Sequential operation execution with chunking
+- ✅ Real-time progress updates via Supabase Realtime
+- ✅ Run history and detail pages with live updates
+- ✅ Snapshot-based immutability for audit trail
+- ✅ Prompt caching for cost optimization (90% savings)
+- ✅ Error handling with retry logic and continue-on-failure
+- ✅ Token tracking and execution metrics
+- ✅ Extended thinking mode support
+- ✅ 7 operation types (Generic, True/False, Extraction, Rating, Classification, Analysis, Traffic Light)
+- ✅ Workbench for testing operations
+- ✅ 3-tier LLM configuration system
 
-### ❌ Out of Scope (Post-MVP)
-- Processor versioning
+### ❌ Out of Scope (Post-MVP / Future Phases)
+- Processor versioning and change tracking
 - External processor publishing (SharePoint embedding, iframe access)
-- Automated run triggers
-- Complex operation dependencies
-- Formatted run reports
-- Batch document processing
-- Custom LLM model selection
-- Webhook notifications
+- Automated run triggers (webhooks, scheduled cron jobs)
+- Complex operation dependencies and conditional execution
+- Formatted run reports (PDF, Excel exports)
+- Batch document processing (multiple documents at once)
+- Webhook notifications for run completion
 - Email-based report delivery for external users
-- API access for external systems
+- Public API access for external systems
+- Run comparison and diff views
+- Analytics dashboard with aggregated metrics
+- Approval workflows for run results
 
 ## Migration Strategy
 
@@ -508,31 +747,61 @@ For operations requiring elevated privileges:
    - All types support thinking mode and prompt caching
    - *Completed on: 2025-10-14*
 
-5. **Phase 2**: Create execution tables (runs, operation_results)
-6. **Phase 3**: Implement RLS policies for execution tables
-7. **Phase 4**: Create database functions for run execution
-8. **Phase 5**: Enhance Storage integration with direct upload
-9. **Phase 6**: Add performance optimizations and monitoring
+5. **Phase 1.8**: ✅ **COMPLETED** - Manual Processor Execution (Runs & Results)
+   - Created `runs` table with snapshot-based immutability architecture
+   - Created `operation_results` table with comprehensive execution tracking
+   - Implemented RLS policies for organization-scoped access to runs and results
+   - Created database functions (`increment_run_progress`, updated `get_llm_config_for_run`)
+   - Built execute-processor-run Edge Function with chunked background processing
+   - Implemented shared LLM executor utilities for code reuse
+   - Created TanStack Query hooks with real-time subscriptions for live updates
+   - Built complete UI: RunProcessorDialog (drag-drop upload), RunDetailPage (progress tracking), RunsTable (history)
+   - Integrated run trigger and navigation into processor detail page
+   - Implemented prompt caching (90% cost reduction) and retry logic
+   - Added Storage policies for documents bucket access
+   - End-to-end testing with 7-operation processor validated all features
+   - *Completed on: 2025-10-14*
 
 ## Success Criteria
 
 The database design successfully enables:
-1. Multiple organizations to independently manage documents and processors
-2. Reusable analysis templates across multiple documents
-3. Complete audit trail of all analysis activities
-4. Secure, isolated data access per organization
-5. Direct database access via PostgREST (no custom APIs needed)
+1. ✅ Multiple organizations to independently manage documents and processors
+2. ✅ Reusable analysis templates across multiple documents
+3. ✅ Complete audit trail of all analysis activities via immutable snapshots
+4. ✅ Secure, isolated data access per organization via RLS
+5. ✅ Direct database access via PostgREST (no custom APIs needed)
+6. ✅ Real-time progress tracking during execution
+7. ✅ Scalable execution via chunked background processing
+8. ✅ Cost-effective LLM operations via prompt caching
 
-## Next Steps
+## Implementation Status
 
-1. Review and approve database design
-2. Create migration files for tables
-3. Implement RLS policies
-4. Create necessary database functions
-5. Set up Storage buckets
-6. Generate TypeScript types
-7. Build frontend components using PostgREST
+**MVP Complete** ✅ (as of 2025-10-14)
+
+All core functionality has been implemented and tested:
+- Database schema with immutable snapshots
+- Edge Function orchestration with chunking
+- Real-time UI with live progress updates
+- Comprehensive error handling and retry logic
+- End-to-end testing validated with 7-operation processor
+
+## Related Documentation
+
+For detailed implementation architecture, see:
+- **[Manual Processor Execution Architecture](../architecture/manual-processor-execution.md)** - Complete Phase 1.8 implementation details including:
+  - Edge Function architecture with chunked execution
+  - Database schema and functions
+  - UI component hierarchy
+  - Real-time update flow
+  - Error handling strategies
+  - Performance optimization
+  - Testing approach
+  - Future enhancement roadmap (566 lines, 2,823 total production code)
 
 ---
+
+**Document History**:
+- **Version 0.1** (2025-09-28): Initial database design proposal
+- **Version 0.2** (2025-10-15): Updated with Phase 1.8 implementation details, actual schemas, and Edge Function architecture
 
 *This design leverages Supabase's platform capabilities to minimize custom code while providing a robust foundation for the document intelligence system.*

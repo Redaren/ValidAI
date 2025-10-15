@@ -50,10 +50,10 @@ function calculateValidationMetrics(results: OperationResult[]) {
   let falseCount = 0
 
   validationResults.forEach((result) => {
-    const structured = result.structured_output as { answer?: boolean } | null
-    if (structured?.answer === true) {
+    const structured = result.structured_output as { result?: boolean } | null
+    if (structured?.result === true) {
       trueCount++
-    } else if (structured?.answer === false) {
+    } else if (structured?.result === false) {
       falseCount++
     }
   })
@@ -82,12 +82,12 @@ function calculateTrafficLightMetrics(results: OperationResult[]) {
   let green = 0
 
   trafficLightResults.forEach((result) => {
-    const structured = result.structured_output as { status?: string } | null
-    if (structured?.status === 'red') {
+    const structured = result.structured_output as { traffic_light?: string } | null
+    if (structured?.traffic_light === 'red') {
       red++
-    } else if (structured?.status === 'yellow') {
+    } else if (structured?.traffic_light === 'yellow') {
       yellow++
-    } else if (structured?.status === 'green') {
+    } else if (structured?.traffic_light === 'green') {
       green++
     }
   })

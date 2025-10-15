@@ -123,7 +123,11 @@ export function RunProcessorDialog({
     } catch (error) {
       console.error('Failed to upload document or create run:', error)
       const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error occurred'
+        error instanceof Error
+          ? error.message
+          : typeof error === 'object' && error !== null && 'message' in error
+            ? String(error.message)
+            : 'Unknown error occurred'
       setUploadError(errorMessage)
       toast.error('Failed to start processor run', {
         description: errorMessage,
