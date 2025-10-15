@@ -141,6 +141,7 @@ export function ProcessorDetailClient({
               <DropdownMenuItem asChild>
                 <RunProcessorDialog
                   processorId={processor.processor_id}
+                  processorName={processor.processor_name}
                   trigger={
                     <div className="flex w-full cursor-pointer items-center">
                       <Play className="mr-2 h-4 w-4" />

@@ -46,6 +46,8 @@ interface RunProcessorDialogProps {
   processorId: string
   /** Trigger element (optional, defaults to button) */
   trigger?: React.ReactNode
+  /** Processor name for dialog title (optional, defaults to "Run") */
+  processorName?: string
 }
 
 /**
@@ -82,6 +84,7 @@ interface RunProcessorDialogProps {
 export function RunProcessorDialog({
   processorId,
   trigger,
+  processorName,
 }: RunProcessorDialogProps) {
   const [open, setOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -158,7 +161,7 @@ export function RunProcessorDialog({
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Play className="h-5 w-5" />
-            <DialogTitle>Run</DialogTitle>
+            <DialogTitle>{processorName || 'Run'}</DialogTitle>
           </div>
           <DialogDescription>
             Drag and drop your document here

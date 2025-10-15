@@ -107,6 +107,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         <div className="flex items-center gap-2 shrink-0">
           <RunProcessorDialog
             processorId={processor.processor_id}
+            processorName={processor.processor_name}
             trigger={
               <Button variant="default" size="icon" title="Run">
                 <Play className="h-4 w-4" />
