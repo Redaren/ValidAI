@@ -54,9 +54,9 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
   if (operationType === 'validation') {
     const structured = result.structured_output as { result?: boolean } | null
     if (structured?.result === true) {
-      return <CheckCircle2 className="h-4 w-4 text-green-600" />
+      return <div className="h-3 w-3 rounded-full bg-green-500" aria-label="True" />
     } else if (structured?.result === false) {
-      return <XCircle className="h-4 w-4 text-red-600" />
+      return <div className="h-3 w-3 rounded-full bg-red-500" aria-label="False" />
     }
   }
 
@@ -187,15 +187,16 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
           )}
         </button>
 
-        {/* Indicator */}
-        <div className="shrink-0">{getOperationIndicator(result, isProcessing)}</div>
-
-        {/* Operation Name */}
+        {/* Operation Name and Results */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <span className={cn('font-medium', isPending && 'text-muted-foreground')}>
               {snapshot.name}
             </span>
+
+            {/* Indicator */}
+            <div className="shrink-0">{getOperationIndicator(result, isProcessing)}</div>
+
             <span className="text-muted-foreground">|</span>
             <span
               className={cn(
