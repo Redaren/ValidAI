@@ -212,6 +212,7 @@ serve(async (req) => {
         operations: operations.map((op: any) => ({
           id: op.id,
           name: op.name,
+          description: op.description,
           operation_type: op.operation_type,
           prompt: op.prompt,
           position: op.position,

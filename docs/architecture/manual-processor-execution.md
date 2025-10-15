@@ -377,6 +377,7 @@ interface RunSnapshot {
   operations: Array<{
     id: string
     name: string
+    description: string | null
     operation_type: OperationType
     prompt: string
     position: number
