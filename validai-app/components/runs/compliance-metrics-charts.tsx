@@ -96,25 +96,24 @@ function calculateTrafficLightMetrics(results: OperationResult[]) {
 }
 
 /**
- * Compliance Metrics Charts
- *
- * Displays three radial charts side-by-side showing key compliance metrics.
- * Updates in real-time as operations complete via parent subscription.
+ * Progress Chart Component
+ * Shows overall completion percentage during processing
  */
-export function ComplianceMetricsCharts({
-  operationResults,
+interface ProgressChartProps {
+  totalOperations: number
+  completedOperations: number
+  failedOperations: number
+}
+
+export function ProgressChart({
   totalOperations,
   completedOperations,
   failedOperations,
-}: ComplianceMetricsChartsProps) {
+}: ProgressChartProps) {
   const progressPercent = Math.round(
     ((completedOperations + failedOperations) / totalOperations) * 100
   )
 
-  const validationMetrics = calculateValidationMetrics(operationResults)
-  const trafficLightMetrics = calculateTrafficLightMetrics(operationResults)
-
-  // Chart configurations
   const progressChartConfig = {
     progress: {
       label: 'Progress',
@@ -122,12 +121,146 @@ export function ComplianceMetricsCharts({
     },
   } satisfies ChartConfig
 
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="items-center pb-2">
+        <CardTitle className="text-sm font-medium">Progress</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 items-center pb-4">
+        <ChartContainer
+          config={progressChartConfig}
+          className="mx-auto aspect-square w-full max-w-[180px]"
+        >
+          <RadialBarChart
+            data={[{ progress: progressPercent }]}
+            startAngle={180}
+            endAngle={0}
+            innerRadius={80}
+            outerRadius={130}
+          >
+            <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                    return (
+                      <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) - 8}
+                          className="fill-foreground text-2xl font-bold"
+                        >
+                          {progressPercent}%
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 12}
+                          className="fill-muted-foreground text-xs"
+                        >
+                          {completedOperations + failedOperations} of {totalOperations}
+                        </tspan>
+                      </text>
+                    )
+                  }
+                }}
+              />
+            </PolarRadiusAxis>
+            <RadialBar
+              dataKey="progress"
+              fill="var(--color-progress)"
+              cornerRadius={10}
+              className="stroke-transparent stroke-2"
+            />
+          </RadialBarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Validation Chart Component
+ * Shows pass rate for True/False validation operations
+ */
+interface ValidationChartProps {
+  operationResults: OperationResult[]
+}
+
+export function ValidationChart({ operationResults }: ValidationChartProps) {
+  const validationMetrics = calculateValidationMetrics(operationResults)
+
   const validationChartConfig = {
     validations: {
       label: 'Validations',
       color: validationMetrics.passRate >= 70 ? 'hsl(142, 76%, 36%)' : 'hsl(0, 84%, 60%)',
     },
   } satisfies ChartConfig
+
+  return (
+    <Card className="flex flex-col">
+      <CardHeader className="items-center pb-2">
+        <CardTitle className="text-sm font-medium">Validations</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 items-center pb-4">
+        <ChartContainer
+          config={validationChartConfig}
+          className="mx-auto aspect-square w-full max-w-[180px]"
+        >
+          <RadialBarChart
+            data={[{ validations: validationMetrics.passRate }]}
+            startAngle={180}
+            endAngle={0}
+            innerRadius={80}
+            outerRadius={130}
+          >
+            <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                    return (
+                      <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) - 8}
+                          className="fill-foreground text-2xl font-bold"
+                        >
+                          {validationMetrics.passRate}%
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 12}
+                          className="fill-muted-foreground text-xs"
+                        >
+                          {validationMetrics.trueCount} passed of {validationMetrics.total}
+                        </tspan>
+                      </text>
+                    )
+                  }
+                }}
+              />
+            </PolarRadiusAxis>
+            <RadialBar
+              dataKey="validations"
+              fill="var(--color-validations)"
+              cornerRadius={10}
+              className="stroke-transparent stroke-2"
+            />
+          </RadialBarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Traffic Light Chart Component
+ * Shows distribution of Red/Yellow/Green traffic light results
+ */
+interface TrafficLightChartProps {
+  operationResults: OperationResult[]
+}
+
+export function TrafficLightChart({ operationResults }: TrafficLightChartProps) {
+  const trafficLightMetrics = calculateTrafficLightMetrics(operationResults)
 
   const trafficLightChartConfig = {
     green: {
@@ -145,196 +278,111 @@ export function ComplianceMetricsCharts({
   } satisfies ChartConfig
 
   return (
+    <Card className="flex flex-col">
+      <CardHeader className="items-center pb-2">
+        <CardTitle className="text-sm font-medium">Traffic Lights</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-1 items-center pb-4">
+        <ChartContainer
+          config={trafficLightChartConfig}
+          className="mx-auto aspect-square w-full max-w-[180px]"
+        >
+          <RadialBarChart
+            data={[
+              {
+                green: trafficLightMetrics.green,
+                yellow: trafficLightMetrics.yellow,
+                red: trafficLightMetrics.red,
+              },
+            ]}
+            startAngle={180}
+            endAngle={0}
+            innerRadius={80}
+            outerRadius={130}
+          >
+            <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
+                    return (
+                      <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) - 8}
+                          className="fill-foreground text-xs"
+                        >
+                          🟢 {trafficLightMetrics.green}
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 6}
+                          className="fill-foreground text-xs"
+                        >
+                          🟡 {trafficLightMetrics.yellow}
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 20}
+                          className="fill-foreground text-xs"
+                        >
+                          🔴 {trafficLightMetrics.red}
+                        </tspan>
+                      </text>
+                    )
+                  }
+                }}
+              />
+            </PolarRadiusAxis>
+            <RadialBar
+              dataKey="green"
+              stackId="a"
+              cornerRadius={5}
+              fill="var(--color-green)"
+              className="stroke-transparent stroke-2"
+            />
+            <RadialBar
+              dataKey="yellow"
+              stackId="a"
+              cornerRadius={5}
+              fill="var(--color-yellow)"
+              className="stroke-transparent stroke-2"
+            />
+            <RadialBar
+              dataKey="red"
+              stackId="a"
+              cornerRadius={5}
+              fill="var(--color-red)"
+              className="stroke-transparent stroke-2"
+            />
+          </RadialBarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Compliance Metrics Charts
+ *
+ * Wrapper component that displays all three radial charts side-by-side.
+ * Used during processing to show Progress, Validations, and Traffic Lights.
+ * Updates in real-time as operations complete via parent subscription.
+ */
+export function ComplianceMetricsCharts({
+  operationResults,
+  totalOperations,
+  completedOperations,
+  failedOperations,
+}: ComplianceMetricsChartsProps) {
+  return (
     <div className="grid gap-4 md:grid-cols-3">
-      {/* Progress Chart */}
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-2">
-          <CardTitle className="text-sm font-medium">Progress</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-1 items-center pb-4">
-          <ChartContainer
-            config={progressChartConfig}
-            className="mx-auto aspect-square w-full max-w-[180px]"
-          >
-            <RadialBarChart
-              data={[{ progress: progressPercent }]}
-              startAngle={180}
-              endAngle={0}
-              innerRadius={80}
-              outerRadius={130}
-            >
-              <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                      return (
-                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) - 8}
-                            className="fill-foreground text-2xl font-bold"
-                          >
-                            {progressPercent}%
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 12}
-                            className="fill-muted-foreground text-xs"
-                          >
-                            {completedOperations + failedOperations} of {totalOperations}
-                          </tspan>
-                        </text>
-                      )
-                    }
-                  }}
-                />
-              </PolarRadiusAxis>
-              <RadialBar
-                dataKey="progress"
-                fill="var(--color-progress)"
-                cornerRadius={10}
-                className="stroke-transparent stroke-2"
-              />
-            </RadialBarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Validations Chart */}
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-2">
-          <CardTitle className="text-sm font-medium">Validations</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-1 items-center pb-4">
-          <ChartContainer
-            config={validationChartConfig}
-            className="mx-auto aspect-square w-full max-w-[180px]"
-          >
-            <RadialBarChart
-              data={[{ validations: validationMetrics.passRate }]}
-              startAngle={180}
-              endAngle={0}
-              innerRadius={80}
-              outerRadius={130}
-            >
-              <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                      return (
-                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) - 8}
-                            className="fill-foreground text-2xl font-bold"
-                          >
-                            {validationMetrics.passRate}%
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 12}
-                            className="fill-muted-foreground text-xs"
-                          >
-                            {validationMetrics.trueCount} passed of {validationMetrics.total}
-                          </tspan>
-                        </text>
-                      )
-                    }
-                  }}
-                />
-              </PolarRadiusAxis>
-              <RadialBar
-                dataKey="validations"
-                fill="var(--color-validations)"
-                cornerRadius={10}
-                className="stroke-transparent stroke-2"
-              />
-            </RadialBarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
-
-      {/* Traffic Lights Chart */}
-      <Card className="flex flex-col">
-        <CardHeader className="items-center pb-2">
-          <CardTitle className="text-sm font-medium">Traffic Lights</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-1 items-center pb-4">
-          <ChartContainer
-            config={trafficLightChartConfig}
-            className="mx-auto aspect-square w-full max-w-[180px]"
-          >
-            <RadialBarChart
-              data={[
-                {
-                  green: trafficLightMetrics.green,
-                  yellow: trafficLightMetrics.yellow,
-                  red: trafficLightMetrics.red,
-                },
-              ]}
-              startAngle={180}
-              endAngle={0}
-              innerRadius={80}
-              outerRadius={130}
-            >
-              <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
-                <Label
-                  content={({ viewBox }) => {
-                    if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
-                      return (
-                        <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) - 8}
-                            className="fill-foreground text-xs"
-                          >
-                            🟢 {trafficLightMetrics.green}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 6}
-                            className="fill-foreground text-xs"
-                          >
-                            🟡 {trafficLightMetrics.yellow}
-                          </tspan>
-                          <tspan
-                            x={viewBox.cx}
-                            y={(viewBox.cy || 0) + 20}
-                            className="fill-foreground text-xs"
-                          >
-                            🔴 {trafficLightMetrics.red}
-                          </tspan>
-                        </text>
-                      )
-                    }
-                  }}
-                />
-              </PolarRadiusAxis>
-              <RadialBar
-                dataKey="green"
-                stackId="a"
-                cornerRadius={5}
-                fill="var(--color-green)"
-                className="stroke-transparent stroke-2"
-              />
-              <RadialBar
-                dataKey="yellow"
-                stackId="a"
-                cornerRadius={5}
-                fill="var(--color-yellow)"
-                className="stroke-transparent stroke-2"
-              />
-              <RadialBar
-                dataKey="red"
-                stackId="a"
-                cornerRadius={5}
-                fill="var(--color-red)"
-                className="stroke-transparent stroke-2"
-              />
-            </RadialBarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+      <ProgressChart
+        totalOperations={totalOperations}
+        completedOperations={completedOperations}
+        failedOperations={failedOperations}
+      />
+      <ValidationChart operationResults={operationResults} />
+      <TrafficLightChart operationResults={operationResults} />
     </div>
   )
 }

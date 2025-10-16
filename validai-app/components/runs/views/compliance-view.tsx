@@ -24,7 +24,12 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { ComplianceMetricsCharts } from '@/components/runs/compliance-metrics-charts'
+import {
+  ComplianceMetricsCharts,
+  ValidationChart,
+  TrafficLightChart,
+} from '@/components/runs/compliance-metrics-charts'
+import { ComplianceSummaryCard } from '@/components/runs/compliance-summary-card'
 import { ComplianceOperationRow } from '@/components/runs/compliance-operation-row'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Database } from '@/lib/database.types'
@@ -199,13 +204,23 @@ export function ComplianceView({
 
   return (
     <div className="space-y-6">
-      {/* Metrics Dashboard */}
-      <ComplianceMetricsCharts
-        operationResults={operationResults}
-        totalOperations={run.total_operations}
-        completedOperations={run.completed_operations}
-        failedOperations={run.failed_operations}
-      />
+      {/* Metrics Dashboard: Summary Card + Charts OR Progress + Charts */}
+      {run.status === 'completed' ? (
+        // Completed: Show Summary Card, Validations, Traffic Lights
+        <div className="grid gap-4 md:grid-cols-3">
+          <ComplianceSummaryCard run={run} />
+          <ValidationChart operationResults={operationResults} />
+          <TrafficLightChart operationResults={operationResults} />
+        </div>
+      ) : (
+        // Processing: Show Progress, Validations, Traffic Lights
+        <ComplianceMetricsCharts
+          operationResults={operationResults}
+          totalOperations={run.total_operations}
+          completedOperations={run.completed_operations}
+          failedOperations={run.failed_operations}
+        />
+      )}
 
       {/* Grouped Operations */}
       <div className="space-y-4">
