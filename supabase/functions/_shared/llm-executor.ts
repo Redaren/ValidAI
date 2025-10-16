@@ -222,13 +222,21 @@ export async function executeLLMOperation(
   // Execute LLM call
   const startTime = Date.now()
 
+  // Check if model supports top_p parameter alongside temperature
+  // Claude 4.5 models (Haiku 4.5, Sonnet 4.5) cannot accept both parameters
+  const supportsTopP = settings.supports_top_p !== false  // Default to true for backward compatibility
+  const isClause45Model = modelToUse.includes('claude-haiku-4-5') || modelToUse.includes('claude-sonnet-4-5')
+  const shouldIncludeTopP = supportsTopP && !isClause45Model
+
+  console.log(`Model parameter support - top_p: ${shouldIncludeTopP ? 'included' : 'excluded (using temperature only)'}`)
+
   const llmParams: any = {
     model: anthropicProvider(modelToUse),
     messages,
     experimental_output: outputConfig,
     maxTokens: settings.max_tokens || 4096,
     temperature: settings.temperature,
-    topP: settings.top_p,
+    ...(shouldIncludeTopP && settings.top_p !== undefined ? { topP: settings.top_p } : {}),
     topK: settings.top_k,
     stopSequences: settings.stop_sequences,
     providerOptions: {

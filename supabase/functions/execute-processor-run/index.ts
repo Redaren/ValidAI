@@ -423,9 +423,12 @@ serve(async (req) => {
         console.log(`Name: ${operation.name}`)
         console.log(`Type: ${operation.operation_type}`)
 
+        // Declare opResult in outer scope so it's accessible in catch block
+        let opResult: any = null
+
         try {
           // Create operation_result (pending)
-          const { data: opResult, error: createError } = await supabase
+          const { data: opResultData, error: createError } = await supabase
             .from('operation_results')
             .insert({
               run_id: backgroundBody.run_id,
@@ -437,10 +440,12 @@ serve(async (req) => {
             .select()
             .single()
 
-          if (createError || !opResult) {
+          if (createError || !opResultData) {
             console.error(`Failed to create operation_result: ${createError?.message}`)
             continue
           }
+
+          opResult = opResultData
 
           // Update to processing
           await supabase
@@ -503,22 +508,27 @@ serve(async (req) => {
             retryCount: error.retryCount
           })
 
-          await supabase
-            .from('operation_results')
-            .update({
-              status: 'failed',
-              error_message: error.message || 'Unknown error occurred',
-              error_type: error.name || 'UnknownError',
-              retry_count: error.retryCount || 0,
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', opResult.id)
+          // Only update operation_result if it was successfully created
+          if (opResult) {
+            await supabase
+              .from('operation_results')
+              .update({
+                status: 'failed',
+                error_message: error.message || 'Unknown error occurred',
+                error_type: error.name || 'UnknownError',
+                retry_count: error.retryCount || 0,
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', opResult.id)
 
-          // Increment run progress (failed)
-          await supabase.rpc('increment_run_progress', {
-            p_run_id: backgroundBody.run_id,
-            p_status: 'failed'
-          })
+            // Increment run progress (failed)
+            await supabase.rpc('increment_run_progress', {
+              p_run_id: backgroundBody.run_id,
+              p_status: 'failed'
+            })
+          } else {
+            console.error('Cannot update operation_result: record was not created')
+          }
 
           // Continue to next operation (don't stop run)
         }

@@ -19,6 +19,38 @@ export interface LLMProvider {
 }
 
 /**
+ * Model configuration object structure
+ *
+ * Defines the shape of model configuration settings including capabilities.
+ *
+ * @property default_temperature - Default temperature setting (0.0-1.0)
+ * @property default_max_tokens - Default maximum tokens to generate
+ * @property default_top_p - Default nucleus sampling parameter (0.0-1.0)
+ * @property context_window - Maximum context window size in tokens
+ * @property supports_top_p - Whether model supports top_p alongside temperature
+ */
+export interface ModelConfiguration {
+  /** Default temperature setting (0.0-1.0 for deterministic to creative) */
+  default_temperature?: number;
+  /** Default maximum tokens to generate */
+  default_max_tokens?: number;
+  /** Default nucleus sampling parameter (0.0-1.0) */
+  default_top_p?: number;
+  /** Maximum context window size in tokens */
+  context_window?: number;
+  /**
+   * Whether model supports top_p parameter alongside temperature
+   *
+   * Claude 4.5 models (Haiku 4.5, Sonnet 4.5): false - can only use temperature
+   * Claude 3.x models: true - supports both temperature and top_p
+   * Default: true for backward compatibility
+   */
+  supports_top_p?: boolean;
+  /** Additional provider-specific configuration */
+  [key: string]: any;
+}
+
+/**
  * Global LLM setting (system-wide model configuration)
  *
  * Stored in `llm_global_settings` table. Defines available models for all organizations.
@@ -33,7 +65,12 @@ export interface LLMProvider {
  *   display_name: "Claude 3.5 Sonnet",
  *   is_default: true,
  *   is_active: true,
- *   configuration: { default_temperature: 1.0, default_max_tokens: 4096 },
+ *   configuration: {
+ *     default_temperature: 1.0,
+ *     default_max_tokens: 4096,
+ *     default_top_p: 1.0,
+ *     supports_top_p: true
+ *   },
  *   created_at: "2025-01-01T00:00:00Z",
  *   updated_at: "2025-01-01T00:00:00Z"
  * }
@@ -52,8 +89,8 @@ export interface LLMGlobalSetting {
   is_default: boolean;
   /** Whether this model is currently available for use */
   is_active: boolean;
-  /** Default settings (temperature, max_tokens, etc.) */
-  configuration: Record<string, any>;
+  /** Model configuration including capabilities and default settings */
+  configuration: ModelConfiguration;
   /** Timestamp when this setting was created */
   created_at: string;
   /** Timestamp when this setting was last updated */

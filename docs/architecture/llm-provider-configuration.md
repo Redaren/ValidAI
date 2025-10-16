@@ -82,11 +82,27 @@ The global level provides system-wide defaults that are available to all users. 
   "display_name": "Claude 3.5 Sonnet",
   "is_default": true,
   "configuration": {
-    "temperature": 0.7,
-    "max_tokens": 4096
+    "default_temperature": 1.0,
+    "default_max_tokens": 4096,
+    "default_top_p": 1.0,
+    "context_window": 200000,
+    "supports_top_p": true
   }
 }
 ```
+
+**Model Capabilities**:
+
+Models may have restrictions on which API parameters they support. The `supports_top_p` flag indicates whether a model can accept both `temperature` and `top_p` parameters simultaneously:
+
+- **Claude 4.5 models** (Haiku 4.5, Sonnet 4.5): `supports_top_p: false`
+  - These models only accept `temperature` parameter
+  - Attempting to send both parameters results in API error
+- **Claude 3.x models** (3.5 Sonnet, 3.5 Haiku, 3 Opus): `supports_top_p: true`
+  - These models accept both `temperature` and `top_p` parameters
+  - Both can be used for sampling control
+
+The LLM executor automatically handles this by conditionally including `top_p` based on model capabilities.
 
 ### 2. Organization Level (Custom Configuration)
 
@@ -477,6 +493,13 @@ SET llm_configuration = jsonb_set(
    - Verify encryption used correct org_id
    - Check service role permissions
    - Ensure key was encrypted with current function
+
+4. **Error: "temperature and top_p cannot both be specified"**
+   - This error occurs with Claude 4.5 models (Haiku 4.5, Sonnet 4.5)
+   - Verify model configuration has `supports_top_p: false` set
+   - Check migration `add_llm_model_capabilities` has been applied
+   - LLM executor should automatically exclude `top_p` for these models
+   - If error persists, check Edge Function logs for parameter detection logic
 
 ### Debug Queries
 
