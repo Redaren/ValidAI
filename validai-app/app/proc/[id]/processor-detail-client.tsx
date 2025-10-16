@@ -142,6 +142,7 @@ export function ProcessorDetailClient({
                 <RunProcessorDialog
                   processorId={processor.processor_id}
                   processorName={processor.processor_name}
+                  defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
                   trigger={
                     <div className="flex w-full cursor-pointer items-center">
                       <Play className="mr-2 h-4 w-4" />

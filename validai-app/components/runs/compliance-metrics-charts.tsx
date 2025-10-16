@@ -235,7 +235,7 @@ export function ComplianceMetricsCharts({
                             y={(viewBox.cy || 0) + 12}
                             className="fill-muted-foreground text-xs"
                           >
-                            {validationMetrics.trueCount} of {validationMetrics.total}
+                            {validationMetrics.trueCount} passed of {validationMetrics.total}
                           </tspan>
                         </text>
                       )

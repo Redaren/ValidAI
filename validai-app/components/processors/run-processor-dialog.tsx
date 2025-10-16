@@ -48,6 +48,8 @@ interface RunProcessorDialogProps {
   trigger?: React.ReactNode
   /** Processor name for dialog title (optional, defaults to "Run") */
   processorName?: string
+  /** Default view to navigate to (optional, defaults to "compliance") */
+  defaultView?: 'technical' | 'compliance' | 'contract-comments'
 }
 
 /**
@@ -85,6 +87,7 @@ export function RunProcessorDialog({
   processorId,
   trigger,
   processorName,
+  defaultView = 'compliance',
 }: RunProcessorDialogProps) {
   const [open, setOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -115,9 +118,9 @@ export function RunProcessorDialog({
         document_id: document.id,
       })
 
-      // 3. Close dialog and navigate to run detail page
+      // 3. Close dialog and navigate to run detail page with view parameter
       setOpen(false)
-      router.push(`/proc/${processorId}/runs/${run_id}`)
+      router.push(`/proc/${processorId}/runs/${run_id}?view=${defaultView}`)
 
       toast.success('Processor run started', {
         description:

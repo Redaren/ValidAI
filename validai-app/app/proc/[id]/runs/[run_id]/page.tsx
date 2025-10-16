@@ -19,8 +19,8 @@
  *
  * **View Selection Hierarchy:**
  * 1. URL query param (`?view=X`) - highest priority
- * 2. Processor's default view (`configuration.default_view`)
- * 3. System default (`"technical"`)
+ * 2. Processor's default view (`configuration.default_run_view`)
+ * 3. System default (`"compliance"`)
  *
  * @since Phase 1.8
  */
@@ -66,8 +66,8 @@ interface RunDetailPageProps {
  *
  * **View Selection Logic:**
  * - URL query param `?view=X` has highest priority (shareable links)
- * - Falls back to processor's configured `default_view`
- * - Finally defaults to "technical" view
+ * - Falls back to processor's configured `default_run_view`
+ * - Finally defaults to "compliance" view
  *
  * **Loading States:**
  * - Shows loading spinner while fetching initial data
@@ -103,14 +103,14 @@ export default function RunDetailPage({ params }: RunDetailPageProps) {
     | {
         processor?: {
           configuration?: {
-            default_view?: ViewType
+            default_run_view?: ViewType
           }
         }
       }
     | undefined
-  const processorDefaultView = snapshot?.processor?.configuration?.default_view
+  const processorDefaultView = snapshot?.processor?.configuration?.default_run_view
 
-  const currentView: ViewType = viewFromUrl || processorDefaultView || 'technical'
+  const currentView: ViewType = viewFromUrl || processorDefaultView || 'compliance'
 
   // Get the appropriate view component
   const ViewComponent = getViewComponent(currentView)

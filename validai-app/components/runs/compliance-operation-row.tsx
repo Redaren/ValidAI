@@ -131,7 +131,7 @@ function getFullComment(result: OperationResult): string {
 /**
  * Get truncated comment from response text or structured output
  */
-function getTruncatedComment(result: OperationResult, maxLength: number = 80): string {
+function getTruncatedComment(result: OperationResult, maxLength: number = 200): string {
   const fullComment = getFullComment(result)
   return fullComment.length > maxLength
     ? fullComment.substring(0, maxLength) + '...'
@@ -141,7 +141,7 @@ function getTruncatedComment(result: OperationResult, maxLength: number = 80): s
 /**
  * Truncate text helper
  */
-function getTruncatedText(text: string, maxLength: number = 80): string {
+function getTruncatedText(text: string, maxLength: number = 200): string {
   return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
 }
 
@@ -256,7 +256,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
               {/* Fixed-width name column */}
               <span
                 className={cn(
-                  'w-48 shrink-0 font-medium truncate',
+                  'w-40 shrink-0 font-medium truncate',
                   isPending && 'text-muted-foreground'
                 )}
               >
@@ -269,7 +269,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
               {/* Comment (with structured value prepended if applicable) */}
               <span
                 className={cn(
-                  'text-sm flex-1 truncate',
+                  'text-sm flex-1 min-w-0 line-clamp-1',
                   isPending && 'text-muted-foreground',
                   isFailed && 'text-destructive'
                 )}
@@ -284,7 +284,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
                 {/* Fixed-width name column */}
                 <span
                   className={cn(
-                    'w-48 shrink-0 font-medium',
+                    'w-40 shrink-0 font-medium',
                     isPending && 'text-muted-foreground'
                   )}
                 >
@@ -295,7 +295,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
                 <span className="text-muted-foreground shrink-0">|</span>
 
                 {/* Comment section */}
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   {(() => {
                     const items = getExtractionItems(result)
                     if (items) {

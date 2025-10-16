@@ -108,6 +108,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
           <RunProcessorDialog
             processorId={processor.processor_id}
             processorName={processor.processor_name}
+            defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
             trigger={
               <Button variant="default" size="icon" title="Run">
                 <Play className="h-4 w-4" />

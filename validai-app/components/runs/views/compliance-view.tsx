@@ -209,7 +209,7 @@ export function ComplianceView({
 
       {/* Grouped Operations */}
       <div className="space-y-4">
-        <h2 className="text-xl font-semibold">Results by Area</h2>
+        <h2 className="text-xl font-semibold">Tests & comments</h2>
 
         {groupedOperations.size === 0 ? (
           <div className="flex min-h-[200px] items-center justify-center rounded-lg border">
