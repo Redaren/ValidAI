@@ -1,8 +1,46 @@
 # LLM Provider Configuration Architecture
 
+> **Last Updated:** 2025-10-16
+
 ## Overview
 
 ValidAI implements a flexible 3-tier configuration hierarchy for managing Large Language Model (LLM) providers and their settings. This architecture allows for progressive customization from system-wide defaults down to processor-specific optimizations.
+
+## Implementation Status
+
+**Current Implementation (as of 2025-10-16):**
+
+### ✅ Fully Implemented
+- **Database Schema:** All tables, columns, and functions are in place and working
+  - `llm_global_settings` table with seeded Anthropic models
+  - `organizations.llm_configuration` JSONB column
+  - `processors.configuration` JSONB column
+- **Database Functions:** All resolution and configuration functions operational
+  - `get_llm_config_for_run()` - Resolves configuration through 3-tier hierarchy
+  - `set_organization_llm_config()` - Saves organization settings with encryption
+  - `get_available_llm_models()` - Returns available models
+- **TypeScript Types:** Complete type definitions in `lib/types/llm-config.types.ts`
+- **React Hooks:** All hooks implemented in `hooks/use-llm-config.ts`
+- **Edge Functions:** Production run execution fully integrated with LLM config resolution
+- **Security:** API key encryption and global fallback working
+
+### ⚠️ Architecturally Ready, UI Pending
+- **Processor Model Selection:** Database supports `selected_model_id` in `processors.configuration`, but no UI to set it yet
+- **Processor Settings Override:** Database supports `settings_override` for temperature/max_tokens, but no UI exists
+- **Organization LLM Management:** Hooks are ready, but Pro/Enterprise admin UI not built
+
+### 🔄 Current Behavior
+- **All processors use global default model** (Claude 3.5 Sonnet) via automatic fallback
+- **Organizations cannot configure custom API keys yet** (all use global `ANTHROPIC_API_KEY` from Edge Function environment)
+- **Processor configuration only stores** `default_run_view` field (for UI preference, not LLM settings)
+- **System prompt is the only processor-level LLM customization** available through UI
+
+### 📋 Roadmap
+This document describes the **complete architecture** as designed. Implementation priority:
+1. ✅ **Phase 1 (Complete):** Core database schema and resolution logic
+2. ⏳ **Phase 2 (Pending):** Processor model selection UI
+3. ⏳ **Phase 3 (Pending):** Organization LLM configuration UI (Pro/Enterprise feature)
+4. ⏳ **Phase 4 (Future):** Advanced settings overrides and usage analytics
 
 ## Configuration Hierarchy
 
@@ -97,16 +135,23 @@ Organizations with Pro or Enterprise accounts can configure their own LLM settin
 
 Individual processors can select specific models and override settings for their particular use case.
 
-**Data Structure**:
+**Data Structure (Designed)**:
 ```json
 {
   "selected_model_id": "opus",
   "settings_override": {
     "temperature": 0.2,
     "max_tokens": 8192
-  }
+  },
+  "default_run_view": "technical"
 }
 ```
+
+**Current Implementation Note:**
+- ⚠️ `selected_model_id` and `settings_override` are **supported by the database and resolution logic** but have **no UI yet**
+- ✅ `default_run_view` is the only field currently settable via UI (determines which view to show on run detail page)
+- In practice, processors currently use organization or global defaults for LLM configuration
+- System prompt (stored in `processors.system_prompt` column, not in `configuration`) is the primary processor-level customization available
 
 ## Resolution Logic
 
@@ -238,6 +283,8 @@ Future implementation:
 
 ### Setting Organization Configuration
 
+> **⚠️ UI Status:** Hook is implemented and ready, but admin UI for organization LLM configuration is not yet built. This is a planned Pro/Enterprise feature.
+
 ```typescript
 // React component using the hook
 import { useSetOrganizationLLMConfig } from '@/hooks/use-llm-config';
@@ -281,13 +328,16 @@ function ModelSelector() {
 
 ### Processor Configuration
 
+> **⚠️ UI Status:** Database and resolution logic support `selected_model_id` and `settings_override`, but no UI exists to set these fields yet. Current UI only allows setting `default_run_view` and `system_prompt` (separate column).
+
 ```typescript
-// When creating/editing a processor
+// When creating/editing a processor (future implementation)
 const processorConfig = {
-  selected_model_id: 'opus',  // Select from available models
+  selected_model_id: 'opus',  // Select from available models (no UI yet)
   settings_override: {
-    temperature: 0.2  // Override for this processor
-  }
+    temperature: 0.2  // Override for this processor (no UI yet)
+  },
+  default_run_view: 'technical'  // ✅ Currently settable via UI
 };
 
 // Save to processors.configuration column
@@ -298,6 +348,8 @@ await updateProcessor({
 
 ### Resolving Configuration at Runtime
 
+> **✅ Fully Implemented:** This works end-to-end in Edge Functions during processor runs.
+
 ```typescript
 import { useResolvedLLMConfig } from '@/hooks/use-llm-config';
 
@@ -306,32 +358,34 @@ function RunProcessor({ processorId }: { processorId: string }) {
 
   // llmConfig contains:
   // - provider: 'anthropic'
-  // - model: 'claude-3-opus-20240229'
-  // - api_key_encrypted: 'encrypted_key' (decrypt server-side)
-  // - settings: { temperature: 0.2, ... }
+  // - model: 'claude-3-5-sonnet-20241022' (currently always global default)
+  // - api_key_encrypted: null (currently always uses global ANTHROPIC_API_KEY)
+  // - settings: { default_temperature: 1.0, default_max_tokens: 4096, ... }
 }
 ```
 
 ## Account Type Behaviors
 
+> **Note:** Account tier differentiation is architecturally designed but not enforced in current UI. All accounts currently behave like Free accounts.
+
 ### Free Accounts
-- Use global default models
-- System provides API keys
+- Use global default models ✅ **Current behavior for all accounts**
+- System provides API keys ✅ **Current behavior for all accounts**
 - Cannot customize settings
 - Single model selection
 
-### Pro Accounts
-- Add custom API keys
-- Select from multiple models
-- Set organization defaults
-- Override global settings
+### Pro Accounts (Planned)
+- Add custom API keys ⏳ Database ready, UI pending
+- Select from multiple models ⏳ Database ready, UI pending
+- Set organization defaults ⏳ Database ready, UI pending
+- Override global settings ⏳ Database ready, UI pending
 
 ### Enterprise Accounts (Future)
 - All Pro features
-- Processor-level optimization
-- Usage analytics
-- Custom model endpoints
-- Audit logging
+- Processor-level optimization ⏳ Database ready, UI pending
+- Usage analytics 📋 Planned
+- Custom model endpoints 📋 Planned
+- Audit logging 📋 Planned
 
 ## Migration Path
 
