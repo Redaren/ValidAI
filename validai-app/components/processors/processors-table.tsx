@@ -11,8 +11,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { Lock, Users, Eye, History, MoreHorizontal } from "lucide-react"
-import { formatDistanceToNow } from "@/lib/utils"
+import { Lock, Users, Eye, History, MoreHorizontal, Play } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 
@@ -35,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ProcessorStatusBadge } from "./processor-status-badge"
+import { RunProcessorDialog } from "./run-processor-dialog"
 import { Processor } from "@/app/queries/processors/use-processors"
 
 interface ProcessorsTableProps {
@@ -44,7 +44,7 @@ interface ProcessorsTableProps {
 export function ProcessorsTable({ data }: ProcessorsTableProps) {
   const router = useRouter()
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "updated_at", desc: true }
+    { id: "processor_name", desc: false }
   ])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
 
@@ -107,24 +107,26 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         },
       },
       {
-        accessorKey: "updated_at",
-        header: "Last Updated",
-        cell: ({ row }) => {
-          const updatedAt = row.getValue("updated_at") as string
-          return (
-            <span className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(updatedAt))}
-            </span>
-          )
-        },
-      },
-      {
         id: "actions",
         cell: ({ row }) => {
           const processor = row.original
 
           return (
             <div className="flex items-center gap-2">
+              <RunProcessorDialog
+                processorId={processor.processor_id}
+                processorName={processor.processor_name}
+                defaultView="compliance"
+                trigger={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <Play className="h-4 w-4" />
+                  </Button>
+                }
+              />
+
               <Button
                 variant="ghost"
                 size="sm"

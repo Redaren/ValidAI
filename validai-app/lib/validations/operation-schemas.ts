@@ -76,19 +76,28 @@ export const createGenericOperationSchema = z.object({
 /**
  * Generic operation update schema
  *
- * Used for updating existing Generic type operations.
- * Note: operation_type cannot be changed after creation.
+ * Used for updating existing operations of any type.
+ * Allows changing the operation type after creation.
  *
  * Fields:
  * - name: The operation identifier (required)
  * - description: What the operation does (optional)
+ * - operation_type: Any of the 7 supported operation types (required)
  * - prompt: Instructions for the AI (required)
  */
 export const updateGenericOperationSchema = z.object({
   name: operationNameSchema,
   description: operationDescriptionSchema,
+  operation_type: z.enum([
+    'extraction',
+    'validation',
+    'rating',
+    'classification',
+    'analysis',
+    'generic',
+    'traffic_light',
+  ]),
   prompt: operationPromptSchema,
-  // operation_type is not editable after creation
 })
 
 /**

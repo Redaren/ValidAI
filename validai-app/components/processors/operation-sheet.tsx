@@ -109,7 +109,8 @@ interface OperationSheetProps {
  * - Requires: `operation`, `processorId`
  * - Uses: `updateGenericOperationSchema` validation
  * - Calls: `useUpdateOperation` mutation
- * - Preserves: area, position, operation_type
+ * - Preserves: area, position
+ * - Editable: name, description, operation_type, prompt
  *
  * ## Form Management
  * - Uses **React Hook Form** for optimal performance
@@ -152,8 +153,8 @@ export function OperationSheet({
    * React Hook Form setup with Zod validation
    *
    * Uses different schemas based on mode:
-   * - Create: includes operation_type field
-   * - Edit: excludes operation_type (not editable)
+   * - Create: creates new operation with all fields
+   * - Edit: updates existing operation, including operation_type
    */
   const form = useForm<CreateGenericOperationInput | UpdateGenericOperationInput>({
     resolver: zodResolver(
@@ -163,6 +164,7 @@ export function OperationSheet({
       ? {
           name: operation.name,
           description: operation.description || '',
+          operation_type: operation.operation_type,
           prompt: operation.prompt,
         }
       : {
@@ -181,6 +183,7 @@ export function OperationSheet({
       form.reset({
         name: operation.name,
         description: operation.description || '',
+        operation_type: operation.operation_type,
         prompt: operation.prompt,
       })
     }
@@ -314,52 +317,33 @@ export function OperationSheet({
                * Renders all available operation types from the database enum.
                * Each operation type is treated equally - no special cases.
                *
-               * In edit mode: Shows the existing operation type (read-only)
-               * In create mode: User can select any of the 7 operation types
+               * Now editable in both create and edit modes.
                */}
               <div className="space-y-2">
                 <Label htmlFor="operation_type">
                   Operation Type <span className="text-destructive">*</span>
                 </Label>
-                {isEditMode ? (
-                  <Select
-                    value={operation?.operation_type}
-                    disabled
-                  >
-                    <SelectTrigger id="operation_type" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {OPERATION_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Controller
-                    name="operation_type"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Select
-                        value={field.value}
-                        onValueChange={field.onChange}
-                      >
-                        <SelectTrigger id="operation_type" className="w-full">
-                          <SelectValue placeholder="Select operation type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {OPERATION_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                )}
+                <Controller
+                  name="operation_type"
+                  control={form.control}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    >
+                      <SelectTrigger id="operation_type" className="w-full">
+                        <SelectValue placeholder="Select operation type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {OPERATION_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type.charAt(0).toUpperCase() + type.slice(1).replace('_', ' ')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {'operation_type' in form.formState.errors &&
                   form.formState.errors.operation_type && (
                     <p className="text-sm text-destructive" role="alert">
