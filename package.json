@@ -1,0 +1,27 @@
+{
+  "name": "playze-validai",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playze Core platform with ValidAI as first application",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "format": "prettier --write \"**/*.{ts,tsx,md,json}\"",
+    "clean": "turbo clean && rm -rf node_modules .turbo"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "prettier": "^3.4.2",
+    "supabase": "^2.51.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5"
+  }
+}
