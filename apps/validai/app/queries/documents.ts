@@ -15,7 +15,7 @@ import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
 import type { Database } from '@/lib/database.types'
 import { validateDocumentFile } from '@/lib/constants/documents'
 
-type Document = Database['public']['Tables']['documents']['Row']
+type Document = Database['public']['Tables']['validai_documents']['Row']
 
 /**
  * Hook to fetch all documents for the current organization
@@ -38,7 +38,7 @@ export function useDocuments() {
     queryKey: ['documents'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('documents')
+        .from('validai_documents')
         .select('*')
         .is('deleted_at', null)
         .order('created_at', { ascending: false })
@@ -106,7 +106,7 @@ export function useUploadDocument() {
 
       // 5. Create document record in database
       const { data: document, error: insertError } = await supabase
-        .from('documents')
+        .from('validai_documents')
         .insert({
           organization_id: organizationId,
           name: file.name,

@@ -140,7 +140,7 @@ export function useCreateProcessor() {
       console.log('Insert data:', insertData)
 
       const { data, error } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .insert(insertData)
         .select('id')
         .single()

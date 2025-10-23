@@ -131,7 +131,7 @@ serve(async (req) => {
 
       // 2. Fetch processor
       const { data: processor, error: procError } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .select('*')
         .eq('id', initialBody.processor_id)
         .single()
@@ -145,7 +145,7 @@ serve(async (req) => {
 
       // 3. Fetch operations (ordered by position)
       const { data: operations, error: opsError } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .select('*')
         .eq('processor_id', initialBody.processor_id)
         .order('position', { ascending: true })
@@ -166,7 +166,7 @@ serve(async (req) => {
 
       // 4. Fetch document
       const { data: document, error: docError } = await supabase
-        .from('documents')
+        .from('validai_documents')
         .select('*')
         .eq('id', initialBody.document_id)
         .single()
@@ -187,7 +187,7 @@ serve(async (req) => {
       } else {
         // Regular user: verify organization membership
         const { data: membership, error: memberError } = await supabase
-          .from('organization_members')
+          .from('validai_organization_members')
           .select('organization_id')
           .eq('user_id', user.id)
           .single()
@@ -233,7 +233,7 @@ serve(async (req) => {
 
       // 7. Create run record
       const { data: run, error: runError } = await supabase
-        .from('runs')
+        .from('validai_runs')
         .insert({
           processor_id: processor.id,
           document_id: document.id,
@@ -299,7 +299,7 @@ serve(async (req) => {
 
       // 1. Fetch run with snapshot
       const { data: run, error: runError } = await supabase
-        .from('runs')
+        .from('validai_runs')
         .select('*')
         .eq('id', backgroundBody.run_id)
         .single()
@@ -317,7 +317,7 @@ serve(async (req) => {
       // 2. Update run status to processing (if first chunk)
       if (backgroundBody.start_index === 0) {
         await supabase
-          .from('runs')
+          .from('validai_runs')
           .update({ status: 'processing' })
           .eq('id', backgroundBody.run_id)
         console.log('Run status updated to: processing')
@@ -332,7 +332,7 @@ serve(async (req) => {
       if (llmError || !llmConfig) {
         console.error(`Failed to get LLM config: ${llmError?.message}`)
         await supabase
-          .from('runs')
+          .from('validai_runs')
           .update({
             status: 'failed',
             error_message: `Failed to resolve LLM configuration: ${llmError?.message}`,
@@ -356,7 +356,7 @@ serve(async (req) => {
         if (decryptError || !decryptedKey) {
           console.error(`Failed to decrypt API key: ${decryptError?.message}`)
           await supabase
-            .from('runs')
+            .from('validai_runs')
             .update({
               status: 'failed',
               error_message: 'Failed to decrypt API key',
@@ -375,7 +375,7 @@ serve(async (req) => {
         if (!globalKey) {
           console.error('No API key available')
           await supabase
-            .from('runs')
+            .from('validai_runs')
             .update({
               status: 'failed',
               error_message: 'No API key available',
@@ -429,7 +429,7 @@ serve(async (req) => {
         try {
           // Create operation_result (pending)
           const { data: opResultData, error: createError } = await supabase
-            .from('operation_results')
+            .from('validai_operation_results')
             .insert({
               run_id: backgroundBody.run_id,
               operation_id: operation.id,
@@ -449,7 +449,7 @@ serve(async (req) => {
 
           // Update to processing
           await supabase
-            .from('operation_results')
+            .from('validai_operation_results')
             .update({
               status: 'processing',
               started_at: new Date().toISOString()
@@ -478,7 +478,7 @@ serve(async (req) => {
 
           // Update operation_result (completed)
           await supabase
-            .from('operation_results')
+            .from('validai_operation_results')
             .update({
               status: 'completed',
               response_text: result.response,
@@ -511,7 +511,7 @@ serve(async (req) => {
           // Only update operation_result if it was successfully created
           if (opResult) {
             await supabase
-              .from('operation_results')
+              .from('validai_operation_results')
               .update({
                 status: 'failed',
                 error_message: error.message || 'Unknown error occurred',
@@ -565,7 +565,7 @@ serve(async (req) => {
         console.log('All operations processed. Marking run as completed.')
 
         await supabase
-          .from('runs')
+          .from('validai_runs')
           .update({
             status: 'completed',
             completed_at: new Date().toISOString()

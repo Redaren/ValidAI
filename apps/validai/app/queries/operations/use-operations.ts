@@ -38,7 +38,7 @@ export function useCreateOperation() {
     mutationFn: async (payload: Omit<CreateOperationPayload, 'position'>) => {
       // First, get the max position in the target area
       const { data: existingOps, error: fetchError } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .select('position')
         .eq('processor_id', payload.processor_id)
         .eq('area', payload.area)
@@ -53,7 +53,7 @@ export function useCreateOperation() {
 
       // Insert the new operation
       const { data, error } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .insert({
           ...payload,
           position: newPosition,
@@ -107,7 +107,7 @@ export function useUpdateOperation() {
       updates: Partial<Omit<CreateOperationPayload, 'processor_id'>>
     }) => {
       const { data, error } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .update(updates)
         .eq('id', id)
         .select()
@@ -164,7 +164,7 @@ export function useUpdateOperationFromWorkbench() {
       operation_type: string
     }) => {
       const { data, error } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .update({
           prompt,
           operation_type
@@ -215,7 +215,7 @@ export function useDeleteOperation() {
       processorId: string
     }) => {
       const { error } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .delete()
         .eq('id', id)
 

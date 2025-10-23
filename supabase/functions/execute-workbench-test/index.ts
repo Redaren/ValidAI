@@ -226,7 +226,7 @@ serve(async (req) => {
     // Create initial execution record (if audit logging enabled)
     if (ENABLE_WORKBENCH_AUDIT_LOG) {
       const { data: execution, error: execError } = await supabase
-        .from('workbench_executions')
+        .from('validai_workbench_executions')
         .insert({
           processor_id: body.processor_id,
           user_id: user.id,
@@ -647,7 +647,7 @@ serve(async (req) => {
     // Update status to processing (if audit logging enabled)
     if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
       await supabase
-        .from('workbench_executions')
+        .from('validai_workbench_executions')
         .update({
           status: 'processing',
           model_used: modelToUse
@@ -950,7 +950,7 @@ serve(async (req) => {
       // Update execution record with completion status (if audit logging enabled)
       if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
         await supabase
-          .from('workbench_executions')
+          .from('validai_workbench_executions')
           .update({
             status: 'completed',
             response: responseText,
@@ -1019,7 +1019,7 @@ serve(async (req) => {
       // Mark as COMPLETED (not failed) so it shows in Output section (if audit logging enabled)
       if (ENABLE_WORKBENCH_AUDIT_LOG && executionId) {
         await supabase
-          .from('workbench_executions')
+          .from('validai_workbench_executions')
           .update({
             status: 'completed',
             response: errorMessage,
@@ -1052,7 +1052,7 @@ serve(async (req) => {
         const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
         await supabase
-          .from('workbench_executions')
+          .from('validai_workbench_executions')
           .update({
             status: 'failed',
             error_message: error.message || error.toString()

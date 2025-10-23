@@ -122,7 +122,7 @@ export function useRun(
     queryFn: async () => {
       if (!runId) throw new Error('Run ID is required')
 
-      const { data, error } = await supabase.from('runs').select('*').eq('id', runId).single()
+      const { data, error } = await supabase.from('validai_runs').select('*').eq('id', runId).single()
 
       if (error) throw error
       return data as Run
@@ -142,7 +142,7 @@ export function useRun(
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'runs',
+          table: 'validai_runs',
           filter: `id=eq.${runId}`,
         },
         () => {
@@ -198,7 +198,7 @@ export function useOperationResults(
       if (!runId) throw new Error('Run ID is required')
 
       const { data, error } = await supabase
-        .from('operation_results')
+        .from('validai_operation_results')
         .select('*')
         .eq('run_id', runId)
         .order('execution_order', { ascending: true })
@@ -220,7 +220,7 @@ export function useOperationResults(
         {
           event: '*', // INSERT and UPDATE
           schema: 'public',
-          table: 'operation_results',
+          table: 'validai_operation_results',
           filter: `run_id=eq.${runId}`,
         },
         () => {
@@ -274,7 +274,7 @@ export function useProcessorRuns(
       if (!processorId) throw new Error('Processor ID is required')
 
       let query = supabase
-        .from('runs')
+        .from('validai_runs')
         .select('*')
         .eq('processor_id', processorId)
         .order('started_at', { ascending: false })

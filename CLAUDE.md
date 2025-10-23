@@ -99,33 +99,69 @@ If you're about to create an API route, STOP and ask:
 
 ## Development Commands
 
+**Note:** ValidAI is now part of a monorepo structure using pnpm + Turborepo (Phase 1 complete).
+
+### From Root (Recommended - Turborepo)
 ```bash
-cd validai-app
-npm run dev          # Start development server with Turbopack
-npm run build        # Build production version
-npm run start        # Start production server
-npm run lint         # Run ESLint checks
-npm run typecheck    # Run TypeScript checks
+# Start ValidAI dev server
+pnpm dev --filter=@playze/validai
+
+# Build ValidAI
+pnpm build --filter=@playze/validai
+
+# Run all tasks across workspace
+pnpm dev              # All apps in parallel
+pnpm build            # Build all apps
+pnpm lint             # Lint all apps
+pnpm typecheck        # Type check all apps
+pnpm test             # Test all apps
+```
+
+### From ValidAI Directory (Direct)
+```bash
+cd apps/validai
+pnpm dev             # Start development server with Turbopack
+pnpm build           # Build production version
+pnpm start           # Start production server
+pnpm lint            # Run ESLint checks
+pnpm typecheck       # Run TypeScript checks
 ```
 
 ### Testing Commands
 ```bash
-npm run test         # Run unit tests with Vitest
-npm run test:watch   # Run tests in watch mode
-npm run test:coverage # Run tests with coverage report
-# npm run test:e2e     # Run E2E tests with Playwright (prepared for future use)
-npm run test:all     # Run all tests (currently unit tests only)
+cd apps/validai
+pnpm test            # Run unit tests with Vitest
+pnpm test:watch      # Run tests in watch mode
+pnpm test:coverage   # Run tests with coverage report
+# pnpm test:e2e      # Run E2E tests with Playwright (prepared for future use)
+pnpm test:all        # Run all tests (currently unit tests only)
 ```
 
 ### Code Quality
 ```bash
-npm run format       # Format code with Prettier
-npm run lint:fix     # Fix ESLint issues automatically
+cd apps/validai
+pnpm format          # Format code with Prettier
+pnpm lint:fix        # Fix ESLint issues automatically
+```
+
+### Supabase Commands (From Root)
+```bash
+# Supabase is at root level (shared across apps)
+npx supabase db push              # Push migrations to remote
+npx supabase gen types typescript # Generate TypeScript types
+npx supabase functions deploy     # Deploy Edge Functions
 ```
 
 ## Architecture
 
-### Project Structure
+### Monorepo Structure (Phase 1 Complete)
+ValidAI is structured as a monorepo using pnpm workspaces + Turborepo:
+- **Root**: `package.json`, `pnpm-workspace.yaml`, `turbo.json`
+- **apps/validai/**: ValidAI Next.js application (`@playze/validai`)
+- **packages/**: Shared packages (prepared for Phase 2)
+- **supabase/**: Database migrations, Edge Functions (shared across apps)
+
+### ValidAI App Structure
 - **App Router**: Uses Next.js 15 App Router pattern
 - **Authentication**: Cookie-based auth via Supabase middleware
 - **Database**: Supabase PostgreSQL with MCP server integration
@@ -135,7 +171,7 @@ npm run lint:fix     # Fix ESLint issues automatically
 - **Testing**: Vitest + React Testing Library + Playwright
 - **Quality**: ESLint + Prettier + Husky hooks + GitHub Actions
 
-### Key Files
+### Key Files (in apps/validai/)
 - `middleware.ts`: Handles session management across all routes
 - `lib/supabase/`: Contains server, client, and middleware configurations
 - `app/protected/`: Routes requiring authentication
@@ -148,26 +184,37 @@ npm run lint:fix     # Fix ESLint issues automatically
 
 ### Supabase Integration
 - **MCP Server**: Configured with project ref `xczippkxxdqlvaacjexj`
-- **Client Types**:
-  - `lib/supabase/server.ts`: Server-side client (RSC, Route Handlers)
-  - `lib/supabase/client.ts`: Client-side operations
-  - `lib/supabase/typed-clients.ts`: TypeScript-enhanced clients
-  - `lib/supabase/middleware.ts`: Session refresh logic
-- **Generated Types**: `lib/database.types.ts` (auto-generated from schema)
+- **Location**: Root level (`/supabase/`) - shared across all apps
+- **Client Types** (in `apps/validai/lib/supabase/`):
+  - `server.ts`: Server-side client (RSC, Route Handlers)
+  - `client.ts`: Client-side operations
+  - `typed-clients.ts`: TypeScript-enhanced clients
+  - `middleware.ts`: Session refresh logic
+- **Generated Types**: `apps/validai/lib/database.types.ts` (auto-generated from schema)
 - **JWT Metadata**: Contains user identity and current organization details in `app_metadata`
+- **Database Tables**: All ValidAI tables use `validai_` prefix (Phase 1)
 
 ### Environment Variables
-Required in `.env.local`:
+Required in `apps/validai/.env.local`:
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
 ```
 
-### Database Schema
-- **todos**: Demo table for basic CRUD operations
+### Database Schema (Phase 1 - All tables prefixed)
+- **validai_documents**: Document management
+- **validai_processors**: AI processor configurations
+- **validai_operations**: Processor operations
+- **validai_runs**: Processor execution runs
+- **validai_operation_results**: Operation execution results
+- **validai_workbench_executions**: Workbench test executions
+- **validai_llm_global_settings**: LLM configuration
+- **validai_organizations**: Organizations (ValidAI-specific)
+- **validai_organization_members**: Organization membership
+- **validai_profiles**: User profiles
 
 ### Path Aliases
-- `@/*`: Maps to project root (configured in tsconfig.json)
+- `@/*`: Maps to `apps/validai/` root (configured in tsconfig.json)
 
 ## State Management & Data Fetching
 

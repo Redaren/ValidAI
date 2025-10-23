@@ -14,7 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      documents: {
+      validai_documents: {
         Row: {
           created_at: string
           deleted_at: string | null
@@ -65,12 +65,12 @@ export type Database = {
             foreignKeyName: "documents_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "validai_organizations"
             referencedColumns: ["id"]
           },
         ]
       }
-      llm_global_settings: {
+      validai_llm_global_settings: {
         Row: {
           configuration: Json | null
           created_at: string
@@ -106,7 +106,7 @@ export type Database = {
         }
         Relationships: []
       }
-      operation_results: {
+      validai_operation_results: {
         Row: {
           cache_hit: boolean | null
           completed_at: string | null
@@ -172,19 +172,19 @@ export type Database = {
             foreignKeyName: "operation_results_operation_id_fkey"
             columns: ["operation_id"]
             isOneToOne: false
-            referencedRelation: "operations"
+            referencedRelation: "validai_operations"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "operation_results_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
-            referencedRelation: "runs"
+            referencedRelation: "validai_runs"
             referencedColumns: ["id"]
           },
         ]
       }
-      operations: {
+      validai_operations: {
         Row: {
           area: string
           configuration: Json | null
@@ -238,12 +238,12 @@ export type Database = {
             foreignKeyName: "operations_processor_id_fkey"
             columns: ["processor_id"]
             isOneToOne: false
-            referencedRelation: "processors"
+            referencedRelation: "validai_processors"
             referencedColumns: ["id"]
           },
         ]
       }
-      organization_members: {
+      validai_organization_members: {
         Row: {
           joined_at: string | null
           organization_id: string
@@ -267,12 +267,12 @@ export type Database = {
             foreignKeyName: "organization_members_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "validai_organizations"
             referencedColumns: ["id"]
           },
         ]
       }
-      organizations: {
+      validai_organizations: {
         Row: {
           created_at: string | null
           created_by: string
@@ -305,7 +305,7 @@ export type Database = {
         }
         Relationships: []
       }
-      processors: {
+      validai_processors: {
         Row: {
           area_configuration: Json | null
           configuration: Json | null
@@ -365,12 +365,12 @@ export type Database = {
             foreignKeyName: "processors_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "validai_organizations"
             referencedColumns: ["id"]
           },
         ]
       }
-      profiles: {
+      validai_profiles: {
         Row: {
           avatar_url: string | null
           created_at: string | null
@@ -394,7 +394,7 @@ export type Database = {
         }
         Relationships: []
       }
-      runs: {
+      validai_runs: {
         Row: {
           completed_at: string | null
           completed_operations: number
@@ -451,26 +451,26 @@ export type Database = {
             foreignKeyName: "runs_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
-            referencedRelation: "documents"
+            referencedRelation: "validai_documents"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "runs_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "validai_organizations"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "runs_processor_id_fkey"
             columns: ["processor_id"]
             isOneToOne: false
-            referencedRelation: "processors"
+            referencedRelation: "validai_processors"
             referencedColumns: ["id"]
           },
         ]
       }
-      workbench_executions: {
+      validai_workbench_executions: {
         Row: {
           citations: Json | null
           created_at: string
@@ -533,14 +533,14 @@ export type Database = {
             foreignKeyName: "workbench_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "validai_organizations"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "workbench_executions_processor_id_fkey"
             columns: ["processor_id"]
             isOneToOne: false
-            referencedRelation: "processors"
+            referencedRelation: "validai_processors"
             referencedColumns: ["id"]
           },
         ]
@@ -556,22 +556,22 @@ export type Database = {
       }
       create_processor_with_operations: {
         Args: {
-          p_area_configuration?: Json
-          p_configuration?: Json
-          p_description?: string
-          p_document_type?: string
+          p_area_configuration: Json
+          p_configuration: Json
+          p_description: string
+          p_document_type: string
           p_name: string
-          p_operations?: Json
-          p_status?: Database["public"]["Enums"]["processor_status"]
-          p_system_prompt?: string
-          p_tags?: string[]
-          p_visibility?: Database["public"]["Enums"]["processor_visibility"]
+          p_operations: Json
+          p_status: Database["public"]["Enums"]["processor_status"]
+          p_system_prompt: string
+          p_tags: string[]
+          p_visibility: Database["public"]["Enums"]["processor_visibility"]
         }
         Returns: {
-          operations_created: number
-          processor_id: string
-          processor_name: string
-          processor_status: Database["public"]["Enums"]["processor_status"]
+          id: string
+          name: string
+          operation_count: number
+          status: Database["public"]["Enums"]["processor_status"]
         }[]
       }
       decrypt_api_key: {
@@ -590,46 +590,37 @@ export type Database = {
         Args: { p_org_id: string; p_plaintext: string }
         Returns: string
       }
-      generate_unique_org_slug: {
-        Args: { base_name: string }
-        Returns: string
-      }
-      get_available_llm_models: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
+      generate_unique_org_slug: { Args: { base_name: string }; Returns: string }
+      get_available_llm_models: { Args: never; Returns: Json }
       get_current_organization: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           created_by: string
-          organization_id: string
-          organization_name: string
-          organization_slug: string
+          id: string
+          name: string
           plan_type: string
+          role: string
+          slug: string
           updated_at: string
-          user_role: string
         }[]
       }
-      get_current_organization_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
-      get_llm_config_for_run: {
-        Args:
-          | { p_processor_id?: string }
-          | { p_processor_id?: string; p_user_id?: string }
-        Returns: Json
-      }
+      get_current_organization_id: { Args: never; Returns: string }
+      get_llm_config_for_run:
+        | {
+            Args: { p_processor_id?: string; p_user_id?: string }
+            Returns: Json
+          }
+        | { Args: { p_processor_id?: string }; Returns: Json }
       get_ordered_operations: {
         Args: { p_processor_id: string }
         Returns: {
           area: string
           configuration: Json
+          description: string
           display_order: number
-          operation_description: string
-          operation_id: string
-          operation_name: string
+          id: string
+          name: string
           operation_type: Database["public"]["Enums"]["operation_type"]
           output_schema: Json
           position: number
@@ -671,17 +662,17 @@ export type Database = {
         }[]
       }
       get_user_organizations: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           created_by: string
+          id: string
           joined_at: string
-          organization_id: string
-          organization_name: string
-          organization_slug: string
+          name: string
           plan_type: string
+          role: string
+          slug: string
           updated_at: string
-          user_role: string
         }[]
       }
       get_user_organizations_safe: {
@@ -689,13 +680,13 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string
+          id: string
           joined_at: string
-          organization_id: string
-          organization_name: string
-          organization_slug: string
+          name: string
           plan_type: string
+          role: string
+          slug: string
           updated_at: string
-          user_role: string
         }[]
       }
       get_user_processors: {
@@ -704,6 +695,7 @@ export type Database = {
           created_at: string
           created_by: string
           created_by_name: string
+          document_type: string
           is_owner: boolean
           operation_count: number
           processor_description: string
@@ -713,7 +705,6 @@ export type Database = {
           status: Database["public"]["Enums"]["processor_status"]
           tags: string[]
           updated_at: string
-          usage_description: string
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }[]
       }
@@ -726,13 +717,13 @@ export type Database = {
         Returns: {
           created_at: string
           created_by: string
-          created_by_name: string
+          creator_name: string
+          description: string
           document_type: string
+          id: string
           is_owner: boolean
+          name: string
           operation_count: number
-          processor_description: string
-          processor_id: string
-          processor_name: string
           published_at: string
           status: Database["public"]["Enums"]["processor_status"]
           tags: string[]
@@ -752,7 +743,7 @@ export type Database = {
         Args: {
           p_api_keys: Json
           p_available_models: Json
-          p_default_model_id?: string
+          p_default_model_id: string
         }
         Returns: Json
       }

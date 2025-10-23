@@ -94,7 +94,7 @@ export function useUpdateOperationPosition() {
       newPosition: number
     }) => {
       const { error } = await supabase
-        .from('operations')
+        .from('validai_operations')
         .update({
           area: newArea,
           position: newPosition,
@@ -162,7 +162,7 @@ export function useUpdateAreaConfiguration() {
       }
     }) => {
       const { error } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .update({
           area_configuration: areaConfiguration,
           updated_at: new Date().toISOString(),
@@ -221,7 +221,7 @@ export function useCreateArea() {
     }) => {
       // Get current processor to access area_configuration
       const { data: processor, error: fetchError } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .select('area_configuration')
         .eq('id', processorId)
         .single()
@@ -253,7 +253,7 @@ export function useCreateArea() {
 
       // Update processor
       const { error: updateError } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .update({
           area_configuration: { areas: updatedAreas },
           updated_at: new Date().toISOString(),
@@ -310,7 +310,7 @@ export function useUpdateProcessorSettings() {
       systemPrompt?: string
     }) => {
       const { error } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .update({
           system_prompt: systemPrompt || null,
           updated_at: new Date().toISOString(),
@@ -353,7 +353,7 @@ export function useUpdateProcessor() {
       let updatedConfig: Record<string, unknown> | undefined = undefined
       if (default_run_view !== undefined) {
         const { data: current } = await supabase
-          .from('processors')
+          .from('validai_processors')
           .select('configuration')
           .eq('id', processorId)
           .single()
@@ -391,7 +391,7 @@ export function useUpdateProcessor() {
       if (updatedConfig !== undefined) updates.configuration = updatedConfig
 
       const { error } = await supabase
-        .from('processors')
+        .from('validai_processors')
         .update(updates)
         .eq('id', processorId)
 
