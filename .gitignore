@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+.turbo/
+dist/
+build/
+out/
+
+# Environment files (sensitive)
+.env.local
+.env*.local
+.env.production
+.env.development
+
+# OS files
+.DS_Store
+Thumbs.db
+nul
+
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+*.log
+*.tmp
+pre-migration-state.txt
+
+# Supabase
+supabase/.temp/
