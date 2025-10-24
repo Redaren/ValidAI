@@ -944,122 +944,7 @@ cp /c/Dev/playze-core/supabase/migrations/*.sql ./supabase/migrations/
 - 20250122000002_unified_authorization.sql
 - (All other Playze Core migrations)
 
-#### Handle Schema Conflicts
 
-**Problem:** Both Playze Core and ValidAI have:
-- organizations table (different schemas)
-- organization_members table (likely same)
-- profiles table (likely same)
-
-**Resolution Strategy:**
-
-**Create migration:** `supabase/migrations/20250123100000_merge_platform_schemas.sql`
-
-```sql
--- =============================================================================
--- MERGE PLAYZE CORE AND VALIDAI SCHEMAS
--- =============================================================================
--- Description: Merge organizations table schemas from both platforms
--- Author: Migration Team
--- Created: 2025-01-23
--- Risk: Medium (schema merge, data preservation critical)
--- =============================================================================
-
--- NOTE: This migration runs AFTER Playze Core migrations create base tables
-
--- -----------------------------------------------------------------------------
--- ENHANCE ORGANIZATIONS TABLE
--- -----------------------------------------------------------------------------
-
--- Playze Core creates: id, name, description, is_active
--- ValidAI needs: slug, plan_type, llm_configuration, created_by
-
-ALTER TABLE organizations
-  ADD COLUMN IF NOT EXISTS slug text UNIQUE,
-  ADD COLUMN IF NOT EXISTS plan_type text CHECK (plan_type IN ('free', 'pro', 'enterprise')),
-  ADD COLUMN IF NOT EXISTS llm_configuration jsonb,
-  ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id);
-
--- Set default plan_type for existing orgs (from Playze Core or ValidAI)
-UPDATE organizations
-SET plan_type = COALESCE(plan_type, 'free')
-WHERE plan_type IS NULL;
-
--- Generate slugs for organizations without them
-UPDATE organizations
-SET slug = lower(regexp_replace(name, '[^a-zA-Z0-9]+', '-', 'g'))
-WHERE slug IS NULL;
-
--- Ensure slug uniqueness (append ID if duplicate)
-UPDATE organizations o1
-SET slug = slug || '-' || substring(id::text from 1 for 8)
-WHERE EXISTS (
-  SELECT 1 FROM organizations o2
-  WHERE o2.slug = o1.slug AND o2.id < o1.id
-);
-
--- Create index on slug
-CREATE INDEX IF NOT EXISTS organizations_slug_idx ON organizations(slug);
-
--- Add comment
-COMMENT ON COLUMN organizations.slug IS 'URL-friendly identifier for organization';
-COMMENT ON COLUMN organizations.plan_type IS 'DEPRECATED: Use organization_app_subscriptions.tier_name instead';
-COMMENT ON COLUMN organizations.llm_configuration IS 'Organization-specific LLM configuration (API keys, models)';
-
--- -----------------------------------------------------------------------------
--- VERIFY ORGANIZATIONS TABLE STRUCTURE
--- -----------------------------------------------------------------------------
-
-DO $$
-BEGIN
-  -- Verify all required columns exist
-  ASSERT (SELECT EXISTS (
-    SELECT FROM information_schema.columns
-    WHERE table_name = 'organizations' AND column_name = 'id'
-  )), 'organizations.id column missing';
-
-  ASSERT (SELECT EXISTS (
-    SELECT FROM information_schema.columns
-    WHERE table_name = 'organizations' AND column_name = 'name'
-  )), 'organizations.name column missing';
-
-  ASSERT (SELECT EXISTS (
-    SELECT FROM information_schema.columns
-    WHERE table_name = 'organizations' AND column_name = 'slug'
-  )), 'organizations.slug column missing';
-
-  ASSERT (SELECT EXISTS (
-    SELECT FROM information_schema.columns
-    WHERE table_name = 'organizations' AND column_name = 'plan_type'
-  )), 'organizations.plan_type column missing';
-
-  ASSERT (SELECT EXISTS (
-    SELECT FROM information_schema.columns
-    WHERE table_name = 'organizations' AND column_name = 'llm_configuration'
-  )), 'organizations.llm_configuration column missing';
-
-  RAISE NOTICE 'Organizations table merge successful!';
-END $$;
-
--- -----------------------------------------------------------------------------
--- ORGANIZATION_MEMBERS TABLE
--- -----------------------------------------------------------------------------
-
--- Should be identical in both platforms
--- Playze Core migration creates it, ValidAI data already migrated
--- No changes needed
-
--- -----------------------------------------------------------------------------
--- PROFILES TABLE
--- -----------------------------------------------------------------------------
-
--- Should be identical in both platforms
--- No changes needed
-
--- -----------------------------------------------------------------------------
--- END MERGE
--- -----------------------------------------------------------------------------
-```
 
 #### Review Migration Order
 
@@ -1135,7 +1020,7 @@ ORDER BY tablename;
 - profiles
 - user_preferences
 
-**ValidAI tables (7):**
+**ValidAI tables (10):**
 - validai_documents
 - validai_llm_global_settings
 - validai_operation_results
@@ -1143,6 +1028,9 @@ ORDER BY tablename;
 - validai_processors
 - validai_runs
 - validai_workbench_executions
+- validai_operations
+- validai_profiles
+- validai_organization_members
 
 **Check functions exist:**
 
