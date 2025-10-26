@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useCurrentOrganization } from '@playze/shared-auth'
+import { useUserAppsWithAdmin } from '@playze/shared-auth'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,34 +11,49 @@ import {
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
 import { Button } from '../ui/button'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Loader2 } from 'lucide-react'
 
 interface AppSwitcherProps {
   currentApp: string
 }
 
 /**
- * AppSwitcher component allows users to navigate between apps their organization subscribes to.
+ * Map app IDs to URLs (temporary until app_url added to database)
+ */
+function getAppUrl(appId: string): string {
+  const urlMap: Record<string, string> = {
+    'admin': 'http://localhost:3001',
+    'validai': 'http://localhost:3000',
+    'testapp': 'http://localhost:3002',
+  }
+  return urlMap[appId] || '#'
+}
+
+/**
+ * AppSwitcher component - Navigate between accessible apps
  *
  * Shows:
- * - Current app (highlighted)
- * - Other subscribed apps (clickable)
- * - Apps without subscription (locked/grayed)
+ * - Organization's subscribed apps (from subscriptions)
+ * - Admin Portal (only for platform administrators)
+ * - Current app (highlighted with checkmark)
+ *
+ * Security: Server-side verification via get_user_apps_with_admin()
+ * - Subscribed apps: Verified via organization_app_subscriptions table
+ * - Admin Portal: Verified via admin_users table (cannot be faked)
  *
  * @example
- * <AppSwitcher currentApp="roadcloud" />
+ * <AppSwitcher currentApp="validai" />
  */
 export function AppSwitcher({ currentApp }: AppSwitcherProps) {
-  const { data: org } = useCurrentOrganization()
+  const { data: userApps, isLoading } = useUserAppsWithAdmin()
 
-  // TODO: Fetch organization's app subscriptions from database
-  // For now, hardcoded example
-  const apps = [
-    { id: 'admin', name: 'Admin Portal', url: 'http://localhost:3001', hasAccess: true },
-    { id: 'projectx', name: 'ProjectX', url: 'http://localhost:3002', hasAccess: true },
-    { id: 'testapp', name: 'TestApp', url: 'http://localhost:3003', hasAccess: true },
-    { id: 'roadcloud', name: 'RoadCloud', url: 'http://localhost:3004', hasAccess: true },
-  ]
+  const apps = (userApps || []).map(app => ({
+    id: app.app_id,
+    name: app.app_name,
+    url: getAppUrl(app.app_id),
+    hasAccess: app.status === 'active',
+    isPlatformApp: app.is_platform_app,
+  }))
 
   const currentAppData = apps.find(app => app.id === currentApp)
 
@@ -47,6 +62,15 @@ export function AppSwitcher({ currentApp }: AppSwitcherProps) {
     if (app?.hasAccess && app.url) {
       window.location.href = app.url
     }
+  }
+
+  if (isLoading) {
+    return (
+      <Button variant="outline" className="w-[200px] justify-between" disabled>
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <ChevronDown className="ml-2 h-4 w-4" />
+      </Button>
+    )
   }
 
   return (

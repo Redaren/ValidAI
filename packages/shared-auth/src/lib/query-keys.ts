@@ -38,4 +38,10 @@ export const queryKeys = {
     context: (appId: string) =>
       [...queryKeys.authorization.all(), 'context', appId] as const,
   },
+
+  // User queries
+  user: {
+    all: () => ['user'] as const,
+    appsWithAdmin: () => [...queryKeys.user.all(), 'apps-with-admin'] as const,
+  },
 } as const
