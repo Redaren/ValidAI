@@ -22,25 +22,18 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useCurrentOrganization, useUserOrganizations, useSwitchOrganization } from "@/app/queries/organizations/use-organizations"
-import { useOrganizationStore } from "@/stores"
+import { useCurrentOrganization, useUserOrganizations, useSwitchOrganization } from "@playze/shared-auth"
 
 export function OrganizationSwitcher() {
   const { isMobile } = useSidebar()
   const router = useRouter()
 
-  // Queries
-  const { data: currentOrgData, isLoading: currentLoading } = useCurrentOrganization()
-  const { data: userOrgsData, isLoading: orgsLoading } = useUserOrganizations()
+  // Queries (shared hooks return data directly, not wrapped in objects)
+  const { data: currentOrg, isLoading: currentLoading } = useCurrentOrganization()
+  const { data: userOrgs = [], isLoading: orgsLoading } = useUserOrganizations()
   const switchOrgMutation = useSwitchOrganization()
 
-  // Store
-  const { isSwitching } = useOrganizationStore()
-
-  const currentOrg = currentOrgData?.organization
-  const userOrgs = userOrgsData?.organizations || []
-
-  const isLoading = currentLoading || orgsLoading || isSwitching
+  const isLoading = currentLoading || orgsLoading || switchOrgMutation.isPending
 
   if (isLoading) {
     return (
@@ -65,7 +58,14 @@ export function OrganizationSwitcher() {
     if (orgId === currentOrg?.id) return
 
     try {
-      await switchOrgMutation.mutateAsync(orgId)
+      // Shared hook expects { organizationId: string }
+      await switchOrgMutation.mutateAsync({ organizationId: orgId })
+
+      // Note: The shared hook invalidates queries but doesn't reload the page
+      // Reloading ensures all components get the new organization context
+      if (typeof window !== 'undefined') {
+        window.location.reload()
+      }
     } catch (error) {
       console.error('Failed to switch organization:', error)
       // TODO: Show error notification
@@ -78,7 +78,8 @@ export function OrganizationSwitcher() {
 
   const handleManageOrganization = () => {
     if (currentOrg) {
-      router.push(`/dashboard/organizations/${currentOrg.slug}/settings`)
+      // Use organization ID instead of slug for settings route
+      router.push(`/dashboard/organizations/${currentOrg.id}/settings`)
     }
   }
 
@@ -115,18 +116,18 @@ export function OrganizationSwitcher() {
             <DropdownMenuLabel className="text-xs text-muted-foreground">
               Organizations
             </DropdownMenuLabel>
-            {userOrgs.map((org: { id: string; name: string; plan_type: string }) => (
+            {userOrgs.map((org) => (
               <DropdownMenuItem
-                key={org.id}
-                onClick={() => handleSwitchOrganization(org.id)}
+                key={org.organization_id}
+                onClick={() => handleSwitchOrganization(org.organization_id)}
                 className="gap-2 p-2"
                 disabled={switchOrgMutation.isPending}
               >
                 <div className="flex size-6 items-center justify-center rounded-sm border">
                   <Building2 className="size-4 shrink-0" />
                 </div>
-                <span className="font-medium">{org.name}</span>
-                {currentOrg?.id === org.id && (
+                <span className="font-medium">{org.organization_name}</span>
+                {currentOrg?.id === org.organization_id && (
                   <div className="ml-auto size-2 rounded-full bg-primary" />
                 )}
               </DropdownMenuItem>

@@ -1,6 +1,6 @@
 # Phase 4: ValidAI Integration with Core Framework
 
-**Status:** In Progress (Task 2/8 Complete)
+**Status:** In Progress (Task 3/8 Complete)
 **Created:** 2025-01-28
 **Last Updated:** 2025-10-28
 **Prerequisites:** Phase 3 MILESTONE Complete (All apps verified running independently)
@@ -292,11 +292,12 @@ Replace local Supabase client implementations with shared clients from `@playze/
 
 ---
 
-### Task 3: Adopt Shared Auth Hooks (3 hours)
+### Task 3: Adopt Shared Auth Hooks (3 hours) ✅ COMPLETE
 
 **Priority:** 🔴 HIGH - Remove duplication
 **Complexity:** 🟡 Medium
 **Risk:** 🟡 Medium (Data fetching patterns change)
+**Status:** ✅ **COMPLETE** (2025-10-28)
 
 #### **Objective**
 Replace local organization query hooks with shared hooks from `@playze/shared-auth/hooks`.
@@ -439,6 +440,56 @@ Replace local organization query hooks with shared hooks from `@playze/shared-au
 ✅ Organization switching works correctly
 ✅ No local `app/queries/organizations/` directory
 ✅ Store refactored or removed (based on chosen option)
+
+#### **Completion Summary**
+
+**Date Completed:** 2025-10-28
+**Status:** ✅ **COMPLETE**
+
+**Changes Made:**
+1. ✅ Updated [organization-switcher.tsx](../apps/validai/components/organization-switcher.tsx) to use shared hooks
+   - Replaced local imports with `@playze/shared-auth` imports
+   - Updated to handle new return types (direct values instead of wrapped objects)
+   - Fixed `slug` reference (changed to `id` for settings route)
+   - Added page reload after organization switch to ensure full context update
+2. ✅ Updated [account page](../apps/validai/app/account/page.tsx) to use shared hooks
+   - Replaced `useCurrentOrganization` from local to shared
+   - Added `useAuthorization('validai')` to get user role information
+   - Updated component logic to handle new data structure
+3. ✅ Removed organization store following Option A (recommended)
+   - Deleted `apps/validai/stores/organization-store.ts` (71 lines removed)
+   - Updated [stores/index.ts](../apps/validai/stores/index.ts) to remove export
+   - All state now managed by React Query in shared hooks
+4. ✅ Deleted local organization queries directory
+   - Removed `apps/validai/app/queries/organizations/` (211 lines removed)
+   - Includes: `use-organizations.ts` with all 6 hooks
+
+**Key Differences Handled:**
+- **Return types:** Shared hooks return data directly, not wrapped in objects
+  - Local: `{ organization: Organization, role: string }` → Shared: `Organization | null`
+  - Local: `{ organizations: Organization[] }` → Shared: `UserOrganization[]`
+- **Hook signatures:** Shared `useSwitchOrganization` expects `{ organizationId: string }` object
+- **Field names:** `UserOrganization` uses `organization_id`, `organization_name` instead of `id`, `name`
+- **Role access:** User role now accessed via `useAuthorization('validai').user_role`
+
+**Impact:**
+- **Code reduction:** -282 lines (organization store + local hooks)
+- **Zero remaining local hooks** - all using `@playze/shared-auth`
+- **Simplified architecture** - React Query caching only, no Zustand duplication
+- **Consistent with framework** - same patterns as admin-portal and testapp
+
+**Verification:**
+- ✅ No remaining imports from `@/app/queries/organizations` (verified via grep)
+- ✅ No remaining usage of `useOrganizationStore` (verified via grep)
+- ✅ Organization switcher compiles with shared hooks
+- ✅ Account page compiles with shared hooks
+- ⚠️ Build has pre-existing type errors in operations/processors (unrelated to this task)
+
+**Notes:**
+- Added page reload after organization switch to ensure all components receive updated JWT context. The shared hook invalidates queries but doesn't reload automatically.
+- **Environment variable fix:** Renamed `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` → `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `.env.local` and `.env.example` to match framework expectations in `@playze/shared-auth` package.
+
+**Next:** Task 4 - Adopt Shared UI Components
 
 ---
 
