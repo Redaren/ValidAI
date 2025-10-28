@@ -6,7 +6,8 @@
 "use client"
 
 import React, { useState } from "react"
-import { Button, Label, Textarea, Switch } from "@playze/shared-ui"
+import { Button, Label, Textarea } from "@playze/shared-ui"
+import { Switch } from "@/components/ui/switch"
 import {
   Sheet,
   SheetContent,

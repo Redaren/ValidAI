@@ -22,21 +22,65 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@playze/shared-ui'
-import { Play } from 'lucide-react'
+import { Button } from '@playze/shared-ui'
+/**
+ * TECHNICAL DEBT: Using direct @radix-ui/react-dialog import
+ *
+ * Issue: Dialog from @playze/shared-ui doesn't open when triggered.
+ * Cause: Unknown - likely Next.js/Turbopack bundling or workspace package resolution issue.
+ * Workaround: Import Dialog directly from @radix-ui/react-dialog (works correctly).
+ *
+ * TODO: Investigate root cause and migrate back to @playze/shared-ui Dialog.
+ * See: Phase 4 Task 4 integration issues
+ *
+ * @see https://github.com/anthropics/claude-code/issues (if reported)
+ */
+import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { Play, X } from 'lucide-react'
 import { useUploadDocument } from '@/app/queries/documents'
 import { useCreateRun } from '@/app/queries/runs'
 import { toast } from 'sonner'
 import { DropZone } from '@/components/ui/dropzone'
 import { validateDocumentFile } from '@/lib/constants/documents'
+
+// Dialog component wrappers (mirroring @playze/shared-ui structure)
+const Dialog = DialogPrimitive.Root
+const DialogTrigger = DialogPrimitive.Trigger
+const DialogPortal = DialogPrimitive.Portal
+const DialogOverlay = DialogPrimitive.Overlay
+
+const DialogContent = ({
+  children,
+  className,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) => (
+  <DialogPortal>
+    <DialogOverlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+    <DialogPrimitive.Content
+      className={`fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg ${className || ''}`}
+      {...props}
+    >
+      {children}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    </DialogPrimitive.Content>
+  </DialogPortal>
+)
+
+const DialogHeader = ({
+  children,
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div className={`flex flex-col space-y-1.5 text-center sm:text-left ${className || ''}`} {...props}>
+    {children}
+  </div>
+)
+
+const DialogTitle = DialogPrimitive.Title
+const DialogDescription = DialogPrimitive.Description
 
 /**
  * Props for the RunProcessorDialog component

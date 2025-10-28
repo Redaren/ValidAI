@@ -8,6 +8,9 @@ export default {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/**/*.{js,ts,jsx,tsx,mdx}",
+    // Include shared packages so Tailwind scans them for CSS classes
+    "../../packages/shared-ui/src/**/*.{js,ts,jsx,tsx,mdx}",
+    "../../packages/shared-auth/src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     extend: {
