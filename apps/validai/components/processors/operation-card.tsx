@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Operation } from "@/app/queries/processors/use-processor-detail"
-import { Badge, Button } from "@playze/shared-ui"
+import { Badge, Button, AuthGate } from "@playze/shared-ui"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Pencil, Trash2, FlaskConical } from "lucide-react"
@@ -181,26 +181,30 @@ export function OperationCard({ operation, processorId }: OperationCardProps) {
         </Button>
 
         {/* Edit Button - Inline edit */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => setIsEditOpen(true)}
-          title="Edit operation"
-        >
-          <Pencil className="h-4 w-4" />
-        </Button>
+        <AuthGate appId="validai" permission="can_edit">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => setIsEditOpen(true)}
+            title="Edit operation"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </AuthGate>
 
         {/* Delete Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => setIsDeleteDialogOpen(true)}
-          title="Delete operation"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        <AuthGate appId="validai" permission="can_delete">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={() => setIsDeleteDialogOpen(true)}
+            title="Delete operation"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </AuthGate>
       </div>
 
       {/* Edit Operation Sheet */}

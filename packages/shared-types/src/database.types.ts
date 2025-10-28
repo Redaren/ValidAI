@@ -41,6 +41,41 @@ export type Database = {
         }
         Relationships: []
       }
+      app_role_permissions: {
+        Row: {
+          app_id: string
+          created_at: string | null
+          id: string
+          permissions: Json
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          app_id: string
+          created_at?: string | null
+          id?: string
+          permissions?: Json
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          app_id?: string
+          created_at?: string | null
+          id?: string
+          permissions?: Json
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_role_permissions_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_tiers: {
         Row: {
           app_id: string
@@ -1292,6 +1327,7 @@ export type Database = {
         Args: { app_id: string; feature_name: string; org_id: string }
         Returns: boolean
       }
+      check_validai_access: { Args: { p_org_id: string }; Returns: boolean }
       create_organization: {
         Args: { org_name: string; org_slug?: string }
         Returns: Json
