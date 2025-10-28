@@ -3,7 +3,6 @@
 import {
   Building2,
   ChevronsUpDown,
-  Plus,
   Settings,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -72,10 +71,6 @@ export function OrganizationSwitcher() {
     }
   }
 
-  const handleCreateOrganization = () => {
-    router.push('/dashboard/organizations/new')
-  }
-
   const handleManageOrganization = () => {
     if (currentOrg) {
       // Use organization ID instead of slug for settings route
@@ -132,16 +127,6 @@ export function OrganizationSwitcher() {
                 )}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={handleCreateOrganization}
-              className="gap-2 p-2"
-            >
-              <div className="flex size-6 items-center justify-center rounded-md border border-dashed">
-                <Plus className="size-4" />
-              </div>
-              <span>Create Organization</span>
-            </DropdownMenuItem>
             {currentOrg && (
               <>
                 <DropdownMenuSeparator />
