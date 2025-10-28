@@ -1,5 +1,4 @@
-import { Badge } from "./ui/badge";
-import { Button } from "./ui/button";
+import { Badge, Button } from "@playze/shared-ui";
 
 export function EnvVarWarning() {
   return (

@@ -3,19 +3,19 @@
 import { useEffect, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { FlaskConical, MoreHorizontal, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@playze/shared-ui"
 import { Separator } from "@/components/ui/separator"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { WorkbenchInput } from "@/components/workbench/workbench-input"
 import { WorkbenchOutput } from "@/components/workbench/workbench-output"
 import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-advanced-settings"

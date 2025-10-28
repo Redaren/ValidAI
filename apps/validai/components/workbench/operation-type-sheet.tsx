@@ -11,6 +11,7 @@
 "use client"
 
 import { useState } from "react"
+import { Badge } from "@playze/shared-ui"
 import {
   Sheet,
   SheetContent,
@@ -19,7 +20,6 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { getAllOperationTypes, type OperationType } from "@/lib/operation-types"
 import { useWorkbenchStore } from "@/stores/workbench-store"

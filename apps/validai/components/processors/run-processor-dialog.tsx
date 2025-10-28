@@ -23,14 +23,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+} from '@playze/shared-ui'
 import { Play } from 'lucide-react'
 import { useUploadDocument } from '@/app/queries/documents'
 import { useCreateRun } from '@/app/queries/runs'

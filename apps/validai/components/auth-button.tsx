@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Button } from "./ui/button";
+import { Button } from "@playze/shared-ui";
 import { createServerClient } from "@playze/shared-auth/server";
 import { LogoutButton } from "./logout-button";
 

@@ -22,17 +22,15 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
+  Button,
+  Input,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@playze/shared-ui"
 import { ProcessorStatusBadge } from "./processor-status-badge"
 import { RunProcessorDialog } from "./run-processor-dialog"
 import { Processor } from "@/app/queries/processors/use-processors"

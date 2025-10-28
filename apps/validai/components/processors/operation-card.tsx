@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 import { Operation } from "@/app/queries/processors/use-processor-detail"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Badge, Button } from "@playze/shared-ui"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { GripVertical, Pencil, Trash2, FlaskConical } from "lucide-react"

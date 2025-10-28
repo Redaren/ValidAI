@@ -1,14 +1,14 @@
 "use client"
 
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+} from "@playze/shared-ui"
 
 interface DeleteOperationDialogProps {
   open: boolean

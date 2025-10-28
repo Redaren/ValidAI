@@ -31,7 +31,7 @@ import { use } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useRun, useOperationResults } from '@/app/queries/runs'
 import { getViewComponent, ViewSwitcher, type ViewType } from '@/components/runs/views'
-import { Button } from '@/components/ui/button'
+import { Button } from '@playze/shared-ui'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 

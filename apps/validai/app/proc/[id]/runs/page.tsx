@@ -24,7 +24,7 @@ import { use } from 'react'
 import { useProcessorRuns } from '@/app/queries/runs'
 import { useProcessorDetail } from '@/app/queries/processors/use-processor-detail'
 import { RunsTable } from '@/components/runs/runs-table'
-import { Button } from '@/components/ui/button'
+import { Button } from '@playze/shared-ui'
 import { ArrowLeft, History } from 'lucide-react'
 import Link from 'next/link'
 

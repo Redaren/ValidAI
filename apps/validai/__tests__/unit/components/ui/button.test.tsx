@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { userEvent } from '@testing-library/user-event'
-import { Button } from '@/components/ui/button'
+import { Button } from '@playze/shared-ui'
 
 describe('Button Component', () => {
   it('renders correctly', () => {

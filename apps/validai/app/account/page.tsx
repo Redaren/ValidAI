@@ -10,18 +10,18 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Badge,
+  Label,
+} from "@playze/shared-ui"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Label } from "@/components/ui/label"
 
 type User = {
   name: string

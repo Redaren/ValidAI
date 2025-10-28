@@ -14,7 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@playze/shared-ui"
 import {
   SidebarGroup,
   SidebarGroupLabel,

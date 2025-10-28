@@ -2,16 +2,16 @@
 
 import { useState } from "react"
 import {
+  Button,
+  Input,
+  Label,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from "@playze/shared-ui"
 import { createAreaSchema } from "@/lib/validations"
 
 interface CreateAreaDialogProps {

@@ -11,6 +11,17 @@ import {
 import { useUpdateProcessor } from '@/app/queries/processors/use-processor-detail'
 import { ProcessorDetail } from '@/app/queries/processors/use-processor-detail'
 import {
+  Button,
+  Input,
+  Label,
+  Textarea,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@playze/shared-ui'
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -18,17 +29,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight, Lock, Users } from 'lucide-react'
 import { AVAILABLE_VIEWS, type ViewType } from '@/components/runs/views'

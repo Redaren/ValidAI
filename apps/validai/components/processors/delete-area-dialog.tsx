@@ -2,21 +2,19 @@
 
 import { useState, useEffect } from "react"
 import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Button } from "@/components/ui/button"
+} from "@playze/shared-ui"
 import { AlertTriangle } from "lucide-react"
 
 interface DeleteAreaDialogProps {

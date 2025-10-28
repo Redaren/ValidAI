@@ -26,9 +26,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+  Badge,
+  Button,
+} from '@playze/shared-ui'
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react'
 import { StructuredOutputVisualizer } from '@/components/workbench/structured-output-visualizer'
 import type { Database } from '@playze/shared-types'

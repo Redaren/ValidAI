@@ -19,7 +19,7 @@
 
 // import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BarChart3, FileText, Scale } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@playze/shared-ui'
 import { cn } from '@/lib/utils'
 
 /**

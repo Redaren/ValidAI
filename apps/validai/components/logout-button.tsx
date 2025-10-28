@@ -1,7 +1,7 @@
 "use client";
 
 import { createBrowserClient } from "@playze/shared-auth/client";
-import { Button } from "@/components/ui/button";
+import { Button } from "@playze/shared-ui";
 import { useRouter } from "next/navigation";
 
 export function LogoutButton() {

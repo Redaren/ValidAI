@@ -16,7 +16,7 @@
 'use client'
 
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from 'recharts'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import { ChartConfig, ChartContainer } from '@/components/ui/chart'
 import type { Database } from '@playze/shared-types'
 

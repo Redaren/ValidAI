@@ -6,9 +6,7 @@
 "use client"
 
 import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { Card, Badge, Button } from "@playze/shared-ui"
 import { Separator } from "@/components/ui/separator"
 import { Download, AlertCircle, Clock, Coins, Trash2, FileJson } from "lucide-react"
 import { useWorkbenchStore } from "@/stores/workbench-store"

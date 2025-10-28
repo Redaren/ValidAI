@@ -5,13 +5,13 @@ import { useProcessorDetail, useCreateArea } from "@/app/queries/processors/use-
 import { ProcessorHeader } from "@/components/processors/processor-header"
 import { OperationsByArea } from "@/components/processors/operations-by-area"
 import { CreateAreaDialog } from "@/components/processors/create-area-dialog"
-import { Button } from "@/components/ui/button"
 import {
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@playze/shared-ui"
 import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical, Play, History } from "lucide-react"
 import Link from "next/link"
 import { ProcessorSettingsSheet } from "@/components/processors/processor-settings-sheet"

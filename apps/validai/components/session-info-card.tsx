@@ -2,11 +2,9 @@
 
 import { useEffect, useState } from "react"
 import { User, Session } from "@supabase/supabase-js"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from "@playze/shared-ui"
 import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, User as UserIcon, Shield, Clock, Building, Key } from "lucide-react"
 import { createBrowserClient } from "@playze/shared-auth/client"
 

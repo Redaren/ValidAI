@@ -21,7 +21,7 @@
 'use client'
 
 import { format } from 'date-fns'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import type { Database } from '@playze/shared-types'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']

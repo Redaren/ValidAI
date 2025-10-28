@@ -31,7 +31,7 @@ import {
 } from '@/components/runs/compliance-metrics-charts'
 import { ComplianceSummaryCard } from '@/components/runs/compliance-summary-card'
 import { ComplianceOperationRow } from '@/components/runs/compliance-operation-row'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import type { Database } from '@playze/shared-types'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']

@@ -1,10 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
+import { Button, Input, Label, Switch } from "@playze/shared-ui"
 import { Slider } from "@/components/ui/slider"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { X } from "lucide-react"

@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@playze/shared-ui"
 import { ProcessorsTable } from "@/components/processors/processors-table"
 import { CreateProcessorSheet } from "@/components/processors/create-processor-sheet"
 import { useUserProcessors } from "@/app/queries/processors/use-processors"

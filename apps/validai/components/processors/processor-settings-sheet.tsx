@@ -9,6 +9,7 @@ import {
 } from '@/lib/validations'
 import { useUpdateProcessorSettings } from '@/app/queries/processors/use-processor-detail'
 import { ProcessorDetail } from '@/app/queries/processors/use-processor-detail'
+import { Button, Label, Textarea } from '@playze/shared-ui'
 import {
   Sheet,
   SheetContent,
@@ -17,9 +18,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 
 /**
  * Props for the ProcessorSettingsSheet component

@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@playze/shared-ui"
 import { Database } from "@playze/shared-types"
 
 type ProcessorStatus = Database['public']['Enums']['processor_status']

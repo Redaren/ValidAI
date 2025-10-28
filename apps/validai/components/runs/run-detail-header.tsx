@@ -15,8 +15,7 @@
  * @since Phase 1.8
  */
 
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge, Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import { Progress } from '@/components/ui/progress'
 import { formatDistanceToNow } from 'date-fns'
 import type { Database } from '@playze/shared-types'

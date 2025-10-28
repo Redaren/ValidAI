@@ -26,8 +26,8 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
+  Badge,
+} from '@playze/shared-ui'
 import { formatDistanceToNow } from 'date-fns'
 import type { Database } from '@playze/shared-types'
 import { FileText } from 'lucide-react'

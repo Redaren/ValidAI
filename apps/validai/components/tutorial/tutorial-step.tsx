@@ -1,4 +1,4 @@
-import { Checkbox } from "../ui/checkbox";
+import { Checkbox } from "@playze/shared-ui";
 
 export function TutorialStep({
   title,
