@@ -6,11 +6,11 @@
  */
 
 import { useMutation } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import type { WorkbenchTestInput, WorkbenchTestResponse } from '@/lib/validations'
 
 export function useWorkbenchTest() {
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async (input: WorkbenchTestInput): Promise<WorkbenchTestResponse> => {

@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import { CreateOperationPayload } from '@/lib/validations'
 
 /**
@@ -32,7 +32,7 @@ import { CreateOperationPayload } from '@/lib/validations'
  */
 export function useCreateOperation() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async (payload: Omit<CreateOperationPayload, 'position'>) => {
@@ -96,7 +96,7 @@ export function useCreateOperation() {
  */
 export function useUpdateOperation() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -149,7 +149,7 @@ export function useUpdateOperation() {
  */
 export function useUpdateOperationFromWorkbench() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -204,7 +204,7 @@ export function useUpdateOperationFromWorkbench() {
  */
 export function useDeleteOperation() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@playze/shared-auth/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createAdminClient(
@@ -9,7 +9,7 @@ const supabaseAdmin = createAdminClient(
 
 export async function POST() {
   try {
-    const supabase = await createClient()
+    const supabase = await createServerClient()
 
     // Get current user (only allow admin users to run this migration)
     const { data: { user }, error: userError } = await supabase.auth.getUser()

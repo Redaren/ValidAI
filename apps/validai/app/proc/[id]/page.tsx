@@ -1,5 +1,5 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@playze/shared-auth/server'
 import { createQueryClient } from '@/lib/query-client'
 import { ProcessorDetailClient } from './processor-detail-client'
 import { notFound } from 'next/navigation'
@@ -44,7 +44,7 @@ export default async function ProcessorDetailPage({
 }: ProcessorDetailPageProps) {
   const { id } = await params
   const queryClient = createQueryClient()
-  const supabase = await createClient()
+  const supabase = await createServerClient()
 
   // Prefetch processor data
   try {

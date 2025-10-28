@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { ChevronDown, ChevronRight, User as UserIcon, Shield, Clock, Building, Key } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { createBrowserClient } from "@playze/shared-auth/client"
 
 interface Organization {
   id: string
@@ -95,7 +95,7 @@ export function SessionInfoCard() {
   useEffect(() => {
     async function fetchSessionData() {
       try {
-        const supabase = createClient()
+        const supabase = createBrowserClient()
 
         // Get user and session
         const [userResponse, sessionResponse] = await Promise.all([

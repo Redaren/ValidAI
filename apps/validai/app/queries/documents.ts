@@ -11,7 +11,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import type { Database } from '@playze/shared-types'
 import { validateDocumentFile } from '@/lib/constants/documents'
 
@@ -32,7 +32,7 @@ type Document = Database['public']['Tables']['validai_documents']['Row']
  * ```
  */
 export function useDocuments() {
-  const supabase = createTypedBrowserClient()
+  const supabase = createBrowserClient()
 
   return useQuery({
     queryKey: ['documents'],
@@ -65,7 +65,7 @@ export function useDocuments() {
  * ```
  */
 export function useUploadDocument() {
-  const supabase = createTypedBrowserClient()
+  const supabase = createBrowserClient()
   const queryClient = useQueryClient()
 
   return useMutation({

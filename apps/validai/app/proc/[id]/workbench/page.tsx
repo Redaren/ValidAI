@@ -1,6 +1,6 @@
 import { Suspense } from "react"
 import { notFound } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+import { createServerClient } from "@playze/shared-auth/server"
 import { WorkbenchClient } from "./workbench-client"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -16,7 +16,7 @@ export default async function WorkbenchPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = await createServerClient()
 
   // Fetch processor with operations
   const { data: processors, error } = await supabase

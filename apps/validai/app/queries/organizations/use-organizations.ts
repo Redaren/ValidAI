@@ -1,11 +1,11 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import { useOrganizationStore } from '@/stores'
 
 export function useUserOrganizations() {
-  const supabase = createClient()
+  const supabase = createBrowserClient()
   const { setUserOrganizations, setIsLoading } = useOrganizationStore()
 
   return useQuery({
@@ -49,7 +49,7 @@ export function useUserOrganizations() {
 }
 
 export function useCurrentOrganization() {
-  const supabase = createClient()
+  const supabase = createBrowserClient()
   const { setCurrentOrganization, setCurrentUserRole, setIsLoading } = useOrganizationStore()
 
   return useQuery({
@@ -99,7 +99,7 @@ export function useCurrentOrganization() {
 }
 
 export function useOrganizationMembers(organizationId: string | null) {
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useQuery({
     queryKey: ['organization-members', organizationId],
@@ -121,7 +121,7 @@ export function useOrganizationMembers(organizationId: string | null) {
 
 export function useSwitchOrganization() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
   const { setIsSwitching } = useOrganizationStore()
 
   return useMutation({
@@ -161,7 +161,7 @@ export function useSwitchOrganization() {
 
 export function useCreateOrganization() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async (data: { name: string; slug?: string }) => {
@@ -186,7 +186,7 @@ export function useCreateOrganization() {
 
 export function useInviteUser() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async (data: {

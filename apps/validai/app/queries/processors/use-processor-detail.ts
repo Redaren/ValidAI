@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import { Database } from '@playze/shared-types'
 
 type OperationType = Database['public']['Enums']['operation_type']
@@ -49,7 +49,7 @@ export interface ProcessorDetail {
 }
 
 export function useProcessorDetail(processorId: string, options?: { enabled?: boolean }) {
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useQuery({
     queryKey: ['processor', processorId],
@@ -79,7 +79,7 @@ export function useProcessorDetail(processorId: string, options?: { enabled?: bo
 
 export function useUpdateOperationPosition() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -146,7 +146,7 @@ export function useUpdateOperationPosition() {
 
 export function useUpdateAreaConfiguration() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -179,7 +179,7 @@ export function useUpdateAreaConfiguration() {
 
 export function useRenameArea() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -209,7 +209,7 @@ export function useRenameArea() {
 
 export function useCreateArea() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -270,7 +270,7 @@ export function useCreateArea() {
 
 export function useDeleteArea() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -299,7 +299,7 @@ export function useDeleteArea() {
 
 export function useUpdateProcessorSettings() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({
@@ -327,7 +327,7 @@ export function useUpdateProcessorSettings() {
 
 export function useUpdateProcessor() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
 
   return useMutation({
     mutationFn: async ({

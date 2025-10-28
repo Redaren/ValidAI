@@ -31,7 +31,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { createClient } from "@/lib/supabase/client"
+import { createBrowserClient } from "@playze/shared-auth/client"
 
 type User = {
   name: string
@@ -45,7 +45,7 @@ export function NavUser() {
   const [user, setUser] = useState<User | null>(null)
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createBrowserClient()
 
     const getUser = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser()
@@ -62,7 +62,7 @@ export function NavUser() {
   }, [])
 
   const handleLogout = async () => {
-    const supabase = createClient()
+    const supabase = createBrowserClient()
     await supabase.auth.signOut()
     router.push('/auth/login')
   }

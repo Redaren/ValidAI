@@ -6,7 +6,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { ConversationMessage, WorkbenchExecution } from '@/lib/validations'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { OperationType } from '@/lib/operation-types'
 
@@ -459,7 +459,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         // Unsubscribe from any existing channel
         get().unsubscribeFromExecution()
 
-        const supabase = createClient()
+        const supabase = createBrowserClient()
 
         // Create channel for this execution
         const channel = supabase

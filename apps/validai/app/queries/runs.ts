@@ -24,7 +24,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import { useEffect } from 'react'
 import type { Database } from '@playze/shared-types'
 
@@ -56,7 +56,7 @@ type OperationResult = Database['public']['Tables']['validai_operation_results']
  * ```
  */
 export function useCreateRun() {
-  const supabase = createTypedBrowserClient()
+  const supabase = createBrowserClient()
   const queryClient = useQueryClient()
 
   return useMutation({
@@ -113,7 +113,7 @@ export function useRun(
     refetchInterval?: number
   }
 ) {
-  const supabase = createTypedBrowserClient()
+  const supabase = createBrowserClient()
   const queryClient = useQueryClient()
   const enableRealtime = options?.realtime !== false
 
@@ -188,7 +188,7 @@ export function useOperationResults(
     realtime?: boolean
   }
 ) {
-  const supabase = createTypedBrowserClient()
+  const supabase = createBrowserClient()
   const queryClient = useQueryClient()
   const enableRealtime = options?.realtime !== false
 
@@ -266,7 +266,7 @@ export function useProcessorRuns(
     limit?: number
   }
 ) {
-  const supabase = createTypedBrowserClient()
+  const supabase = createBrowserClient()
 
   return useQuery({
     queryKey: ['processor-runs', processorId, options?.limit],

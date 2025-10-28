@@ -4,8 +4,8 @@ import { LoginForm } from '@/components/login-form'
 
 // Mock Supabase client
 const mockSignInWithPassword = vi.fn()
-vi.mock('@/lib/supabase/client', () => ({
-  createClient: () => ({
+vi.mock('@playze/shared-auth/client', () => ({
+  createBrowserClient: () => ({
     auth: {
       signInWithPassword: mockSignInWithPassword
     }

@@ -7,6 +7,7 @@ settings:
 overrides:
   zod: 4.1.12
   zod@3: 4.1.12
+  '@hookform/resolvers': 5.2.2
 
 importers:
 
@@ -31,7 +32,7 @@ importers:
   apps/admin-portal:
     dependencies:
       '@hookform/resolvers':
-        specifier: ^5.2.2
+        specifier: 5.2.2
         version: 5.2.2(react-hook-form@7.65.0(react@19.2.0))
       '@playze/shared-auth':
         specifier: workspace:*
@@ -195,11 +196,17 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.2.0)
       '@hookform/resolvers':
-        specifier: ^5.2.2
+        specifier: 5.2.2
         version: 5.2.2(react-hook-form@7.65.0(react@19.2.0))
+      '@playze/shared-auth':
+        specifier: workspace:*
+        version: link:../../packages/shared-auth
       '@playze/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
+      '@playze/shared-ui':
+        specifier: workspace:*
+        version: link:../../packages/shared-ui
       '@radix-ui/react-accordion':
         specifier: ^1.2.12
         version: 1.2.12(@types/react-dom@19.2.2(@types/react@19.2.2))(@types/react@19.2.2)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { createClient } from '@/lib/supabase/client'
+import { createBrowserClient } from '@playze/shared-auth/client'
 import { Database } from '@playze/shared-types'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -28,7 +28,7 @@ export interface Processor {
 }
 
 export function useUserProcessors(includeArchived: boolean = false) {
-  const supabase = createClient()
+  const supabase = createBrowserClient()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
@@ -100,7 +100,7 @@ export function useUserProcessors(includeArchived: boolean = false) {
  */
 export function useCreateProcessor() {
   const queryClient = useQueryClient()
-  const supabase = createClient()
+  const supabase = createBrowserClient()
   const router = useRouter()
 
   return useMutation({

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
-import { createClient } from "@/lib/supabase/client"
+import { createBrowserClient } from "@playze/shared-auth/client"
 import { useCurrentOrganization } from "@/app/queries/organizations/use-organizations"
 import {
   Card,
@@ -41,7 +41,7 @@ export default function AccountPage() {
   }, [])
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = createBrowserClient()
 
     const getUser = async () => {
       const { data: { user: authUser } } = await supabase.auth.getUser()

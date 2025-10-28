@@ -2,8 +2,8 @@ import { render, screen } from '@testing-library/react'
 import { AuthButton } from '@/components/auth-button'
 
 // Mock the Supabase client
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: vi.fn(() => Promise.resolve({
+vi.mock('@playze/shared-auth/server', () => ({
+  createServerClient: vi.fn(() => Promise.resolve({
     auth: {
       getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
       getClaims: vi.fn(() => Promise.resolve({ data: { claims: null }, error: null }))

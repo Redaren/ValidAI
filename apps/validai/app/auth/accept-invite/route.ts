@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@playze/shared-auth/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
 const supabaseAdmin = createAdminClient(
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/error', request.url))
     }
 
-    const supabase = await createClient()
+    const supabase = await createServerClient()
 
     // Verify the invitation token
     const { data: { user }, error } = await supabase.auth.verifyOtp({

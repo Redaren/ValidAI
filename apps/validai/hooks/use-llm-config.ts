@@ -13,7 +13,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { createClient } from '@/lib/supabase/client';
+import { createBrowserClient } from '@playze/shared-auth/client';
 import type {
   ResolvedLLMConfig,
   LLMModelConfig,
@@ -53,7 +53,7 @@ import type {
  * ```
  */
 export function useAvailableLLMModels() {
-  const supabase = createClient();
+  const supabase = createBrowserClient();
 
   return useQuery({
     queryKey: ['llm-models-available'],
@@ -99,7 +99,7 @@ export function useAvailableLLMModels() {
  */
 export function useSetOrganizationLLMConfig() {
   const queryClient = useQueryClient();
-  const supabase = createClient();
+  const supabase = createBrowserClient();
 
   return useMutation({
     mutationFn: async (config: {
@@ -158,7 +158,7 @@ export function useSetOrganizationLLMConfig() {
  * ```
  */
 export function useResolvedLLMConfig(processorId?: string) {
-  const supabase = createClient();
+  const supabase = createBrowserClient();
 
   return useQuery({
     queryKey: ['llm-config-resolved', processorId],
@@ -206,7 +206,7 @@ export function useResolvedLLMConfig(processorId?: string) {
  * ```
  */
 export function useGlobalLLMSettings() {
-  const supabase = createClient();
+  const supabase = createBrowserClient();
 
   return useQuery({
     queryKey: ['llm-global-settings'],
