@@ -20,7 +20,7 @@ import { WorkbenchInput } from "@/components/workbench/workbench-input"
 import { WorkbenchOutput } from "@/components/workbench/workbench-output"
 import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-advanced-settings"
 import { useWorkbenchStore } from "@/stores/workbench-store"
-import type { Database } from "@/lib/database.types"
+import type { Database } from "@playze/shared-types"
 import type { Operation } from "@/app/queries/processors/use-processor-detail"
 
 /**

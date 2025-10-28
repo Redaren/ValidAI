@@ -23,7 +23,7 @@ export const createOrganizationSchema = z.object({
       z.object({
         appId: z.string().min(1, 'App ID is required'),
         tierName: z.enum(['free', 'pro', 'enterprise'], {
-          errorMap: () => ({ message: 'Tier must be free, pro, or enterprise' }),
+          message: 'Tier must be free, pro, or enterprise',
         }),
       })
     )
@@ -53,7 +53,7 @@ export const assignSubscriptionSchema = z.object({
   appId: z.string().min(1, 'App ID is required'),
   tierId: uuidSchema,
   tierName: z.enum(['free', 'pro', 'enterprise'], {
-    errorMap: () => ({ message: 'Tier must be free, pro, or enterprise' }),
+    message: 'Tier must be free, pro, or enterprise',
   }),
   notes: z.string().max(500, 'Notes must be at most 500 characters').optional(),
 })
@@ -72,8 +72,8 @@ export const assignMembershipSchema = z.object({
   organizationId: uuidSchema,
   userId: uuidSchema,
   role: z.enum(['owner', 'admin', 'member', 'viewer'], {
-    errorMap: () => ({ message: 'Role must be owner, admin, member, or viewer' }),
-  }).default('member'),
+    message: 'Role must be owner, admin, member, or viewer',
+  }),
 })
 
 export type AssignMembershipInput = z.infer<typeof assignMembershipSchema>

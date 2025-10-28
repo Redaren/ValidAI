@@ -26,10 +26,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
 import { useEffect } from 'react'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type Run = Database['public']['Tables']['runs']['Row']
-type OperationResult = Database['public']['Tables']['operation_results']['Row']
+type Run = Database['public']['Tables']['validai_runs']['Row']
+type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
 /**
  * Hook to create a new processor run

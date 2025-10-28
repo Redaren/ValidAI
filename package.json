@@ -8,6 +8,13 @@
     "node": ">=22.0.0",
     "pnpm": ">=9.0.0"
   },
+  "pnpm": {
+    "overrides": {
+      "zod": "4.1.12",
+      "zod@3": "4.1.12",
+      "@hookform/resolvers": "5.2.2"
+    }
+  },
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",

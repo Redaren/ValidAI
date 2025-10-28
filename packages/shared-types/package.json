@@ -6,7 +6,7 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "gen:types": "supabase gen types typescript --project-id cgaajzhddfuxzsugjqkk > src/database.types.ts",
+    "gen:types": "supabase gen types typescript --project-id xczippkxxdqlvaacjexj > src/database.types.ts",
     "clean": "rm -rf dist"
   },
   "devDependencies": {

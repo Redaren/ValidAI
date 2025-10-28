@@ -29,10 +29,10 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 import { FileText } from 'lucide-react'
 
-type Run = Database['public']['Tables']['runs']['Row']
+type Run = Database['public']['Tables']['validai_runs']['Row']
 
 /**
  * Props for RunsTable component

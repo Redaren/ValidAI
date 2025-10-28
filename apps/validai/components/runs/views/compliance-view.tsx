@@ -32,10 +32,10 @@ import {
 import { ComplianceSummaryCard } from '@/components/runs/compliance-summary-card'
 import { ComplianceOperationRow } from '@/components/runs/compliance-operation-row'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type Run = Database['public']['Tables']['runs']['Row']
-type OperationResult = Database['public']['Tables']['operation_results']['Row']
+type Run = Database['public']['Tables']['validai_runs']['Row']
+type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
 /**
  * Props for ComplianceView component

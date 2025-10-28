@@ -20,9 +20,9 @@
 import { useState } from 'react'
 import { ChevronRight, ChevronDown, Loader2, CheckCircle2, XCircle, Circle, Tag, FileText } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type OperationResult = Database['public']['Tables']['operation_results']['Row']
+type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
 interface ComplianceOperationRowProps {
   /** The operation result to display */

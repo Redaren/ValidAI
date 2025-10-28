@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { Database } from '@/lib/database.types'
+import { Database } from '@playze/shared-types'
 
 type OperationType = Database['public']['Enums']['operation_type']
 type ProcessorStatus = Database['public']['Enums']['processor_status']

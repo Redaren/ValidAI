@@ -31,9 +31,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react'
 import { StructuredOutputVisualizer } from '@/components/workbench/structured-output-visualizer'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type OperationResult = Database['public']['Tables']['operation_results']['Row']
+type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
 /**
  * Props for OperationResultsTable component

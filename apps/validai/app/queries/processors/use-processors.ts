@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createClient } from '@/lib/supabase/client'
-import { Database } from '@/lib/database.types'
+import { Database } from '@playze/shared-types'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { CreateProcessorInput } from '@/lib/validations'

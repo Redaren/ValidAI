@@ -12,7 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createTypedBrowserClient } from '@/lib/supabase/typed-clients'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 import { validateDocumentFile } from '@/lib/constants/documents'
 
 type Document = Database['public']['Tables']['validai_documents']['Row']

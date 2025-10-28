@@ -10,7 +10,7 @@ export const updateSubscriptionTierSchema = z.object({
   subscriptionId: uuidSchema,
   tierId: uuidSchema,
   tierName: z.enum(['free', 'pro', 'enterprise'], {
-    errorMap: () => ({ message: 'Tier must be free, pro, or enterprise' }),
+    message: 'Tier must be free, pro, or enterprise',
   }),
   notes: z.string().max(500, 'Notes must be at most 500 characters').optional(),
 })

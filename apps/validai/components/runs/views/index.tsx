@@ -25,10 +25,10 @@ import type { ComponentType } from 'react'
 import { TechnicalView } from './technical-view'
 import { ComplianceView as ComplianceViewComponent } from './compliance-view'
 import type { ViewType } from './view-switcher'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type Run = Database['public']['Tables']['runs']['Row']
-type OperationResult = Database['public']['Tables']['operation_results']['Row']
+type Run = Database['public']['Tables']['validai_runs']['Row']
+type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
 /**
  * Common props interface that all view components must accept

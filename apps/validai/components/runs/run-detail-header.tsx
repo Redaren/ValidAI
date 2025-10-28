@@ -19,9 +19,9 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { formatDistanceToNow } from 'date-fns'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type Run = Database['public']['Tables']['runs']['Row']
+type Run = Database['public']['Tables']['validai_runs']['Row']
 
 /**
  * Props for RunDetailHeader component

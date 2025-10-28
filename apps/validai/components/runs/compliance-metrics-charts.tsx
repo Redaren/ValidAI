@@ -18,9 +18,9 @@
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartConfig, ChartContainer } from '@/components/ui/chart'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type OperationResult = Database['public']['Tables']['operation_results']['Row']
+type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
 interface ComplianceMetricsChartsProps {
   /** Array of operation results to calculate metrics from */

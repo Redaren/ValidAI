@@ -22,9 +22,9 @@
 
 import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
-type Run = Database['public']['Tables']['runs']['Row']
+type Run = Database['public']['Tables']['validai_runs']['Row']
 
 /**
  * Props for ComplianceSummaryCard component

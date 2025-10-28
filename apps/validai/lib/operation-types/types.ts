@@ -8,7 +8,7 @@
  */
 
 import type { z } from 'zod'
-import type { Database } from '@/lib/database.types'
+import type { Database } from '@playze/shared-types'
 
 /**
  * Operation type enum from database
