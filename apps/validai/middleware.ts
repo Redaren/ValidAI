@@ -6,7 +6,8 @@ export async function middleware(request: NextRequest) {
   // First, update session (handles auth)
   const response = await updateSession(request);
 
-  // Skip access check for auth routes and no-access page
+  // Skip access check for auth routes (including callback) and no-access page
+  // Callback route needs to complete auth exchange BEFORE middleware checks session
   if (
     request.nextUrl.pathname.startsWith('/auth') ||
     request.nextUrl.pathname === '/no-access'
@@ -28,7 +29,7 @@ export async function middleware(request: NextRequest) {
       // Uses SECURITY DEFINER function to bypass RLS (like is_playze_admin)
       // This avoids circular dependency where RLS on subscription table requires auth.uid()
       const { data: hasAccess, error } = await supabase
-        .rpc('check_validai_access', { p_org_id: orgId })
+        .rpc('check_validai_access' as any, { p_org_id: orgId })
         .single();
 
       if (error || !hasAccess) {

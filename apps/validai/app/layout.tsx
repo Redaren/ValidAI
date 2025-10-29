@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { NotificationDisplay } from "@/components/notifications";
+import { ToastContainer } from "@/components/ui/toast-container";
 import { Toaster } from "sonner";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants/app";
 import "./globals.css";
@@ -40,6 +41,7 @@ export default function RootLayout({
           <QueryProvider>
             {children}
             <NotificationDisplay />
+            <ToastContainer />
             <Toaster />
           </QueryProvider>
         </ThemeProvider>
