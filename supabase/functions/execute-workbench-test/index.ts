@@ -45,6 +45,8 @@ import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
 import { generateText, Output } from 'npm:ai'
 import { z } from 'npm:zod'
+import { Mistral } from 'npm:@mistralai/mistralai'
+import { uploadDocumentToMistral } from '../_shared/llm-executor-mistral.ts'
 
 /**
  * CORS headers configuration for cross-origin requests
@@ -223,6 +225,22 @@ serve(async (req) => {
     // Moved earlier so we can use it for cache token calculations
     const modelToUse = body.settings.model_id || llmConfig.model
 
+    // Determine provider by looking up model in global settings
+    console.log(`Resolving provider for model: ${modelToUse}`)
+    const { data: modelInfo, error: modelError } = await supabase
+      .from('validai_llm_global_settings')
+      .select('provider')
+      .eq('model_name', modelToUse)
+      .eq('is_active', true)
+      .maybeSingle()
+
+    const provider = modelInfo?.provider || llmConfig.provider || 'anthropic'
+    console.log(`Provider resolved: ${provider}`)
+
+    if (modelError) {
+      console.warn(`Warning: Model not found in global settings (${modelToUse}), using fallback provider: ${provider}`)
+    }
+
     // Create initial execution record (if audit logging enabled)
     if (ENABLE_WORKBENCH_AUDIT_LOG) {
       const { data: execution, error: execError } = await supabase
@@ -245,32 +263,62 @@ serve(async (req) => {
       executionId = execution.id
     }
 
-    // Get API key: use organization key if configured, otherwise use global env var
+    // Get API key based on provider: use organization key if configured, otherwise use global env var
     let apiKey: string | null = null
 
-    if (llmConfig.api_key_encrypted) {
-      // Organization has custom API key - decrypt it
-      const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
-        ciphertext: llmConfig.api_key_encrypted,
-        org_id: llmConfig.organization_id
-      })
+    if (provider === 'mistral') {
+      console.log('Resolving Mistral API key...')
+      if (llmConfig.api_key_encrypted) {
+        // Organization has custom Mistral API key - decrypt it
+        const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+          p_ciphertext: llmConfig.api_key_encrypted,
+          p_org_id: llmConfig.organization_id
+        })
 
-      if (decryptError || !decryptedKey) {
-        throw new Error(`Failed to decrypt organization API key: ${decryptError?.message || 'Unknown error'}`)
+        if (decryptError || !decryptedKey) {
+          throw new Error(`Failed to decrypt organization Mistral API key: ${decryptError?.message || 'Unknown error'}`)
+        }
+
+        apiKey = decryptedKey
+      } else {
+        // No organization key - use global Mistral API key from environment
+        apiKey = Deno.env.get('MISTRAL_API_KEY')
+
+        if (!apiKey) {
+          throw new Error('No Mistral API key available. Please configure MISTRAL_API_KEY environment variable or set organization API key.')
+        }
       }
-
-      apiKey = decryptedKey
+      console.log('Mistral API key resolved successfully')
     } else {
-      // No organization key - use global API key from environment
-      apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+      console.log('Resolving Anthropic API key...')
+      if (llmConfig.api_key_encrypted) {
+        // Organization has custom Anthropic API key - decrypt it
+        const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+          p_ciphertext: llmConfig.api_key_encrypted,
+          p_org_id: llmConfig.organization_id
+        })
 
-      if (!apiKey) {
-        throw new Error('No API key available. Please configure ANTHROPIC_API_KEY environment variable or set organization API key.')
+        if (decryptError || !decryptedKey) {
+          throw new Error(`Failed to decrypt organization Anthropic API key: ${decryptError?.message || 'Unknown error'}`)
+        }
+
+        apiKey = decryptedKey
+      } else {
+        // No organization key - use global Anthropic API key from environment
+        apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+
+        if (!apiKey) {
+          throw new Error('No Anthropic API key available. Please configure ANTHROPIC_API_KEY environment variable or set organization API key.')
+        }
       }
+      console.log('Anthropic API key resolved successfully')
     }
 
-    // Initialize Anthropic provider with API key using createAnthropic factory
-    const anthropicProvider = createAnthropic({ apiKey })
+    // Initialize Anthropic provider with API key (only if using Anthropic)
+    let anthropicProvider: any = null
+    if (provider === 'anthropic') {
+      anthropicProvider = createAnthropic({ apiKey })
+    }
 
     // Build messages array
     const messages: any[] = []
@@ -735,14 +783,141 @@ serve(async (req) => {
     // Get structured output configuration for this operation type
     const outputConfig = getOutputConfig(body.operation_type)
 
-    // Execute LLM call using Vercel AI SDK
+    // Execute LLM call
     // Tracks execution time for performance metrics
     const startTime = Date.now()
 
     try {
       let response: any
 
-      // VERCEL AI SDK PROPER PATTERN FOR STRUCTURED OUTPUT
+      // BRANCH: Mistral vs Anthropic execution paths
+      if (provider === 'mistral') {
+        // ===== MISTRAL EXECUTION PATH =====
+        console.log('=== Executing with Mistral ===')
+
+        const mistralClient = new Mistral({ apiKey })
+
+        // Handle document upload for Mistral
+        let mistralDocumentUrl: string | null = null
+
+        if (body.send_file && body.file_content) {
+          console.log('Uploading document to Mistral...')
+
+          // Decode base64 file content
+          const fileBuffer = Buffer.from(body.file_content, 'base64')
+
+          // Determine file extension from MIME type
+          const fileExt = body.file_type === 'application/pdf' ? 'pdf' : 'txt'
+          const fileName = `workbench-${Date.now()}.${fileExt}`
+
+          mistralDocumentUrl = await uploadDocumentToMistral(
+            mistralClient,
+            fileBuffer,
+            fileName
+          )
+
+          console.log('✅ Mistral document uploaded successfully')
+        }
+
+        // Build prompt
+        let fullPrompt = body.new_prompt
+
+        // Prepend system prompt if enabled (Mistral best practice)
+        if (body.send_system_prompt && body.system_prompt) {
+          fullPrompt = `${body.system_prompt}\n\n${fullPrompt}`
+        }
+
+        // Add structured output schema to prompt (if not generic)
+        if (body.operation_type !== 'generic') {
+          const zodToJsonSchemaPrompt = (opType: string): string => {
+            switch (opType) {
+              case 'validation':
+                return '{"result": true|false, "comment": "string - explanation"}'
+              case 'rating':
+                return '{"value": number, "comment": "string - explanation"}'
+              case 'classification':
+                return '{"classification": "string", "comment": "string - explanation"}'
+              case 'extraction':
+                return '{"items": ["string", ...], "comment": "string - explanation"}'
+              case 'analysis':
+                return '{"conclusion": "string", "comment": "string - explanation"}'
+              case 'traffic_light':
+                return '{"traffic_light": "red"|"yellow"|"green", "comment": "string - explanation"}'
+              default:
+                return '{"response": "string"}'
+            }
+          }
+
+          const jsonSchema = zodToJsonSchemaPrompt(body.operation_type)
+          fullPrompt = `${fullPrompt}\n\nIMPORTANT: Return ONLY a valid JSON object with this exact structure:\n${jsonSchema}`
+        }
+
+        // Build Mistral messages
+        const mistralContent: any[] = [
+          { type: 'text', text: fullPrompt }
+        ]
+
+        if (mistralDocumentUrl) {
+          mistralContent.push({
+            type: 'document_url',
+            documentUrl: mistralDocumentUrl
+          })
+        }
+
+        // Call Mistral API
+        console.log('Calling Mistral API...')
+        const mistralResponse = await mistralClient.chat.complete({
+          model: modelToUse,
+          messages: [{
+            role: 'user',
+            content: mistralContent
+          }],
+          responseFormat: body.operation_type !== 'generic'
+            ? { type: 'json_object' }
+            : undefined,
+          temperature: body.settings.temperature,
+          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+          topP: body.settings.top_p
+        })
+
+        const executionTime = Date.now() - startTime
+        console.log(`✅ Mistral call completed in ${executionTime}ms`)
+
+        // Parse response
+        const content = mistralResponse.choices[0].message.content || ''
+
+        let structuredOutput: any = null
+        let responseText = content
+
+        // Parse structured output if not generic
+        if (body.operation_type !== 'generic') {
+          try {
+            structuredOutput = JSON.parse(content)
+            console.log('✅ Structured output parsed:', JSON.stringify(structuredOutput))
+          } catch (e) {
+            console.warn('⚠️ Failed to parse Mistral JSON response:', e)
+            structuredOutput = { raw: content, error: 'Failed to parse JSON' }
+          }
+        }
+
+        // Build response object in same format as Anthropic
+        response = {
+          text: responseText,
+          experimental_output: structuredOutput,
+          usage: {
+            inputTokens: mistralResponse.usage?.promptTokens || 0,
+            outputTokens: mistralResponse.usage?.completionTokens || 0
+          },
+          providerMetadata: {
+            mistral: {
+              usage: mistralResponse.usage
+            }
+          }
+        }
+
+      } else {
+        // ===== ANTHROPIC EXECUTION PATH (existing logic) =====
+        // VERCEL AI SDK PROPER PATTERN FOR STRUCTURED OUTPUT
       // Uses experimental_output with generateText - the correct way to combine:
       // - Structured output (for validation, rating, classification, extraction)
       // - Extended thinking mode
@@ -781,10 +956,14 @@ serve(async (req) => {
         universalParams.system = system
       }
 
-      response = await generateText(universalParams)
+        response = await generateText(universalParams)
+      } // End Anthropic execution path
 
-      // Extract structured output using Vercel AI SDK's experimental_output
-      // This is automatically validated against the schema we provided
+      // ===== COMMON RESPONSE PROCESSING (works for both providers) =====
+
+      // Extract structured output using experimental_output
+      // This is automatically validated against the schema for Anthropic
+      // For Mistral, we've already parsed it and set it in response.experimental_output
       const structuredOutput = response.experimental_output || null
 
       if (structuredOutput) {
@@ -811,20 +990,29 @@ serve(async (req) => {
       }
 
       // Log cache usage for debugging
-      // Vercel AI SDK v5 returns cache metadata in providerMetadata.anthropic
+      // Provider-specific metadata handling
       const anthropicMetadata = response.providerMetadata?.anthropic || {}
+      const mistralMetadata = response.providerMetadata?.mistral || {}
 
-      if (Object.keys(anthropicMetadata).length > 0) {
-        console.log('✅ Anthropic metadata found:', JSON.stringify(anthropicMetadata))
+      // Cache tokens (Anthropic only - Mistral doesn't support caching)
+      let cacheWriteTokens = 0
+      let cacheReadTokens = 0
+
+      if (provider === 'anthropic') {
+        if (Object.keys(anthropicMetadata).length > 0) {
+          console.log('✅ Anthropic metadata found:', JSON.stringify(anthropicMetadata))
+        } else {
+          console.log('⚠️ No Anthropic metadata in response')
+        }
+
+        // Vercel AI SDK returns cache data in the usage object with snake_case names
+        cacheWriteTokens = anthropicMetadata.usage?.cache_creation_input_tokens ||
+                                 anthropicMetadata.cacheCreationInputTokens || 0
+        cacheReadTokens = anthropicMetadata.usage?.cache_read_input_tokens ||
+                                anthropicMetadata.cacheReadInputTokens || 0
       } else {
-        console.log('⚠️ No Anthropic metadata in response')
+        console.log('Mistral provider - no cache support')
       }
-
-      // Vercel AI SDK returns cache data in the usage object with snake_case names
-      const cacheWriteTokens = anthropicMetadata.usage?.cache_creation_input_tokens ||
-                               anthropicMetadata.cacheCreationInputTokens || 0
-      const cacheReadTokens = anthropicMetadata.usage?.cache_read_input_tokens ||
-                              anthropicMetadata.cacheReadInputTokens || 0
 
       // Calculate actual input tokens
       // IMPORTANT: Vercel AI SDK's response.usage.inputTokens is the TOTAL including cached tokens
@@ -918,8 +1106,11 @@ serve(async (req) => {
         structured_output: structuredOutput,  // Include structured data for visualization
         thinking_blocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
         citations: citations.length > 0 ? citations : undefined,
+        provider: provider,  // NEW: Include provider name for client awareness
+        model_used: modelToUse,  // NEW: Include actual model used
         metadata: {
           mode: body.mode,
+          provider: provider,  // NEW: Provider used for this execution
           cacheCreated: body.settings.create_cache || false,
           systemPromptSent: body.send_system_prompt && !!body.system_prompt,
           fileSent: body.send_file && !!body.file_content,

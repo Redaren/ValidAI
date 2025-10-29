@@ -34,6 +34,9 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { executeLLMOperationWithRetry, downloadDocument } from '../_shared/llm-executor.ts'
+import { executeLLMOperationWithRetryRouter } from '../_shared/llm-executor-router.ts'
+import { Mistral } from 'npm:@mistralai/mistralai'
+import { uploadDocumentToMistral } from '../_shared/llm-executor-mistral.ts'
 import type { OperationSnapshot, DocumentSnapshot, ProcessorSettings } from '../_shared/types.ts'
 
 /**
@@ -82,6 +85,7 @@ interface RunSnapshot {
   }
   operations: OperationSnapshot[]
   document: DocumentSnapshot
+  mistral_document_url?: string  // Signed URL for Mistral document reuse (valid 24 hours)
 }
 
 /**
@@ -209,7 +213,76 @@ serve(async (req) => {
         organization_id = membership.organization_id
       }
 
-      // 6. Create snapshot (frozen state)
+      // 6. Resolve LLM config to determine provider (before creating snapshot)
+      console.log('Resolving LLM configuration...')
+      const { data: llmConfig, error: llmError } = await supabase.rpc('get_llm_config_for_run', {
+        p_processor_id: processor.id,
+        p_user_id: user?.id || null
+      })
+
+      if (llmError || !llmConfig) {
+        return new Response(
+          JSON.stringify({ error: `Failed to resolve LLM configuration: ${llmError?.message}` }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      const provider = llmConfig.provider || 'anthropic'
+      console.log(`Provider: ${provider}`)
+
+      // 7. If Mistral, upload document BEFORE creating run (fail-fast)
+      let mistralDocumentUrl: string | null = null
+
+      if (provider === 'mistral') {
+        console.log('Processor uses Mistral - uploading document before creating run...')
+
+        try {
+          // Resolve Mistral API key
+          let mistralApiKey: string
+          if (llmConfig.api_key_encrypted) {
+            const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+              p_ciphertext: llmConfig.api_key_encrypted,
+              p_org_id: llmConfig.organization_id
+            })
+
+            if (decryptError || !decryptedKey) {
+              throw new Error(`Failed to decrypt Mistral API key: ${decryptError?.message}`)
+            }
+            mistralApiKey = decryptedKey
+          } else {
+            const globalKey = Deno.env.get('MISTRAL_API_KEY')
+            if (!globalKey) {
+              throw new Error('No Mistral API key available (neither org-specific nor global)')
+            }
+            mistralApiKey = globalKey
+          }
+
+          // Download and upload document
+          const documentBuffer = await downloadDocument(supabase, document.storage_path)
+          const mistralClient = new Mistral({ apiKey: mistralApiKey })
+
+          mistralDocumentUrl = await uploadDocumentToMistral(
+            mistralClient,
+            documentBuffer,
+            document.name
+          )
+
+          console.log(`✅ Mistral document uploaded successfully`)
+          console.log(`Signed URL will be stored in snapshot and reused for all ${operations.length} operations`)
+        } catch (error: any) {
+          console.error(`❌ Failed to upload document to Mistral: ${error.message}`)
+          // FAIL FAST: Return error BEFORE creating run
+          return new Response(
+            JSON.stringify({
+              error: 'Document upload to Mistral failed',
+              details: error.message
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
+      // 8. Create snapshot (frozen state)
       const snapshot: RunSnapshot = {
         processor: {
           id: processor.id,
@@ -234,10 +307,14 @@ serve(async (req) => {
           size_bytes: document.size_bytes,
           mime_type: document.mime_type,
           storage_path: document.storage_path
-        }
+        },
+        mistral_document_url: mistralDocumentUrl  // NULL for Anthropic, URL for Mistral
       }
 
       console.log(`Snapshot created: ${operations.length} operations, document: ${document.name}`)
+      if (mistralDocumentUrl) {
+        console.log(`Mistral signed URL stored in snapshot for reuse`)
+      }
 
       // 7. Create run record
       const { data: run, error: runError } = await supabase
@@ -353,52 +430,102 @@ serve(async (req) => {
         )
       }
 
-      // 4. Decrypt API key
+      // 4. Determine provider and decrypt API key
+      const provider = llmConfig.provider || 'anthropic'
+      console.log(`Provider: ${provider}`)
+
       let apiKey: string
-      if (llmConfig.api_key_encrypted) {
-        const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
-          p_ciphertext: llmConfig.api_key_encrypted,
-          p_org_id: llmConfig.organization_id
-        })
+      if (provider === 'mistral') {
+        // Mistral API key resolution
+        if (llmConfig.api_key_encrypted) {
+          const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+            p_ciphertext: llmConfig.api_key_encrypted,
+            p_org_id: llmConfig.organization_id
+          })
 
-        if (decryptError || !decryptedKey) {
-          console.error(`Failed to decrypt API key: ${decryptError?.message}`)
-          await supabase
-            .from('validai_runs')
-            .update({
-              status: 'failed',
-              error_message: 'Failed to decrypt API key',
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', backgroundBody.run_id)
-          return new Response(
-            JSON.stringify({ error: 'Failed to decrypt API key' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+          if (decryptError || !decryptedKey) {
+            console.error(`Failed to decrypt Mistral API key: ${decryptError?.message}`)
+            await supabase
+              .from('validai_runs')
+              .update({
+                status: 'failed',
+                error_message: 'Failed to decrypt Mistral API key',
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', backgroundBody.run_id)
+            return new Response(
+              JSON.stringify({ error: 'Failed to decrypt Mistral API key' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          apiKey = decryptedKey
+        } else {
+          // Use global Mistral API key
+          const globalKey = Deno.env.get('MISTRAL_API_KEY')
+          if (!globalKey) {
+            console.error('No Mistral API key available')
+            await supabase
+              .from('validai_runs')
+              .update({
+                status: 'failed',
+                error_message: 'No Mistral API key available',
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', backgroundBody.run_id)
+            return new Response(
+              JSON.stringify({ error: 'No Mistral API key available' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          apiKey = globalKey
         }
-        apiKey = decryptedKey
+        console.log('Mistral API key resolved successfully')
       } else {
-        // Use global API key
-        const globalKey = Deno.env.get('ANTHROPIC_API_KEY')
-        if (!globalKey) {
-          console.error('No API key available')
-          await supabase
-            .from('validai_runs')
-            .update({
-              status: 'failed',
-              error_message: 'No API key available',
-              completed_at: new Date().toISOString()
-            })
-            .eq('id', backgroundBody.run_id)
-          return new Response(
-            JSON.stringify({ error: 'No API key available' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-        apiKey = globalKey
-      }
+        // Anthropic API key resolution (existing logic)
+        if (llmConfig.api_key_encrypted) {
+          const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+            p_ciphertext: llmConfig.api_key_encrypted,
+            p_org_id: llmConfig.organization_id
+          })
 
-      console.log('API key resolved successfully')
+          if (decryptError || !decryptedKey) {
+            console.error(`Failed to decrypt Anthropic API key: ${decryptError?.message}`)
+            await supabase
+              .from('validai_runs')
+              .update({
+                status: 'failed',
+                error_message: 'Failed to decrypt Anthropic API key',
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', backgroundBody.run_id)
+            return new Response(
+              JSON.stringify({ error: 'Failed to decrypt Anthropic API key' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          apiKey = decryptedKey
+        } else {
+          // Use global Anthropic API key
+          const globalKey = Deno.env.get('ANTHROPIC_API_KEY')
+          if (!globalKey) {
+            console.error('No Anthropic API key available')
+            await supabase
+              .from('validai_runs')
+              .update({
+                status: 'failed',
+                error_message: 'No Anthropic API key available',
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', backgroundBody.run_id)
+            return new Response(
+              JSON.stringify({ error: 'No Anthropic API key available' }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+          apiKey = globalKey
+        }
+        console.log('Anthropic API key resolved successfully')
+      }
 
       // 5. Process chunk of operations
       const operations = snapshot.operations
@@ -409,25 +536,39 @@ serve(async (req) => {
       // Merge LLM config settings with snapshot overrides
       // Priority: snapshot.settings_override > llmConfig.settings > defaults
       const settings: ProcessorSettings = {
+        // Provider (required for router)
+        provider: provider as 'anthropic' | 'mistral',
+
         // Start with resolved LLM config settings from get_llm_config_for_run
         selected_model_id: llmConfig.model,
         max_tokens: llmConfig.settings?.default_max_tokens,
         temperature: llmConfig.settings?.default_temperature,
         top_p: llmConfig.settings?.default_top_p,
         top_k: llmConfig.settings?.default_top_k,
+        supports_top_p: llmConfig.settings?.supports_top_p,
 
         // Override with processor-specific settings if present
         ...(snapshot.processor.configuration?.settings_override || {})
       }
-      const enableCaching = settings.enable_caching !== false // Default: true
+      const enableCaching = settings.enable_caching !== false && provider === 'anthropic' // Only Anthropic supports caching
 
       console.log(`Using model: ${settings.selected_model_id}`)
       console.log(`Settings: temp=${settings.temperature}, max_tokens=${settings.max_tokens}, caching=${enableCaching}`)
 
-      // Download document once and cache in memory for all operations in this chunk
-      console.log(`\n--- Downloading document: ${snapshot.document.name} ---`)
-      const documentBuffer = await downloadDocument(supabase, snapshot.document.storage_path)
-      console.log(`Document cached in memory: ${documentBuffer.length} bytes`)
+      // Get Mistral signed URL from snapshot (if applicable)
+      const mistralDocumentUrl = snapshot.mistral_document_url || null
+      if (provider === 'mistral' && mistralDocumentUrl) {
+        console.log(`✅ Reusing Mistral signed URL from snapshot: ${mistralDocumentUrl.substring(0, 50)}...`)
+      }
+
+      // Download document once and cache in memory for all operations in this chunk (Anthropic only)
+      // Mistral uses signed URL, so no need to download
+      let documentBuffer: any = null
+      if (provider === 'anthropic') {
+        console.log(`\n--- Downloading document: ${snapshot.document.name} ---`)
+        documentBuffer = await downloadDocument(supabase, snapshot.document.storage_path)
+        console.log(`Document cached in memory: ${documentBuffer.length} bytes`)
+      }
 
       // Track progress for batch update
       let completedCount = 0
@@ -443,18 +584,21 @@ serve(async (req) => {
         try {
           const startedAt = new Date().toISOString()
 
-          // Execute LLM operation with retry (using cached document buffer)
-          const result = await executeLLMOperationWithRetry(
+          // Execute LLM operation with retry using router (supports both Anthropic and Mistral)
+          // For Anthropic: uses cachedDocumentBuffer
+          // For Mistral: uses mistralDocumentUrl from snapshot
+          const result = await executeLLMOperationWithRetryRouter(
             {
               operation,
               document: snapshot.document,
               systemPrompt: snapshot.processor.system_prompt,
               settings,
               apiKey,
-              enableCache: enableCaching && operationIndex === 0 ? true : enableCaching, // First op creates cache
-              cachedDocumentBuffer: documentBuffer // Use cached buffer
+              enableCache: enableCaching && operationIndex === 0 ? true : enableCaching, // First op creates cache (Anthropic only)
             },
-            supabase
+            supabase,
+            // Pass appropriate document reference based on provider
+            provider === 'mistral' ? mistralDocumentUrl : documentBuffer
           )
 
           console.log(`✅ Operation completed successfully`)

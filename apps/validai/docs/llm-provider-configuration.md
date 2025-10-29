@@ -295,6 +295,283 @@ Future implementation:
 - Plan-based features (free: global key, pro/enterprise: custom keys)
 - Audit logging for configuration changes
 
+## Mistral Integration
+
+**Status:** ✅ **Fully Implemented** (2025-10-29)
+
+ValidAI now supports Mistral AI models alongside Anthropic Claude models, giving organizations choice in their AI providers.
+
+### Available Mistral Models
+
+| Model | Display Name | Context Window | Best For |
+|-------|-------------|----------------|----------|
+| `mistral-small-latest` | Mistral Small Latest | 128k tokens | Cost-effective document processing, routine tasks, multilingual content |
+| `mistral-large-latest` | Mistral Large Latest | 128k tokens | Complex analysis, high-accuracy extraction, advanced multilingual processing |
+
+### Key Differences vs Anthropic
+
+| Feature | Anthropic (Claude) | Mistral |
+|---------|-------------------|---------|
+| **Prompt Caching** | ✅ Yes (90% cost savings) | ❌ No |
+| **Extended Thinking** | ✅ Yes (reasoning mode) | ❌ No |
+| **Structured Output** | ✅ Strict validation | ⚠️ Best-effort JSON mode |
+| **Document Processing** | ✅ Direct base64 encoding | ⚠️ Upload step required (2-3s) |
+| **API Key Fallback** | `ANTHROPIC_API_KEY` | `MISTRAL_API_KEY` |
+| **Context Window** | 200k tokens | 128k tokens |
+| **Multilingual** | ✅ Good | ✅ Excellent |
+
+### Architecture Implementation
+
+**Provider Routing (Factory Pattern):**
+```typescript
+// supabase/functions/_shared/llm-executor-router.ts
+export async function executeLLMOperationWithRetryRouter(
+  params: LLMExecutionParams,
+  supabase: any,
+  signedDocumentUrl?: string
+): Promise<LLMExecutionResult> {
+  const provider = params.settings.provider || 'anthropic'
+
+  // Route to provider-specific executor
+  if (provider === 'mistral') {
+    return executeLLMOperationMistralWithRetry(params, supabase, signedDocumentUrl)
+  } else {
+    return executeLLMOperationWithRetry(params, supabase)
+  }
+}
+```
+
+**Document Handling (Mistral-specific):**
+```typescript
+// For Mistral: Upload once per run, reuse signed URL
+// Initial invocation (execute-processor-run):
+const mistralDocumentUrl = await uploadDocumentToMistral(
+  mistralClient,
+  documentBuffer,
+  document.name
+)
+
+// Store in run snapshot
+snapshot.mistral_document_url = mistralDocumentUrl
+
+// Background processing: Reuse URL for all operations
+for (const operation of operations) {
+  const result = await executeLLMOperationMistral(
+    params,
+    supabase,
+    snapshot.mistral_document_url  // Reuse signed URL (valid 24 hours)
+  )
+}
+```
+
+**API Key Resolution:**
+```typescript
+// Priority: Organization key → Global env var
+if (provider === 'mistral') {
+  if (llmConfig.api_key_encrypted) {
+    apiKey = await decrypt_api_key(llmConfig.api_key_encrypted, org_id)
+  } else {
+    apiKey = Deno.env.get('MISTRAL_API_KEY')  // Global fallback
+  }
+}
+```
+
+### Cost Implications
+
+**⚠️ Important:** Mistral models do NOT support prompt caching. This has significant cost implications for multi-operation processor runs.
+
+**Cost Comparison Example (100 operations on same document):**
+
+| Provider | Caching | Approximate Cost |
+|----------|---------|------------------|
+| Anthropic with caching | 90% cache hit rate | ~$1.50 |
+| Mistral without caching | No caching | ~$10.50 |
+| **Cost Difference** | | **~7x more expensive** |
+
+**When Mistral is Cost-Effective:**
+- Single-operation processors (similar cost to Anthropic)
+- Small document batches (1-5 operations)
+- Mistral Small is cheaper than Claude Sonnet for baseline pricing
+
+**When Anthropic is More Cost-Effective:**
+- Multi-operation processors (10+ operations on same document)
+- Repeated processing of same documents
+- High-volume production workloads
+
+### Recommended Use Cases
+
+**Use Mistral When:**
+- ✅ Multilingual document processing (Mistral excels at non-English languages)
+- ✅ Cost-sensitive single-operation workloads
+- ✅ Regulatory requirements mandate provider diversity
+- ✅ Testing provider redundancy and fallback strategies
+- ✅ Workloads where prompt caching provides minimal benefit
+
+**Use Anthropic When:**
+- ✅ Multi-operation processor runs (caching saves 90% on costs)
+- ✅ Complex reasoning tasks requiring thinking mode
+- ✅ Maximum structured output reliability needed
+- ✅ Document processing speed is critical (no upload overhead)
+- ✅ Large context windows required (200k vs 128k)
+
+### Structured Output Handling
+
+Mistral uses JSON mode with manual validation, not Anthropic's strict Zod schema enforcement:
+
+```typescript
+// Anthropic: Automatic Zod validation
+const response = await generateText({
+  experimental_output: Output.object({ schema: zodSchema })
+})
+// → response.experimental_output is type-safe and validated
+
+// Mistral: Manual validation with fallback
+const response = await mistralClient.chat.complete({
+  responseFormat: { type: 'json_object' }
+})
+
+try {
+  const parsed = JSON.parse(response.content)
+  const validated = zodSchema.parse(parsed)  // Manual validation
+} catch (error) {
+  console.warn('Validation failed, storing raw JSON')
+  // Store raw + error, continue processing (graceful degradation)
+}
+```
+
+**Validation Strategy:**
+- Parse JSON response manually
+- Validate against operation type Zod schema
+- On error: Store raw JSON + log warning (don't fail run)
+- Continue processing remaining operations
+
+### Known Limitations
+
+1. **No Prompt Caching**
+   - Impact: 7x higher costs for multi-operation runs
+   - Mitigation: Use for single-operation processors or accept higher costs
+
+2. **No Extended Thinking Mode**
+   - Impact: Cannot use reasoning/analysis features
+   - Mitigation: Use Anthropic models for complex reasoning tasks
+
+3. **Document Upload Overhead**
+   - Impact: Initial 2-3 second delay per run
+   - Mitigation: Amortized across operations (signed URL reused)
+
+4. **Less Strict Structured Output**
+   - Impact: May produce unexpected field names/types
+   - Mitigation: Validation with graceful fallback to raw JSON
+
+### Configuration
+
+**Environment Variables (Supabase Edge Functions):**
+```bash
+# Set global Mistral API key
+npx supabase secrets set MISTRAL_API_KEY=your_mistral_api_key
+
+# Set global Anthropic API key (for comparison)
+npx supabase secrets set ANTHROPIC_API_KEY=your_anthropic_api_key
+```
+
+**Organization-Level Keys (Pro/Enterprise):**
+```typescript
+// Organizations can set provider-specific keys
+const llmConfig = {
+  api_keys_encrypted: {
+    anthropic: 'encrypted_claude_key',
+    mistral: 'encrypted_mistral_key'
+  },
+  available_models: [
+    {
+      id: 'sonnet',
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      display_name: 'Claude Sonnet'
+    },
+    {
+      id: 'mistral-small',
+      provider: 'mistral',
+      model: 'mistral-small-latest',
+      display_name: 'Mistral Small'
+    }
+  ],
+  default_model_id: 'sonnet'  // Organization default
+}
+```
+
+### Provider Detection
+
+The system automatically determines the provider from the selected model:
+
+1. **Model Selection in UI** → User selects "Mistral Small Latest"
+2. **Database Lookup** → Query `validai_llm_global_settings` for model's provider
+3. **Provider Routing** → Router dispatches to Mistral executor
+4. **API Key Resolution** → Resolve Mistral API key (org or global)
+5. **Execution** → Use Mistral-specific flow (upload, JSON mode, etc.)
+
+### Migration Impact
+
+The Mistral integration is **additive only** with zero breaking changes:
+
+- ✅ Existing processors continue using Anthropic unchanged
+- ✅ New model options appear in UI dropdowns automatically
+- ✅ Users opt-in by selecting Mistral models
+- ✅ No code changes required for existing processors
+- ✅ Rollback: Delete Mistral rows from `validai_llm_global_settings`
+
+### Testing Mistral Integration
+
+```sql
+-- Verify Mistral models are available
+SELECT model_name, display_name, is_active, provider
+FROM validai_llm_global_settings
+WHERE provider = 'mistral';
+
+-- Create test processor with Mistral
+INSERT INTO validai_processors (name, organization_id, configuration)
+VALUES (
+  'Mistral Test Processor',
+  'your_org_id',
+  jsonb_build_object('selected_model_id', 'mistral-small-latest')
+);
+
+-- Execute test run and monitor logs
+-- Check for: document upload, signed URL reuse, JSON parsing
+```
+
+**Edge Function Logs to Verify:**
+```
+[Mistral] Uploading document: test.pdf (52348 bytes)
+[Mistral] File uploaded successfully: file-abc123
+[Mistral] Signed URL obtained: https://files.mistral.ai/...
+[Router] Routing to mistral executor
+Reusing Mistral signed URL from snapshot
+✅ Mistral call completed in 2845ms
+✅ Structured output parsed: {"traffic_light":"green","comment":"..."}
+```
+
+### Future Enhancements
+
+**Planned Mistral Features:**
+- RAG (Retrieval-Augmented Generation) integration
+- Dedicated OCR API endpoint utilization
+- Mistral-specific advanced features as they become available
+- Cost optimization strategies for multi-operation runs
+
+**Extensibility:**
+The router architecture supports easy addition of new providers:
+```typescript
+// Future: Add OpenAI, Google, Cohere, etc.
+const executors = {
+  anthropic: executeLLMOperation,
+  mistral: executeLLMOperationMistral,
+  openai: executeLLMOperationOpenAI,      // Future
+  google: executeLLMOperationGoogle,      // Future
+  cohere: executeLLMOperationCohere,      // Future
+}
+```
+
 ## Usage Patterns
 
 ### Setting Organization Configuration

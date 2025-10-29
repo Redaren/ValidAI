@@ -48,10 +48,16 @@ export interface DocumentSnapshot {
 }
 
 /**
+ * Supported LLM providers
+ */
+export type LLMProvider = 'anthropic' | 'mistral'
+
+/**
  * Processor configuration settings
  * Extracted from processors.configuration.settings_override or defaults
  */
 export interface ProcessorSettings {
+  provider?: LLMProvider  // LLM provider (anthropic, mistral, etc.)
   selected_model_id?: string
   max_tokens?: number
   temperature?: number
@@ -63,6 +69,7 @@ export interface ProcessorSettings {
   }
   enable_caching?: boolean
   stop_sequences?: string[]
+  supports_top_p?: boolean  // Whether model supports top_p parameter alongside temperature
 }
 
 /**
@@ -125,6 +132,7 @@ export interface LLMExecutionResult {
   tokens: TokenUsage
   executionTime: number
   cacheHit: boolean
+  documentUrl?: string  // Mistral signed URL for document reuse (valid 24 hours)
 }
 
 /**
