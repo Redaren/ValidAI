@@ -60,7 +60,7 @@ export async function uploadDocumentToMistral(
       fileName: documentName,
       content: documentBuffer
     },
-    purpose: 'batch' as any  // Using 'batch' instead of 'ocr' for general document processing
+    purpose: 'ocr'  // For document QnA/OCR per Mistral documentation
   })
 
   console.log(`[Mistral] File uploaded successfully: ${uploadedFile.id}`)
