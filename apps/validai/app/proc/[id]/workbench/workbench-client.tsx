@@ -19,6 +19,7 @@ import {
 import { WorkbenchInput } from "@/components/workbench/workbench-input"
 import { WorkbenchOutput } from "@/components/workbench/workbench-output"
 import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-advanced-settings"
+import { WorkbenchOCRMode } from "@/components/workbench/workbench-ocr-mode"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import type { Database } from "@playze/shared-types"
@@ -107,8 +108,10 @@ export function WorkbenchClient({
   // Initialize default model from database
   useEffect(() => {
     if (availableModels && !selectedModel) {
-      // Find the default model from the database
-      const defaultModel = availableModels.models.find(m => m.is_default)
+      // Find the default model using default_model_id from response
+      const defaultModel = availableModels.default_model_id
+        ? availableModels.models.find(m => m.id === availableModels.default_model_id)
+        : null
 
       if (defaultModel) {
         setModel(defaultModel.model)
@@ -125,6 +128,9 @@ export function WorkbenchClient({
       setIsExpanded(false)
     }
   }, [advancedMode, isExpanded])
+
+  // Detect if current model is OCR model
+  const isOCRModel = selectedModel === 'mistral-ocr-latest'
 
   return (
     <div className="space-y-6">
@@ -190,15 +196,29 @@ export function WorkbenchClient({
 
       <Separator />
 
-      {/* Workbench Input */}
-      <WorkbenchInput
-        processor={initialProcessor}
-        operations={[]}
-      />
+      {/* OCR Mode Component - Only shown in Advanced Mode with OCR model */}
+      {advancedMode && isOCRModel && (
+        <>
+          <WorkbenchOCRMode
+            processor={initialProcessor}
+            selectedModel={selectedModel}
+          />
+          <Separator />
+        </>
+      )}
 
-      <Separator />
+      {/* Regular Workbench Input - Hidden when OCR is active */}
+      {!(advancedMode && isOCRModel) && (
+        <>
+          <WorkbenchInput
+            processor={initialProcessor}
+            operations={[]}
+          />
+          <Separator />
+        </>
+      )}
 
-      {/* Output Section */}
+      {/* Output Section - Shared between both modes */}
       <div className="space-y-4">
         <h2 className="text-lg font-medium">Output</h2>
         <WorkbenchOutput />

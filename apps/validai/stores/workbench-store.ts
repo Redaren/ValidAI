@@ -44,6 +44,33 @@ export interface TestResult {
 }
 
 /**
+ * OCR result from Mistral OCR processing
+ *
+ * @interface OCRResult
+ * @property {'ocr'} type - Result type identifier
+ * @property {string} markdown - Full markdown content from OCR
+ * @property {any} [annotations] - Structured annotations (if annotation format was specified)
+ * @property {Object} metadata - Execution metadata
+ * @property {string} metadata.model - Model used for OCR
+ * @property {number} metadata.executionTime - Processing time in milliseconds
+ * @property {string} metadata.annotationFormat - Selected annotation format
+ * @property {string} metadata.fileType - MIME type of processed file
+ * @property {string} metadata.timestamp - ISO timestamp of processing
+ */
+export interface OCRResult {
+  type: 'ocr'
+  markdown: string
+  annotations: any | null
+  metadata: {
+    model: string
+    executionTime: number
+    annotationFormat: string
+    fileType: string
+    timestamp: string
+  }
+}
+
+/**
  * Advanced LLM settings with override controls
  *
  * @interface AdvancedSettings
@@ -182,6 +209,10 @@ export interface WorkbenchStore {
   output: TestResult | null
   error: string | null
 
+  // OCR State
+  ocrAnnotationFormat: 'none' | 'chapters' | 'dates' | 'items' | 'custom'
+  ocrResults: OCRResult | null
+
   // Actions
   setFile: (file: SelectedFile) => void
   setModel: (modelId: string) => void
@@ -235,6 +266,11 @@ export interface WorkbenchStore {
   removeStopSequence: (index: number) => void
   clearStopSequences: () => void
   resetAdvancedSettings: () => void
+
+  // OCR Actions
+  setOCRAnnotationFormat: (format: 'none' | 'chapters' | 'dates' | 'items' | 'custom') => void
+  setOCRResults: (results: OCRResult) => void
+  clearOCRResults: () => void
 }
 
 /**
@@ -290,6 +326,10 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       isRunning: false,
       output: null,
       error: null,
+
+      // OCR initial state
+      ocrAnnotationFormat: 'none',
+      ocrResults: null,
 
       // Actions
 
@@ -687,6 +727,20 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
         set({ advancedSettings: defaultAdvancedSettings })
       },
 
+      // OCR Actions
+
+      setOCRAnnotationFormat: (format) => {
+        set({ ocrAnnotationFormat: format })
+      },
+
+      setOCRResults: (results) => {
+        set({ ocrResults: results })
+      },
+
+      clearOCRResults: () => {
+        set({ ocrResults: null })
+      },
+
       reset: () => {
         // Unsubscribe before resetting
         get().unsubscribeFromExecution()
@@ -715,7 +769,9 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
           realtimeChannel: null,
           isRunning: false,
           output: null,
-          error: null
+          error: null,
+          ocrAnnotationFormat: 'none',
+          ocrResults: null
         })
       }
     }),

@@ -14,6 +14,7 @@ import { useWorkbenchTest } from "@/hooks/use-workbench-test"
 import type { ConversationMessage } from "@/lib/validations"
 import { extractStructuredContent } from "@/lib/utils/content-detector"
 import { StructuredOutputVisualizer } from "@/components/workbench/structured-output-visualizer"
+import { OCRResultDisplay } from "@/components/workbench/ocr-result-display"
 
 /**
  * Workbench Output Component
@@ -62,13 +63,26 @@ export function WorkbenchOutput() {
     advancedSettings,
     advancedMode,
     autoParseStructuredData,
-    clearConversation
+    clearConversation,
+    ocrResults
   } = useWorkbenchStore()
 
   const workbenchTest = useWorkbenchTest()
 
   // Track which messages have been manually parsed (by index)
   const [manuallyParsedMessages, setManuallyParsedMessages] = useState<Set<number>>(new Set())
+
+  // Detect if last result is OCR
+  const isOCRResult = ocrResults !== null
+
+  // If OCR result, display OCR-specific output
+  if (isOCRResult) {
+    return (
+      <Card className="p-6">
+        <OCRResultDisplay results={ocrResults} />
+      </Card>
+    )
+  }
 
   /**
    * Get status badge component for current execution

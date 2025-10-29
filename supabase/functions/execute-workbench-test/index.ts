@@ -123,6 +123,303 @@ interface WorkbenchTestRequest {
 }
 
 /**
+ * OCR test request payload structure
+ *
+ * @interface OCRTestRequest
+ * @property {string} processor_id - UUID of the processor to test
+ * @property {string} model_id - OCR model identifier (e.g., 'mistral-ocr-latest')
+ * @property {'none' | 'chapters' | 'dates' | 'items'} annotation_format - Annotation schema to apply
+ * @property {string} file_content - Base64-encoded file content
+ * @property {string} file_type - MIME type of the file
+ */
+interface OCRTestRequest {
+  processor_id: string
+  model_id: string
+  annotation_format: 'none' | 'chapters' | 'dates' | 'items' | 'custom'
+  file_content: string
+  file_type: string
+}
+
+/**
+ * OCR test response structure
+ *
+ * @interface OCRTestResponse
+ * @property {'ocr'} type - Response type identifier
+ * @property {string} markdown - Full markdown content from OCR
+ * @property {any} annotations - Structured annotations (if annotation format was specified)
+ * @property {Object} metadata - Execution metadata
+ */
+interface OCRTestResponse {
+  type: 'ocr'
+  markdown: string
+  annotations: any | null
+  metadata: {
+    model: string
+    executionTime: number
+    annotationFormat: string
+    fileType: string
+    timestamp: string
+  }
+}
+
+/**
+ * Check if the model is an OCR model
+ *
+ * @param {string} modelId - Model identifier
+ * @returns {boolean} True if OCR model
+ */
+function isOCRModel(modelId: string): boolean {
+  return modelId === 'mistral-ocr-latest'
+}
+
+/**
+ * Get file extension from MIME type
+ *
+ * @param {string} mimeType - MIME type
+ * @returns {string} File extension
+ */
+function getFileExtension(mimeType: string): string {
+  const map: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'text/plain': 'txt',
+    'text/html': 'html',
+    'text/markdown': 'md'
+  }
+  return map[mimeType] || 'bin'
+}
+
+/**
+ * Get annotation schema based on selected format
+ *
+ * @param {string} format - Annotation format identifier
+ * @returns {any} ResponseFormat object for Mistral OCR API
+ */
+function getAnnotationSchema(format: string) {
+  switch (format) {
+    case 'none':
+      return undefined
+
+    case 'chapters':
+      return {
+        type: 'json_schema',
+        json_schema: {
+          type: 'object',
+          properties: {
+            language: { type: 'string' },
+            chapter_titles: {
+              type: 'array',
+              items: { type: 'string' }
+            },
+            urls: {
+              type: 'array',
+              items: { type: 'string' }
+            }
+          }
+        }
+      }
+
+    case 'dates':
+      return {
+        type: 'json_schema',
+        json_schema: {
+          type: 'object',
+          properties: {
+            effective_date: { type: 'string' },
+            expiration_date: { type: 'string' },
+            parties: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  role: { type: 'string' }
+                }
+              }
+            }
+          }
+        }
+      }
+
+    case 'items':
+      return {
+        type: 'json_schema',
+        json_schema: {
+          type: 'object',
+          properties: {
+            invoice_number: { type: 'string' },
+            date: { type: 'string' },
+            line_items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  description: { type: 'string' },
+                  quantity: { type: 'number' },
+                  unit_price: { type: 'number' },
+                  amount: { type: 'number' }
+                }
+              }
+            },
+            total: { type: 'number' }
+          }
+        }
+      }
+
+    default:
+      return undefined
+  }
+}
+
+/**
+ * Handle OCR processing request
+ *
+ * @param {OCRTestRequest} body - Request body
+ * @returns {Promise<Response>} HTTP response with OCR results
+ *
+ * @description
+ * Processes OCR requests through the following steps:
+ * 1. Validate file content
+ * 2. Upload document to Mistral Files API
+ * 3. Get signed URL
+ * 4. Call mistralClient.ocr.process()
+ * 5. Extract markdown and annotations
+ * 6. Return formatted results
+ */
+async function handleOCRRequest(body: OCRTestRequest): Promise<Response> {
+  console.log('=== OCR Request ===')
+  console.log(`Model: ${body.model_id}`)
+  console.log(`Annotation format: ${body.annotation_format}`)
+  console.log(`File type: ${body.file_type}`)
+
+  // Validate file content
+  if (!body.file_content) {
+    return new Response(
+      JSON.stringify({ error: 'No file content provided' }),
+      { status: 400, headers: corsHeaders }
+    )
+  }
+
+  // Get Mistral API key
+  const apiKey = Deno.env.get('MISTRAL_API_KEY')
+  if (!apiKey) {
+    throw new Error('No Mistral API key available')
+  }
+
+  // Initialize Mistral client
+  const mistralClient = new Mistral({ apiKey })
+
+  try {
+    // Convert base64 to buffer
+    const fileBuffer = Buffer.from(body.file_content, 'base64')
+    console.log(`File size: ${fileBuffer.length} bytes`)
+
+    // Upload document to Mistral
+    console.log('Uploading document to Mistral...')
+    const uploadedFile = await mistralClient.files.upload({
+      file: {
+        fileName: `workbench-ocr-${Date.now()}.${getFileExtension(body.file_type)}`,
+        content: fileBuffer
+      },
+      purpose: 'ocr'
+    })
+    console.log(`Document uploaded: ${uploadedFile.id}`)
+
+    // Get signed URL
+    const signedUrl = await mistralClient.files.getSignedUrl({
+      fileId: uploadedFile.id
+    })
+    console.log('Signed URL obtained')
+
+    // Build annotation format schema
+    const annotationSchema = getAnnotationSchema(body.annotation_format)
+
+    // Execute OCR
+    console.log('Processing document with OCR...')
+    const startTime = Date.now()
+
+    const ocrResponse = await mistralClient.ocr.process({
+      model: body.model_id,
+      document: {
+        type: 'document_url',
+        documentUrl: signedUrl.url
+      },
+      documentAnnotationFormat: annotationSchema,
+      includeImageBase64: false  // Don't include images in response (saves bandwidth)
+    })
+
+    const executionTime = Date.now() - startTime
+    console.log(`OCR completed in ${executionTime}ms`)
+
+    // Extract results
+    const markdown = extractMarkdownFromOCR(ocrResponse)
+    const annotations = body.annotation_format !== 'none'
+      ? extractAnnotationsFromOCR(ocrResponse)
+      : null
+
+    // Return results
+    return new Response(
+      JSON.stringify({
+        type: 'ocr',
+        markdown,
+        annotations,
+        metadata: {
+          model: body.model_id,
+          executionTime,
+          annotationFormat: body.annotation_format,
+          fileType: body.file_type,
+          timestamp: new Date().toISOString()
+        }
+      } satisfies OCRTestResponse),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+
+  } catch (error) {
+    console.error('OCR processing error:', error)
+    return new Response(
+      JSON.stringify({
+        error: 'OCR processing failed',
+        details: error.message
+      }),
+      { status: 500, headers: corsHeaders }
+    )
+  }
+}
+
+/**
+ * Extract markdown content from OCR response
+ *
+ * @param {any} ocrResponse - Mistral OCR API response
+ * @returns {string} Concatenated markdown content
+ */
+function extractMarkdownFromOCR(ocrResponse: any): string {
+  // Mistral OCR returns markdown in the response
+  // Structure: response.pages[].markdown (markdown per page)
+  // We concatenate all pages
+
+  if (ocrResponse.pages && Array.isArray(ocrResponse.pages)) {
+    return ocrResponse.pages
+      .map((page: any) => page.markdown)
+      .join('\n\n---\n\n')  // Page separator
+  }
+
+  return ocrResponse.markdown || ''
+}
+
+/**
+ * Extract annotations from OCR response
+ *
+ * @param {any} ocrResponse - Mistral OCR API response
+ * @returns {any} Structured annotations
+ */
+function extractAnnotationsFromOCR(ocrResponse: any): any {
+  // Mistral returns document_annotation field when annotation format is provided
+  return ocrResponse.document_annotation || null
+}
+
+/**
  * Main request handler for the Edge Function
  *
  * @function serve
@@ -175,19 +472,28 @@ serve(async (req) => {
   }
 
   try {
-    const body: WorkbenchTestRequest = await req.json()
+    const body: any = await req.json()
+
+    // Detect OCR model and route accordingly
+    if (body.model_id && isOCRModel(body.model_id)) {
+      console.log('Routing to OCR handler')
+      return await handleOCRRequest(body as OCRTestRequest)
+    }
+
+    // Cast to regular workbench request for LLM handling
+    const workbenchBody = body as WorkbenchTestRequest
 
     // Log request configuration for debugging
     console.log('=== Workbench Test Request ===')
-    console.log(`Mode: ${body.mode}`)
-    console.log(`Operation Type: ${body.operation_type}`)
-    console.log(`Model: ${body.settings.model_id || 'default'}`)
+    console.log(`Mode: ${workbenchBody.mode}`)
+    console.log(`Operation Type: ${workbenchBody.operation_type}`)
+    console.log(`Model: ${workbenchBody.settings.model_id || 'default'}`)
     console.log(`Features: ${[
-      body.settings.create_cache && 'caching',
-      body.settings.thinking && 'thinking',
-      body.settings.citations_enabled && 'citations',
-      body.send_system_prompt && 'system_prompt',
-      body.send_file && 'file'
+      workbenchBody.settings.create_cache && 'caching',
+      workbenchBody.settings.thinking && 'thinking',
+      workbenchBody.settings.citations_enabled && 'citations',
+      workbenchBody.send_system_prompt && 'system_prompt',
+      workbenchBody.send_file && 'file'
     ].filter(Boolean).join(', ') || 'none'}`)
 
     // Get Supabase client with service role key
@@ -213,7 +519,7 @@ serve(async (req) => {
 
     // Resolve LLM configuration for the processor (includes organization_id)
     const { data: llmConfig, error: llmError } = await supabase.rpc('get_llm_config_for_run', {
-      p_processor_id: body.processor_id,
+      p_processor_id: workbenchBody.processor_id,
       p_user_id: user.id
     })
 
@@ -223,7 +529,7 @@ serve(async (req) => {
 
     // Use model from request or fallback to resolved config
     // Moved earlier so we can use it for cache token calculations
-    const modelToUse = body.settings.model_id || llmConfig.model
+    const modelToUse = workbenchBody.settings.model_id || llmConfig.model
 
     // Determine provider by looking up model in global settings
     console.log(`Resolving provider for model: ${modelToUse}`)
@@ -246,12 +552,12 @@ serve(async (req) => {
       const { data: execution, error: execError } = await supabase
         .from('validai_workbench_executions')
         .insert({
-          processor_id: body.processor_id,
+          processor_id: workbenchBody.processor_id,
           user_id: user.id,
           organization_id: llmConfig.organization_id,
           status: 'pending',
-          prompt: body.new_prompt,
-          settings: body.settings
+          prompt: workbenchBody.new_prompt,
+          settings: workbenchBody.settings
         })
         .select()
         .single()
@@ -330,21 +636,21 @@ serve(async (req) => {
 
     // Detect if we're in stateful mode with previously cached content
     // This is crucial for maintaining cache consistency across messages
-    const hasPreviousCachedContent = body.mode === 'stateful' &&
-      body.conversation_history.some(msg =>
+    const hasPreviousCachedContent = workbenchBody.mode === 'stateful' &&
+      workbenchBody.conversation_history.some(msg =>
         msg.metadata?.cacheCreated || msg.metadata?.cachedWriteTokens > 0
       )
 
     // Check if a file was previously cached (we need to preserve it for cache hits)
-    const cachedFileMetadata = body.mode === 'stateful' ?
-      body.conversation_history.find(msg =>
+    const cachedFileMetadata = workbenchBody.mode === 'stateful' ?
+      workbenchBody.conversation_history.find(msg =>
         msg.metadata?.cacheCreated && msg.metadata?.fileSent
       )?.metadata : null
 
     console.log(`=== Cache State Analysis ===`)
-    console.log(`Mode: ${body.mode}`)
+    console.log(`Mode: ${workbenchBody.mode}`)
     console.log(`Has previous cached content: ${hasPreviousCachedContent}`)
-    console.log(`Create cache requested: ${body.settings.create_cache}`)
+    console.log(`Create cache requested: ${workbenchBody.settings.create_cache}`)
     console.log(`Has cached file from previous message: ${!!cachedFileMetadata}`)
     if (hasPreviousCachedContent) {
       console.log('Previous cache detected - will send cache_control markers for Anthropic to match against existing cache')
@@ -357,18 +663,18 @@ serve(async (req) => {
     // 3. File is sent as SEPARATE user message positioned BEFORE conversation history
     // 4. This ensures prefix (system + file) stays identical across all turns
     // 5. Anthropic automatically matches cached prefixes when it sees cache_control markers
-    if (body.send_system_prompt && body.system_prompt) {
-      if (body.settings.create_cache || hasPreviousCachedContent) {
+    if (workbenchBody.send_system_prompt && workbenchBody.system_prompt) {
+      if (workbenchBody.settings.create_cache || hasPreviousCachedContent) {
         // For ANY caching scenario, system message goes in messages array
         // but WITHOUT cache control - cache control will be on the file only
         messages.push({
           role: 'system',
-          content: body.system_prompt
+          content: workbenchBody.system_prompt
         })
         console.log('System message added to messages array (no cache control - file will have cache marker)')
       } else {
         // No caching involved - use system parameter for simpler approach
-        system = body.system_prompt
+        system = workbenchBody.system_prompt
         console.log('System message using system parameter (no caching)')
       }
     }
@@ -378,10 +684,10 @@ serve(async (req) => {
     let preservedFileBlock: any = null
     if (hasPreviousCachedContent && cachedFileMetadata && cachedFileMetadata.fileSent) {
       // Check if current request is sending a file
-      if (!body.send_file || !body.file_content) {
+      if (!workbenchBody.send_file || !workbenchBody.file_content) {
         // No new file being sent, but we had a cached file - we need to preserve it!
         // Look for the original file content in the first user message that had caching enabled
-        const originalMessage = body.conversation_history.find(msg =>
+        const originalMessage = workbenchBody.conversation_history.find(msg =>
           msg.role === 'user' && msg.metadata?.cacheCreated && msg.metadata?.fileSent
         )
 
@@ -437,9 +743,9 @@ serve(async (req) => {
 
     // FIRST: Add file as SEPARATE user message (if file is being sent)
     // This positions the file BEFORE any conversation history for consistent cache position
-    if (body.send_file && body.file_content) {
-      if (body.file_type === 'application/pdf') {
-        const pdfBuffer = Buffer.from(body.file_content, 'base64')
+    if (workbenchBody.send_file && workbenchBody.file_content) {
+      if (workbenchBody.file_type === 'application/pdf') {
+        const pdfBuffer = Buffer.from(workbenchBody.file_content, 'base64')
         const fileBlock: any = {
           type: 'file',
           data: pdfBuffer,
@@ -447,7 +753,7 @@ serve(async (req) => {
         }
 
         // Add cache control whenever caching is enabled
-        if (body.settings.create_cache || hasPreviousCachedContent) {
+        if (workbenchBody.settings.create_cache || hasPreviousCachedContent) {
           const estimatedTokens = Math.ceil(pdfBuffer.length / 5)
           const minTokensRequired = modelToUse.includes('haiku') ? 2048 : 1024
 
@@ -461,7 +767,7 @@ serve(async (req) => {
             }
           }
 
-          if (body.settings.create_cache && !hasPreviousCachedContent) {
+          if (workbenchBody.settings.create_cache && !hasPreviousCachedContent) {
             console.log(`PDF file in SEPARATE message WITH cache control - creating cache (size: ${pdfBuffer.length} bytes, ~${estimatedTokens} tokens)`)
           } else {
             console.log(`PDF file in SEPARATE message WITH cache control - matching cache (size: ${pdfBuffer.length} bytes, ~${estimatedTokens} tokens)`)
@@ -481,11 +787,11 @@ serve(async (req) => {
         // Text file
         const textBlock: any = {
           type: 'text',
-          text: body.file_content
+          text: workbenchBody.file_content
         }
 
-        if (body.settings.create_cache || hasPreviousCachedContent) {
-          const estimatedTokens = Math.ceil(body.file_content.length / 4)
+        if (workbenchBody.settings.create_cache || hasPreviousCachedContent) {
+          const estimatedTokens = Math.ceil(workbenchBody.file_content.length / 4)
           const minTokensRequired = modelToUse.includes('haiku') ? 2048 : 1024
 
           if (estimatedTokens < minTokensRequired) {
@@ -498,13 +804,13 @@ serve(async (req) => {
             }
           }
 
-          if (body.settings.create_cache && !hasPreviousCachedContent) {
-            console.log(`Text file in SEPARATE message WITH cache control - creating cache (length: ${body.file_content.length} chars, ~${estimatedTokens} tokens)`)
+          if (workbenchBody.settings.create_cache && !hasPreviousCachedContent) {
+            console.log(`Text file in SEPARATE message WITH cache control - creating cache (length: ${workbenchBody.file_content.length} chars, ~${estimatedTokens} tokens)`)
           } else {
-            console.log(`Text file in SEPARATE message WITH cache control - matching cache (length: ${body.file_content.length} chars, ~${estimatedTokens} tokens)`)
+            console.log(`Text file in SEPARATE message WITH cache control - matching cache (length: ${workbenchBody.file_content.length} chars, ~${estimatedTokens} tokens)`)
           }
         } else {
-          console.log(`Text file in SEPARATE message WITHOUT cache control (length: ${body.file_content.length} chars)`)
+          console.log(`Text file in SEPARATE message WITHOUT cache control (length: ${workbenchBody.file_content.length} chars)`)
         }
 
         // Add file as its own user message
@@ -514,7 +820,7 @@ serve(async (req) => {
         })
         console.log('✅ File added as SEPARATE user message (will stay in same position across turns)')
       }
-    } else if (preservedFileBlock && (!body.send_file || !body.file_content)) {
+    } else if (preservedFileBlock && (!workbenchBody.send_file || !workbenchBody.file_content)) {
       // User toggled "Send file" OFF but we need to preserve cached file
       messages.push({
         role: 'user',
@@ -538,11 +844,11 @@ serve(async (req) => {
      * - New prompt comes last (no cache control) - SEPARATE user message
      * - This ensures the file stays at position 1, allowing cache hits across all turns
      */
-    if (body.mode === 'stateful' && body.conversation_history.length > 0) {
+    if (workbenchBody.mode === 'stateful' && workbenchBody.conversation_history.length > 0) {
       console.log(`\n=== Processing Conversation History ===`)
-      console.log(`History contains ${body.conversation_history.length} messages`)
+      console.log(`History contains ${workbenchBody.conversation_history.length} messages`)
 
-      body.conversation_history.forEach((msg, historyIdx) => {
+      workbenchBody.conversation_history.forEach((msg, historyIdx) => {
         // NEW ARCHITECTURE: Skip file messages entirely from history
         // The file is now sent as a separate message at the beginning
         if (msg.metadata?.fileSent) {
@@ -579,7 +885,7 @@ serve(async (req) => {
         console.log(`Added history message ${historyIdx}: role=${msg.role}, length=${processedContent.length} chars`)
       })
 
-      console.log(`✅ Processed ${body.conversation_history.length} history messages (files excluded, now sent separately)`)
+      console.log(`✅ Processed ${workbenchBody.conversation_history.length} history messages (files excluded, now sent separately)`)
       console.log(`===================================\n`)
     }
 
@@ -587,7 +893,7 @@ serve(async (req) => {
     // This comes AFTER the file message and conversation history
     messages.push({
       role: 'user',
-      content: body.new_prompt
+      content: workbenchBody.new_prompt
     })
     console.log('✅ Current prompt added as SEPARATE user message')
 
@@ -598,7 +904,7 @@ serve(async (req) => {
     console.log('\n=== DETAILED MESSAGE STRUCTURE FOR CACHE DEBUGGING ===')
     console.log(`Total messages: ${messages.length}`)
     console.log(`System parameter: ${system ? 'yes (for non-cached request)' : 'no (using messages array)'}`)
-    console.log(`Cache strategy: ${body.settings.create_cache ? 'CREATE NEW CACHE' : hasPreviousCachedContent ? 'USE EXISTING CACHE' : 'NO CACHING'}`)
+    console.log(`Cache strategy: ${workbenchBody.settings.create_cache ? 'CREATE NEW CACHE' : hasPreviousCachedContent ? 'USE EXISTING CACHE' : 'NO CACHING'}`)
     console.log('')
 
     // Generate a prefix signature for comparison across turns
@@ -685,7 +991,7 @@ serve(async (req) => {
       console.log(`Expected behavior:`)
       console.log(`- Turn 1: Anthropic will CACHE everything up to and including this marker`)
       console.log(`- Turn 2+: If prefix is identical, Anthropic will HIT cache and reuse cached tokens`)
-    } else if (body.settings.create_cache || hasPreviousCachedContent) {
+    } else if (workbenchBody.settings.create_cache || hasPreviousCachedContent) {
       console.warn('⚠️ WARNING: Cache requested but no cache markers found!')
     } else {
       console.log('No cache markers (caching disabled)')
@@ -781,7 +1087,7 @@ serve(async (req) => {
     }
 
     // Get structured output configuration for this operation type
-    const outputConfig = getOutputConfig(body.operation_type)
+    const outputConfig = getOutputConfig(workbenchBody.operation_type)
 
     // Execute LLM call
     // Tracks execution time for performance metrics
@@ -800,14 +1106,14 @@ serve(async (req) => {
         // Handle document upload for Mistral
         let mistralDocumentUrl: string | null = null
 
-        if (body.send_file && body.file_content) {
+        if (workbenchBody.send_file && workbenchBody.file_content) {
           console.log('Uploading document to Mistral...')
 
           // Decode base64 file content
-          const fileBuffer = Buffer.from(body.file_content, 'base64')
+          const fileBuffer = Buffer.from(workbenchBody.file_content, 'base64')
 
           // Determine file extension from MIME type
-          const fileExt = body.file_type === 'application/pdf' ? 'pdf' : 'txt'
+          const fileExt = workbenchBody.file_type === 'application/pdf' ? 'pdf' : 'txt'
           const fileName = `workbench-${Date.now()}.${fileExt}`
 
           mistralDocumentUrl = await uploadDocumentToMistral(
@@ -820,15 +1126,15 @@ serve(async (req) => {
         }
 
         // Build prompt
-        let fullPrompt = body.new_prompt
+        let fullPrompt = workbenchBody.new_prompt
 
         // Prepend system prompt if enabled (Mistral best practice)
-        if (body.send_system_prompt && body.system_prompt) {
-          fullPrompt = `${body.system_prompt}\n\n${fullPrompt}`
+        if (workbenchBody.send_system_prompt && workbenchBody.system_prompt) {
+          fullPrompt = `${workbenchBody.system_prompt}\n\n${fullPrompt}`
         }
 
         // Add structured output schema to prompt (if not generic)
-        if (body.operation_type !== 'generic') {
+        if (workbenchBody.operation_type !== 'generic') {
           const zodToJsonSchemaPrompt = (opType: string): string => {
             switch (opType) {
               case 'validation':
@@ -848,7 +1154,7 @@ serve(async (req) => {
             }
           }
 
-          const jsonSchema = zodToJsonSchemaPrompt(body.operation_type)
+          const jsonSchema = zodToJsonSchemaPrompt(workbenchBody.operation_type)
           fullPrompt = `${fullPrompt}\n\nIMPORTANT: Return ONLY a valid JSON object with this exact structure:\n${jsonSchema}`
         }
 
@@ -872,12 +1178,12 @@ serve(async (req) => {
             role: 'user',
             content: mistralContent
           }],
-          responseFormat: body.operation_type !== 'generic'
+          responseFormat: workbenchBody.operation_type !== 'generic'
             ? { type: 'json_object' }
             : undefined,
-          temperature: body.settings.temperature,
-          maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-          topP: body.settings.top_p
+          temperature: workbenchBody.settings.temperature,
+          maxTokens: workbenchBody.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+          topP: workbenchBody.settings.top_p
         })
 
         const executionTime = Date.now() - startTime
@@ -890,7 +1196,7 @@ serve(async (req) => {
         let responseText = content
 
         // Parse structured output if not generic
-        if (body.operation_type !== 'generic') {
+        if (workbenchBody.operation_type !== 'generic') {
           try {
             structuredOutput = JSON.parse(content)
             console.log('✅ Structured output parsed:', JSON.stringify(structuredOutput))
@@ -933,18 +1239,18 @@ serve(async (req) => {
         model: anthropicProvider(modelToUse),
         messages, // Use original messages without modifications
         experimental_output: outputConfig, // undefined for Generic/Analysis, schema for others
-        maxTokens: body.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
-        temperature: body.settings.temperature,
-        topP: body.settings.top_p,
-        topK: body.settings.top_k,
-        stopSequences: body.settings.stop_sequences,
+        maxTokens: workbenchBody.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+        temperature: workbenchBody.settings.temperature,
+        topP: workbenchBody.settings.top_p,
+        topK: workbenchBody.settings.top_k,
+        stopSequences: workbenchBody.settings.stop_sequences,
         providerOptions: {
           anthropic: {
             // Pass thinking mode if enabled
-            ...(body.settings.thinking ? {
+            ...(workbenchBody.settings.thinking ? {
               thinking: {
-                type: body.settings.thinking.type,
-                budgetTokens: body.settings.thinking.budget_tokens
+                type: workbenchBody.settings.thinking.type,
+                budgetTokens: workbenchBody.settings.thinking.budget_tokens
               }
             } : {})
           }
@@ -1035,7 +1341,7 @@ serve(async (req) => {
         console.log(`💰 COST SAVINGS: ~${tokensSaved} tokens (90% discount applied)`)
       }
       if (cacheWriteTokens === 0 && cacheReadTokens === 0) {
-        if (body.settings.create_cache) {
+        if (workbenchBody.settings.create_cache) {
           console.error('❌ CACHE FAILED: Requested to create cache but no tokens were cached')
           console.error('   Possible causes:')
           console.error('   - Content too short (needs 1024+ tokens for most models, 2048+ for Haiku)')
@@ -1057,7 +1363,7 @@ serve(async (req) => {
 
       // For structured outputs, extract the appropriate text representation
       if (structuredOutput) {
-        if (body.operation_type === 'generic' || body.operation_type === 'analysis') {
+        if (workbenchBody.operation_type === 'generic' || workbenchBody.operation_type === 'analysis') {
           // For Generic/Analysis, the response field contains the actual text
           responseText = structuredOutput.response || responseText
         } else if (!responseText || responseText.trim() === '') {
@@ -1109,13 +1415,13 @@ serve(async (req) => {
         provider: provider,  // NEW: Include provider name for client awareness
         model_used: modelToUse,  // NEW: Include actual model used
         metadata: {
-          mode: body.mode,
+          mode: workbenchBody.mode,
           provider: provider,  // NEW: Provider used for this execution
-          cacheCreated: body.settings.create_cache || false,
-          systemPromptSent: body.send_system_prompt && !!body.system_prompt,
-          fileSent: body.send_file && !!body.file_content,
-          thinkingEnabled: !!body.settings.thinking,
-          citationsEnabled: body.settings.citations_enabled || false,
+          cacheCreated: workbenchBody.settings.create_cache || false,
+          systemPromptSent: workbenchBody.send_system_prompt && !!workbenchBody.system_prompt,
+          fileSent: workbenchBody.send_file && !!workbenchBody.file_content,
+          thinkingEnabled: !!workbenchBody.settings.thinking,
+          citationsEnabled: workbenchBody.settings.citations_enabled || false,
           inputTokens: totalInputTokens,
           outputTokens: response.usage?.outputTokens || 0,
           cachedReadTokens,
@@ -1184,12 +1490,12 @@ serve(async (req) => {
         response: errorMessage,  // Display error as assistant response
         structured_output: null,  // No structured output on error
         metadata: {
-          mode: body.mode,
-          cacheCreated: body.settings.create_cache || false,
-          systemPromptSent: body.send_system_prompt && !!body.system_prompt,
-          fileSent: body.send_file && !!body.file_content,
-          thinkingEnabled: !!body.settings.thinking,
-          citationsEnabled: body.settings.citations_enabled || false,
+          mode: workbenchBody.mode,
+          cacheCreated: workbenchBody.settings.create_cache || false,
+          systemPromptSent: workbenchBody.send_system_prompt && !!workbenchBody.system_prompt,
+          fileSent: workbenchBody.send_file && !!workbenchBody.file_content,
+          thinkingEnabled: !!workbenchBody.settings.thinking,
+          citationsEnabled: workbenchBody.settings.citations_enabled || false,
           inputTokens: 0,
           outputTokens: 0,
           executionTimeMs: executionTime
