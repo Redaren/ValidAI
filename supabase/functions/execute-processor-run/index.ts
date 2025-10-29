@@ -19,14 +19,16 @@
  * - Initial invocation: Creates run with snapshot, returns immediately (HTTP 202)
  * - Background invocation: Processes chunk of operations, self-invokes for next chunk
  * - Uses shared llm-executor utility for all LLM calls
- * - Updates run progress in batches (once per chunk, not per operation)
+ * - Updates run progress per operation (crash-resistant, idempotent retries)
  * - Downloads document once per chunk and caches in memory for all operations
  *
- * ## Performance Optimizations (2025-10-29)
+ * ## Performance & Stability (2025-10-29)
  * - Document buffer cached in memory (1 download per chunk vs 1 per operation = 70% reduction)
  * - Single INSERT per operation (no pending/processing states = 66% reduction in writes)
- * - Batch progress updates (1 UPDATE per chunk vs 1 per operation = 90% reduction)
- * - For 7 operations: 10 queries total (was 33) = 70% improvement, 500ms DB overhead (was 1.7s)
+ * - Per-operation progress updates (1 UPDATE per operation = crash-resistant, adds ~100ms overhead)
+ * - Resume logic prevents duplicate processing on retries (idempotent execution)
+ * - CHUNK_SIZE=4 to stay within 200s runtime limit (was 10, caused timeouts on large docs)
+ * - For 9 operations: ~18 queries total (9 inserts + 9 updates), ~1s DB overhead
  *
  * @version 1.1.0
  * @since 2025-10-14
@@ -49,9 +51,33 @@ const corsHeaders = {
 
 /**
  * Chunk size for operation processing
- * Processes 10 operations per invocation to stay well under 25-minute timeout
+ *
+ * IMPORTANT: This value is constrained by actual Edge Function runtime limits, NOT the
+ * theoretical 25-minute maximum. Based on testing with large documents (8MB PDFs):
+ *
+ * - Observed operation time: 22-27 seconds per operation (Mistral Large, 76K tokens)
+ * - HTTP Gateway timeout: 150 seconds (504 Gateway Timeout)
+ * - Edge Function runtime limit: ~200 seconds (forcible "shutdown")
+ *
+ * Current setting: CHUNK_SIZE = 4
+ * - Expected chunk duration: 4 ops × 23s = ~92 seconds
+ * - Safety margin: 92s < 150s (HTTP) and 92s < 200s (runtime)
+ *
+ * TECHNICAL DEBT / TODO:
+ * 1. Investigate actual Edge Function timeout configuration (why 200s not 25min?)
+ * 2. Check if timeout differs by Supabase plan (Free/Pro/Enterprise)
+ * 3. Consider document size warnings in UI (>5MB = slower processing)
+ * 4. Optimize with mistral-small-latest instead of mistral-large-latest (3x faster)
+ * 5. Implement document chunking (send only relevant pages per operation)
+ * 6. Add adaptive CHUNK_SIZE based on avg operation time from previous runs
+ * 7. Consider streaming response pattern to avoid HTTP Gateway timeout
+ *
+ * Related issue: Run 9b3ff289-ece5-4d9b-9dd8-c4465f54949f (2025-10-29)
+ * - 9 operations, 8.78MB PDF, mistral-large-latest
+ * - Timed out after operation 7, lost all progress due to batch update bug
+ * - Fixed with this change + per-operation updates + resume logic
  */
-const CHUNK_SIZE = 10
+const CHUNK_SIZE = 4
 
 /**
  * Initial request payload (from UI)
@@ -527,11 +553,22 @@ serve(async (req) => {
         console.log('Anthropic API key resolved successfully')
       }
 
-      // 5. Process chunk of operations
+      // 5. Process chunk of operations with resume logic
       const operations = snapshot.operations
-      const chunk = operations.slice(backgroundBody.start_index, backgroundBody.start_index + CHUNK_SIZE)
 
-      console.log(`Processing chunk: ${chunk.length} operations (${backgroundBody.start_index} to ${backgroundBody.start_index + chunk.length - 1})`)
+      // Resume from last completed operation if this is a retry
+      // This prevents re-processing operations that already have results
+      const lastCompletedIndex = run.completed_operations  // Number of completed ops = next index to process
+      const effectiveStartIndex = Math.max(backgroundBody.start_index, lastCompletedIndex)
+
+      if (effectiveStartIndex > backgroundBody.start_index) {
+        console.log(`⚠️ Resuming from operation ${effectiveStartIndex} (requested: ${backgroundBody.start_index}, already completed: ${lastCompletedIndex})`)
+        console.log(`This appears to be a retry after a crash or timeout`)
+      }
+
+      const chunk = operations.slice(effectiveStartIndex, effectiveStartIndex + CHUNK_SIZE)
+
+      console.log(`Processing chunk: ${chunk.length} operations (${effectiveStartIndex} to ${effectiveStartIndex + chunk.length - 1})`)
 
       // Merge LLM config settings with snapshot overrides
       // Priority: snapshot.settings_override > llmConfig.settings > defaults
@@ -570,12 +607,8 @@ serve(async (req) => {
         console.log(`Document cached in memory: ${documentBuffer.length} bytes`)
       }
 
-      // Track progress for batch update
-      let completedCount = 0
-      let failedCount = 0
-
       for (const [chunkIndex, operation] of chunk.entries()) {
-        const operationIndex = backgroundBody.start_index + chunkIndex
+        const operationIndex = effectiveStartIndex + chunkIndex
 
         console.log(`\n--- Processing Operation ${operationIndex + 1}/${operations.length} ---`)
         console.log(`Name: ${operation.name}`)
@@ -628,7 +661,14 @@ serve(async (req) => {
               completed_at: new Date().toISOString()
             })
 
-          completedCount++
+          // Update progress counter immediately (atomic increment, crash-resistant)
+          // If function crashes after this, progress is persisted
+          await supabase.rpc('increment_run_progress', {
+            p_run_id: backgroundBody.run_id,
+            p_status: 'completed'
+          })
+
+          console.log(`Progress updated: ${operationIndex + 1}/${operations.length} operations completed`)
 
         } catch (error: any) {
           // Operation failed (after retries)
@@ -658,33 +698,26 @@ serve(async (req) => {
               completed_at: new Date().toISOString()
             })
 
-          failedCount++
+          // Update failure counter immediately (atomic increment, crash-resistant)
+          await supabase.rpc('increment_run_progress', {
+            p_run_id: backgroundBody.run_id,
+            p_status: 'failed'
+          })
+
+          console.log(`Failed operation recorded: ${operationIndex + 1}/${operations.length}`)
 
           // Continue to next operation (don't stop run)
         }
       }
 
-      console.log(`Chunk processing complete: ${completedCount} completed, ${failedCount} failed`)
-
-      // Batch update run progress (single RPC call for entire chunk)
-      if (completedCount > 0 || failedCount > 0) {
-        await supabase
-          .from('validai_runs')
-          .update({
-            completed_operations: run.completed_operations + completedCount,
-            failed_operations: run.failed_operations + failedCount
-          })
-          .eq('id', backgroundBody.run_id)
-
-        console.log(`Progress updated: +${completedCount} completed, +${failedCount} failed`)
-      }
+      console.log(`Chunk processing complete`)
 
       // 6. Check if more chunks remain
-      const hasMoreOperations = (backgroundBody.start_index + CHUNK_SIZE) < operations.length
+      const hasMoreOperations = (effectiveStartIndex + CHUNK_SIZE) < operations.length
 
       if (hasMoreOperations) {
         // Invoke next chunk
-        const nextStartIndex = backgroundBody.start_index + CHUNK_SIZE
+        const nextStartIndex = effectiveStartIndex + CHUNK_SIZE
         console.log(`More operations remaining. Invoking next chunk (start: ${nextStartIndex})`)
 
         const edgeFunctionUrl = `${supabaseUrl}/functions/v1/execute-processor-run`
