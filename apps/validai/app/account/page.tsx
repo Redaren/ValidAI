@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useTheme } from "next-themes"
 import { createBrowserClient } from "@playze/shared-auth/client"
-import { useCurrentOrganization, useAuthorization } from "@playze/shared-auth"
+import { useCurrentOrganization } from "@playze/shared-auth"
 import {
   Card,
   CardContent,
@@ -35,7 +35,6 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   const { theme, setTheme } = useTheme()
   const { data: currentOrg, isLoading: orgLoading } = useCurrentOrganization()
-  const { data: auth } = useAuthorization('validai')
 
   useEffect(() => {
     setMounted(true)
@@ -70,25 +69,6 @@ export default function AccountPage() {
     .toUpperCase()
     .slice(0, 2) || 'U'
 
-  const getRoleBadgeVariant = (role: string | null) => {
-    switch (role) {
-      case 'owner':
-        return 'default'
-      case 'admin':
-        return 'secondary'
-      case 'member':
-        return 'outline'
-      case 'viewer':
-        return 'outline'
-      default:
-        return 'outline'
-    }
-  }
-
-  const getRoleLabel = (role: string | null) => {
-    if (!role) return 'No Role'
-    return role.charAt(0).toUpperCase() + role.slice(1)
-  }
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -189,19 +169,9 @@ export default function AccountPage() {
               <Skeleton className="h-4 w-32" />
             </div>
           ) : currentOrg ? (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Current Organization</Label>
-                <p className="text-sm font-medium">{currentOrg.name}</p>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Your Role</Label>
-                <div>
-                  <Badge variant={getRoleBadgeVariant(auth?.user_role || null)}>
-                    {getRoleLabel(auth?.user_role || null)}
-                  </Badge>
-                </div>
-              </div>
+            <div className="space-y-2">
+              <Label className="text-muted-foreground">Current Organization</Label>
+              <p className="text-sm font-medium">{currentOrg.name}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

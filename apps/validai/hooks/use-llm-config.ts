@@ -14,6 +14,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createBrowserClient } from '@playze/shared-auth/client';
+import type { Json } from '@playze/shared-types';
 import type {
   ResolvedLLMConfig,
   LLMModelConfig,
@@ -60,7 +61,7 @@ export function useAvailableLLMModels() {
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_available_llm_models');
       if (error) throw error;
-      return data as AvailableModelsResponse;
+      return data as unknown as AvailableModelsResponse;
     },
   });
 }
@@ -110,13 +111,22 @@ export function useSetOrganizationLLMConfig() {
       /** Default model ID for new processors (optional) */
       default_model_id?: string;
     }) => {
-      const { data, error } = await supabase.rpc('set_organization_llm_config', {
+      const params: {
+        p_api_keys: Record<string, string>;
+        p_available_models: Json;
+        p_default_model_id?: string;
+      } = {
         p_api_keys: config.api_keys,
-        p_available_models: config.available_models,
-        p_default_model_id: config.default_model_id,
-      });
+        p_available_models: config.available_models as unknown as Json,
+      };
+
+      if (config.default_model_id) {
+        params.p_default_model_id = config.default_model_id;
+      }
+
+      const { data, error } = await supabase.rpc('set_organization_llm_config', params as any);
       if (error) throw error;
-      return data as SetOrganizationConfigResponse;
+      return data as unknown as SetOrganizationConfigResponse;
     },
     onSuccess: () => {
       // Invalidate related queries to refetch with new configuration
@@ -164,10 +174,10 @@ export function useResolvedLLMConfig(processorId?: string) {
     queryKey: ['llm-config-resolved', processorId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_llm_config_for_run', {
-        p_processor_id: processorId || null,
+        p_processor_id: processorId || undefined,
       });
       if (error) throw error;
-      return data as ResolvedLLMConfig;
+      return data as unknown as ResolvedLLMConfig;
     },
     enabled: true, // Always fetch even without processorId (uses org default)
   });
@@ -212,7 +222,7 @@ export function useGlobalLLMSettings() {
     queryKey: ['llm-global-settings'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('llm_global_settings')
+        .from('llm_global_settings' as any)
         .select('*')
         .eq('is_active', true)
         .order('is_default', { ascending: false })

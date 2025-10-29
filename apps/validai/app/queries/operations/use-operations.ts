@@ -7,7 +7,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
-import { CreateOperationPayload } from '@/lib/validations'
+import { CreateOperationPayload, UpdateGenericOperationInput } from '@/lib/validations'
 
 /**
  * Hook for creating a new operation
@@ -161,7 +161,7 @@ export function useUpdateOperationFromWorkbench() {
       id: string
       processorId: string
       prompt: string
-      operation_type: string
+      operation_type: UpdateGenericOperationInput['operation_type']
     }) => {
       const { data, error } = await supabase
         .from('validai_operations')

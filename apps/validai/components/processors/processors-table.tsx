@@ -117,37 +117,46 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 defaultView="compliance"
                 trigger={
                   <Button
+                    type="button"
                     variant="ghost"
-                    size="sm"
+                    size="icon"
+                    title="Run processor"
                   >
                     <Play className="h-4 w-4" />
+                    <span className="sr-only">Run processor</span>
                   </Button>
                 }
               />
 
               <Button
+                type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
+                title="View details"
                 onClick={() => {
                   router.push(`/proc/${processor.processor_id}`)
                 }}
               >
                 <Eye className="h-4 w-4" />
+                <span className="sr-only">View details</span>
               </Button>
 
               <Button
+                type="button"
                 variant="ghost"
-                size="sm"
+                size="icon"
+                title="View runs"
                 onClick={() => {
                   router.push(`/proc/${processor.processor_id}/runs`)
                 }}
               >
                 <History className="h-4 w-4" />
+                <span className="sr-only">View runs</span>
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="h-8 w-8 p-0">
+                  <Button type="button" variant="ghost" className="h-8 w-8 p-0">
                     <span className="sr-only">Open menu</span>
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
-import { Database } from '@playze/shared-types'
+import { Database, Json } from '@playze/shared-types'
 
 type OperationType = Database['public']['Enums']['operation_type']
 type ProcessorStatus = Database['public']['Enums']['processor_status']
@@ -68,7 +68,7 @@ export function useProcessorDetail(processorId: string, options?: { enabled?: bo
       }
 
       // The RPC returns an array with single result
-      const processor = data[0] as ProcessorDetail
+      const processor = data[0] as unknown as ProcessorDetail
 
       return processor
     },
@@ -228,7 +228,8 @@ export function useCreateArea() {
 
       if (fetchError) throw fetchError
 
-      const currentAreas = processor?.area_configuration?.areas || []
+      const areaConfig = processor?.area_configuration as ProcessorDetail['area_configuration']
+      const currentAreas = areaConfig?.areas || []
 
       // Check if area already exists
       if (currentAreas.some((area: { name: string }) => area.name === areaName)) {
@@ -286,7 +287,7 @@ export function useDeleteArea() {
       const { error } = await supabase.rpc('delete_processor_area', {
         p_processor_id: processorId,
         p_area_name: areaName,
-        p_target_area: targetArea || null,
+        p_target_area: targetArea || undefined,
       })
 
       if (error) throw error
@@ -350,7 +351,7 @@ export function useUpdateProcessor() {
       default_run_view?: 'technical' | 'compliance' | 'contract-comments'
     }) => {
       // Only fetch and update configuration if default_run_view is provided
-      let updatedConfig: Record<string, unknown> | undefined = undefined
+      let updatedConfig: Json | undefined = undefined
       if (default_run_view !== undefined) {
         const { data: current } = await supabase
           .from('validai_processors')
@@ -364,7 +365,7 @@ export function useUpdateProcessor() {
         updatedConfig = {
           ...(current.configuration as Record<string, unknown> || {}),
           default_run_view,
-        }
+        } as Json
       }
 
       // Build update object with only provided fields
@@ -375,7 +376,7 @@ export function useUpdateProcessor() {
         visibility?: 'personal' | 'organization'
         system_prompt?: string | null
         tags?: string[] | null
-        configuration?: unknown
+        configuration?: Json
         updated_at: string
       } = {
         updated_at: new Date().toISOString(),
