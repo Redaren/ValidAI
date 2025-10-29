@@ -20,6 +20,7 @@ import { WorkbenchInput } from "@/components/workbench/workbench-input"
 import { WorkbenchOutput } from "@/components/workbench/workbench-output"
 import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-advanced-settings"
 import { useWorkbenchStore } from "@/stores/workbench-store"
+import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import type { Database } from "@playze/shared-types"
 import type { Operation } from "@/app/queries/processors/use-processor-detail"
 
@@ -61,14 +62,19 @@ export function WorkbenchClient({
   const {
     advancedMode,
     editOperationName,
+    selectedModel,
     setSystemPrompt,
     setOperationType,
     updateOperationPrompt,
     setEditOperation,
     clearEditOperation,
     toggleAdvancedMode,
+    setModel,
     reset
   } = useWorkbenchStore()
+
+  // Fetch available models from database
+  const { data: availableModels } = useAvailableLLMModels()
 
   // Initialize store with processor data
   useEffect(() => {
@@ -97,6 +103,21 @@ export function WorkbenchClient({
       reset()
     }
   }, [initialProcessor, operationId, setSystemPrompt, setOperationType, updateOperationPrompt, setEditOperation, clearEditOperation, reset])
+
+  // Initialize default model from database
+  useEffect(() => {
+    if (availableModels && !selectedModel) {
+      // Find the default model from the database
+      const defaultModel = availableModels.models.find(m => m.is_default)
+
+      if (defaultModel) {
+        setModel(defaultModel.model)
+      } else if (availableModels.models.length > 0) {
+        // Fallback: use first model if no default is marked
+        setModel(availableModels.models[0].model)
+      }
+    }
+  }, [availableModels, selectedModel, setModel])
 
   // Collapse Advanced Settings when Advanced Mode is turned off
   useEffect(() => {

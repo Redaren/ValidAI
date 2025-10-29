@@ -266,7 +266,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
     (set, get) => ({
       // Initial state
       selectedFile: null,
-      selectedModel: 'claude-3-5-haiku-20241022',
+      selectedModel: '',  // Will be set from database default on mount
       selectedOperationType: 'generic',  // Default to generic (backward compatible)
       systemPrompt: '',
       operationPrompt: '',
@@ -693,7 +693,7 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
 
         set({
           selectedFile: null,
-          selectedModel: 'claude-3-5-haiku-20241022',
+          selectedModel: '',  // Will be set from database default on mount
           selectedOperationType: 'generic',
           systemPrompt: '',
           operationPrompt: '',

@@ -1,6 +1,6 @@
 # LLM Provider Configuration Architecture
 
-> **Last Updated:** 2025-10-16
+> **Last Updated:** 2025-10-29
 
 ## Overview
 
@@ -8,13 +8,13 @@ ValidAI implements a flexible 3-tier configuration hierarchy for managing Large 
 
 ## Implementation Status
 
-**Current Implementation (as of 2025-10-16):**
+**Current Implementation (as of 2025-10-29):**
 
 ### ✅ Fully Implemented
 - **Database Schema:** All tables, columns, and functions are in place and working
-  - `llm_global_settings` table with seeded Anthropic models
+  - `validai_llm_global_settings` table with seeded Anthropic and Mistral models
   - `organizations.llm_configuration` JSONB column
-  - `processors.configuration` JSONB column
+  - `validai_processors.configuration` JSONB column
 - **Database Functions:** All resolution and configuration functions operational
   - `get_llm_config_for_run()` - Resolves configuration through 3-tier hierarchy
   - `set_organization_llm_config()` - Saves organization settings with encryption
@@ -25,13 +25,13 @@ ValidAI implements a flexible 3-tier configuration hierarchy for managing Large 
 - **Security:** API key encryption and global fallback working
 
 ### ⚠️ Architecturally Ready, UI Pending
-- **Processor Model Selection:** Database supports `selected_model_id` in `processors.configuration`, but no UI to set it yet
+- **Processor Model Selection:** Database supports `selected_model_id` in `validai_processors.configuration`, but no UI to set it yet
 - **Processor Settings Override:** Database supports `settings_override` for temperature/max_tokens, but no UI exists
 - **Organization LLM Management:** Hooks are ready, but Pro/Enterprise admin UI not built
 
 ### 🔄 Current Behavior
-- **All processors use global default model** (Claude 3.5 Sonnet) via automatic fallback
-- **Organizations cannot configure custom API keys yet** (all use global `ANTHROPIC_API_KEY` from Edge Function environment)
+- **All processors use global default model** (Claude Haiku 4.5) via automatic fallback
+- **Organizations cannot configure custom API keys yet** (all use global `ANTHROPIC_API_KEY` and `MISTRAL_API_KEY` from Edge Function environment)
 - **Processor configuration only stores** `default_run_view` field (for UI preference, not LLM settings)
 - **System prompt is the only processor-level LLM customization** available through UI
 
@@ -64,7 +64,7 @@ The system follows a strict 3-level hierarchy where each level can override the 
 
 ### 1. Global Level (System Defaults)
 
-**Table**: `llm_global_settings`
+**Table**: `validai_llm_global_settings`
 
 The global level provides system-wide defaults that are available to all users. These are managed by system administrators and serve as the fallback when no custom configuration exists.
 
@@ -147,7 +147,7 @@ Organizations with Pro or Enterprise accounts can configure their own LLM settin
 
 ### 3. Processor Level (Fine-tuned Control)
 
-**Column**: `processors.configuration`
+**Column**: `validai_processors.configuration`
 
 Individual processors can select specific models and override settings for their particular use case.
 
@@ -167,7 +167,7 @@ Individual processors can select specific models and override settings for their
 - ⚠️ `selected_model_id` and `settings_override` are **supported by the database and resolution logic** but have **no UI yet**
 - ✅ `default_run_view` is the only field currently settable via UI (determines which view to show on run detail page)
 - In practice, processors currently use organization or global defaults for LLM configuration
-- System prompt (stored in `processors.system_prompt` column, not in `configuration`) is the primary processor-level customization available
+- System prompt (stored in `validai_processors.system_prompt` column, not in `configuration`) is the primary processor-level customization available
 
 ## Resolution Logic
 
@@ -217,8 +217,9 @@ Result:
 ### Core Tables and Functions
 
 #### Tables
-- `llm_global_settings` - Stores all available models and their default configurations
+- `validai_llm_global_settings` - Stores all available models and their default configurations
 - `organizations.llm_configuration` - JSONB column for organization-specific settings
+- `validai_processors.configuration` - JSONB column for processor-specific settings
 
 #### Key Functions
 
@@ -247,7 +248,9 @@ Result:
 ### API Key Storage
 
 **Current Implementation (Pre-Production):**
-- Global API key stored in Edge Function environment variable (`ANTHROPIC_API_KEY`)
+- Global API keys stored in Edge Function environment variables:
+  - `ANTHROPIC_API_KEY` for Claude models
+  - `MISTRAL_API_KEY` for Mistral models
 - Enables immediate testing without organization setup
 - Used as fallback when organization has no custom key
 - Suitable for beta/preview deployments
@@ -274,12 +277,18 @@ Stored in organizations.llm_configuration.api_keys_encrypted
 **Edge Function Resolution:**
 ```typescript
 // Priority: Organization key → Global env var
+const provider = llmConfig.provider || 'anthropic'
+
 if (llmConfig.api_key_encrypted) {
-  // Use organization's custom key
+  // Use organization's custom key (decrypts with org-specific key)
   apiKey = await decrypt_api_key(llmConfig.api_key_encrypted, org_id)
 } else {
-  // Fallback to global key
-  apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  // Fallback to global key based on provider
+  if (provider === 'mistral') {
+    apiKey = Deno.env.get('MISTRAL_API_KEY')
+  } else {
+    apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  }
 }
 ```
 
@@ -321,6 +330,14 @@ ValidAI now supports Mistral AI models alongside Anthropic Claude models, giving
 | **Multilingual** | ✅ Good | ✅ Excellent |
 
 ### Architecture Implementation
+
+**Implementation Files:**
+- `supabase/functions/_shared/llm-executor-router.ts` - Factory pattern router for multi-provider dispatch
+- `supabase/functions/_shared/llm-executor-mistral.ts` - Mistral-specific executor (~438 lines)
+- `supabase/functions/_shared/llm-executor.ts` - Anthropic executor (existing)
+- `supabase/functions/_shared/types.ts` - Shared TypeScript types with `LLMProvider` enum
+- `supabase/functions/execute-processor-run/index.ts` - Production run orchestration
+- `supabase/functions/execute-workbench-test/index.ts` - Workbench testing endpoint
 
 **Provider Routing (Factory Pattern):**
 ```typescript
@@ -504,11 +521,11 @@ const llmConfig = {
 
 The system automatically determines the provider from the selected model:
 
-1. **Model Selection in UI** → User selects "Mistral Small Latest"
-2. **Database Lookup** → Query `validai_llm_global_settings` for model's provider
-3. **Provider Routing** → Router dispatches to Mistral executor
-4. **API Key Resolution** → Resolve Mistral API key (org or global)
-5. **Execution** → Use Mistral-specific flow (upload, JSON mode, etc.)
+1. **Model Selection in UI** → User selects "Mistral Small Latest" from workbench or processor config
+2. **Database Lookup** → Query `validai_llm_global_settings` for model's `provider` field
+3. **Provider Routing** → `llm-executor-router.ts` dispatches to provider-specific executor
+4. **API Key Resolution** → Resolve API key (organization-specific or global `MISTRAL_API_KEY`)
+5. **Execution** → Use Mistral-specific flow (document upload, JSON mode, structured output parsing)
 
 ### Migration Impact
 
@@ -523,21 +540,24 @@ The Mistral integration is **additive only** with zero breaking changes:
 ### Testing Mistral Integration
 
 ```sql
--- Verify Mistral models are available
-SELECT model_name, display_name, is_active, provider
+-- Verify Mistral models are available in database
+SELECT provider, model_name, display_name, is_active
 FROM validai_llm_global_settings
-WHERE provider = 'mistral';
+WHERE provider = 'mistral'
+ORDER BY model_name;
 
--- Create test processor with Mistral
+-- Expected result: 2 models (mistral-small-latest, mistral-large-latest)
+
+-- Create test processor with Mistral model selection (optional, no UI yet)
 INSERT INTO validai_processors (name, organization_id, configuration)
 VALUES (
   'Mistral Test Processor',
-  'your_org_id',
+  'your_org_id',  -- Replace with actual organization UUID
   jsonb_build_object('selected_model_id', 'mistral-small-latest')
 );
 
--- Execute test run and monitor logs
--- Check for: document upload, signed URL reuse, JSON parsing
+-- Note: Currently, users select Mistral models via workbench UI dropdown
+-- Processor-level model selection has no UI yet but works programmatically
 ```
 
 **Edge Function Logs to Verify:**
@@ -550,6 +570,36 @@ Reusing Mistral signed URL from snapshot
 ✅ Mistral call completed in 2845ms
 ✅ Structured output parsed: {"traffic_light":"green","comment":"..."}
 ```
+
+**How to Use Mistral Models:**
+
+1. **Workbench Testing (Available Now):**
+   - Navigate to Workbench page in ValidAI app
+   - Click model selector dropdown
+   - Select "Mistral Small Latest" or "Mistral Large Latest"
+   - Upload a test document
+   - Configure operation (extraction, validation, etc.)
+   - Click "Run Test"
+   - View structured output and token usage
+
+2. **Processor Runs (Programmatic Only - No UI Yet):**
+   ```sql
+   -- Set processor to use Mistral model
+   UPDATE validai_processors
+   SET configuration = jsonb_build_object(
+     'selected_model_id', 'mistral-small-latest',
+     'default_run_view', 'technical'
+   )
+   WHERE id = 'your_processor_id';
+   ```
+   - Future: UI will allow model selection in processor settings
+   - Current: Processors use global default (Claude Haiku 4.5) unless manually updated
+
+3. **API Key Configuration (One-Time Setup):**
+   ```bash
+   # Set global Mistral API key (already done in production)
+   npx supabase secrets set MISTRAL_API_KEY=your_mistral_api_key
+   ```
 
 ### Future Enhancements
 
@@ -633,7 +683,7 @@ const processorConfig = {
   default_run_view: 'technical'  // ✅ Currently settable via UI
 };
 
-// Save to processors.configuration column
+// Save to validai_processors.configuration column
 await updateProcessor({
   configuration: processorConfig
 });
@@ -781,19 +831,30 @@ SET llm_configuration = jsonb_set(
 ### Debug Queries
 
 ```sql
--- Check current user's organization
-SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id';
+-- Check current user's organization context from JWT
+SELECT auth.jwt() -> 'app_metadata' ->> 'organization_id' AS current_org_id;
 
--- View organization configuration
-SELECT llm_configuration
+-- View organization LLM configuration (if custom keys/models set)
+SELECT id, name, llm_configuration
 FROM organizations
-WHERE id = 'org_uuid';
+WHERE id = 'org_uuid';  -- Replace with your organization UUID
 
--- Test resolution
-SELECT get_llm_config_for_run('processor_uuid');
+-- Test full configuration resolution for a processor
+SELECT get_llm_config_for_run('processor_uuid');  -- Replace with actual processor UUID
 
--- View available models
-SELECT get_available_llm_models();
+-- View all available models (respects organization context)
+SELECT * FROM get_available_llm_models();
+
+-- Check all active models in database (global level)
+SELECT provider, model_name, display_name, is_default, is_active
+FROM validai_llm_global_settings
+WHERE is_active = true
+ORDER BY provider, model_name;
+
+-- View specific processor configuration
+SELECT id, name, configuration, system_prompt
+FROM validai_processors
+WHERE id = 'processor_uuid';  -- Replace with actual processor UUID
 ```
 
 ## Future Enhancements
