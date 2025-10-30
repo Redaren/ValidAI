@@ -5,7 +5,9 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  /* Default Light Theme */
+  :root,
+  .light {
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
@@ -32,6 +34,8 @@
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
   }
+
+  /* Default Dark Theme */
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -57,6 +61,63 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+  }
+
+  /* Claude Light Theme - Warm, colorful palette */
+  .claude-light {
+    --background: 48 33% 97%; /* Ivory Light */
+    --foreground: 60 4% 8%; /* Slate Dark */
+    --card: 48 33% 97%;
+    --card-foreground: 60 4% 8%;
+    --popover: 48 33% 97%;
+    --popover-foreground: 60 4% 8%;
+    --primary: 17 60% 60%; /* Clay */
+    --primary-foreground: 48 33% 97%;
+    --secondary: 84 20% 46%; /* Olive */
+    --secondary-foreground: 48 33% 97%;
+    --muted: 48 20% 90%;
+    --muted-foreground: 60 4% 40%;
+    --accent: 210 47% 60%; /* Sky */
+    --accent-foreground: 48 33% 97%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 48 33% 97%;
+    --border: 48 15% 85%;
+    --input: 48 15% 85%;
+    --ring: 17 60% 60%;
+    --chart-1: 210 47% 60%; /* Sky */
+    --chart-2: 84 20% 46%; /* Olive */
+    --chart-3: 17 60% 60%; /* Clay */
+    --chart-4: 340 41% 59%; /* Fig */
+    --chart-5: 17 52% 51%; /* Accent */
+    --radius: 0.5rem;
+  }
+
+  /* Claude Dark Theme - Inverted warm palette */
+  .claude-dark {
+    --background: 60 4% 8%; /* Slate Dark */
+    --foreground: 48 33% 97%; /* Ivory Light */
+    --card: 60 4% 12%;
+    --card-foreground: 48 33% 97%;
+    --popover: 60 4% 12%;
+    --popover-foreground: 48 33% 97%;
+    --primary: 17 60% 65%; /* Clay - lighter for dark bg */
+    --primary-foreground: 60 4% 8%;
+    --secondary: 84 20% 50%; /* Olive - lighter for dark bg */
+    --secondary-foreground: 60 4% 8%;
+    --muted: 60 4% 15%;
+    --muted-foreground: 48 20% 70%;
+    --accent: 210 47% 65%; /* Sky - lighter for dark bg */
+    --accent-foreground: 60 4% 8%;
+    --destructive: 0 62.8% 50%;
+    --destructive-foreground: 48 33% 97%;
+    --border: 60 4% 20%;
+    --input: 60 4% 20%;
+    --ring: 17 60% 65%;
+    --chart-1: 210 47% 65%; /* Sky */
+    --chart-2: 84 20% 55%; /* Olive */
+    --chart-3: 17 60% 65%; /* Clay */
+    --chart-4: 340 41% 65%; /* Fig */
+    --chart-5: 17 52% 60%; /* Accent */
   }
 }
 

@@ -142,13 +142,14 @@ export default function AccountPage() {
                 <SelectValue placeholder="Select a theme" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="system">System</SelectItem>
+                <SelectItem value="light">Default Light</SelectItem>
+                <SelectItem value="dark">Default Dark</SelectItem>
+                <SelectItem value="claude-light">Claude Light</SelectItem>
+                <SelectItem value="claude-dark">Claude Dark</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Choose how the application appears. System matches your operating system setting.
+              Choose how the application appears. Claude themes use a warm, colorful palette.
             </p>
           </div>
         </CardContent>
