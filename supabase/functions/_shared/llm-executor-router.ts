@@ -31,6 +31,7 @@
 
 import { executeLLMOperation, executeLLMOperationWithRetry } from './llm-executor.ts'
 import { executeLLMOperationMistral, executeLLMOperationMistralWithRetry } from './llm-executor-mistral.ts'
+import { executeLLMOperationAnthropic, executeLLMOperationAnthropicWithRetry } from './llm-executor-anthropic.ts'
 import type { LLMExecutionParams, LLMExecutionResult } from './types.ts'
 
 /**
@@ -121,7 +122,7 @@ export async function executeLLMOperationWithRouter(
  *
  * @param params - Execution parameters (includes settings.provider)
  * @param supabase - Supabase client
- * @param signedDocumentUrl - Optional pre-uploaded document URL (Mistral only, ignored by Anthropic)
+ * @param documentRef - Document reference (string for file_id/URL, Buffer for inline, undefined for none)
  * @param maxRetries - Maximum number of retry attempts (default: 3)
  * @returns Execution result from provider-specific executor
  * @throws Error if provider is unknown/unsupported or max retries exceeded
@@ -130,39 +131,63 @@ export async function executeLLMOperationWithRouter(
  * Factory function that routes execution to the correct provider-specific executor WITH retry logic.
  * Provider is determined from params.settings.provider, with 'anthropic' as default.
  *
+ * Routing decision logic:
+ * 1. If provider is 'mistral' → Mistral executor (documentRef is signed URL string)
+ * 2. If provider is 'anthropic' AND documentRef is string → Anthropic Files API executor (NEW)
+ * 3. If provider is 'anthropic' AND documentRef is Buffer/undefined → Anthropic legacy executor (EXISTING)
+ *
  * Retry behavior:
  * - Exponential backoff: 1s, 5s, 15s
  * - Retries on: 429 (rate limit), 503 (service unavailable), timeouts, network errors
  * - Fails immediately on: auth errors, validation errors, permanent API errors
- *
- * **Note:** The signedDocumentUrl parameter is only used by Mistral executor for URL reuse.
- * Anthropic executor ignores this parameter as it processes documents inline.
  */
 export async function executeLLMOperationWithRetryRouter(
   params: LLMExecutionParams,
   supabase: any,
-  signedDocumentUrl?: string,
+  documentRef?: string | any,
   maxRetries: number = 3
 ): Promise<LLMExecutionResult> {
   const provider = (params.settings.provider || 'anthropic') as LLMProvider
 
   console.log(`[Router] Routing LLM execution to ${provider} executor with retry (max: ${maxRetries})`)
 
-  const executor = executorsWithRetry[provider]
-
-  if (!executor) {
-    const supportedProviders = Object.keys(executorsWithRetry).join(', ')
-    throw new Error(
-      `Unknown LLM provider: ${provider}. Supported providers: ${supportedProviders}`
+  if (provider === 'mistral') {
+    // Mistral path: documentRef is signed URL (string)
+    console.log('[Router] → Mistral executor with signed URL')
+    return await executeLLMOperationMistralWithRetry(
+      params,
+      supabase,
+      documentRef as string,
+      maxRetries
     )
   }
 
-  // Route to provider-specific executor with retry
-  // Note: Both executors accept similar signatures, but with different 3rd param types
-  // Anthropic: cachedDocumentBuffer (Buffer | undefined)
-  // Mistral: signedDocumentUrl (string | undefined)
-  // TypeScript may show warning, but both signatures are compatible with 'any' cast
-  return await executor(params, supabase, signedDocumentUrl as any, maxRetries)
+  if (provider === 'anthropic') {
+    // Determine Anthropic execution path based on documentRef type
+    if (typeof documentRef === 'string') {
+      // NEW: Anthropic Files API path (documentRef is file_id)
+      console.log('[Router] → Anthropic Files API executor with file_id')
+      return await executeLLMOperationAnthropicWithRetry(
+        params,
+        supabase,
+        documentRef,  // file_id (string)
+        maxRetries
+      )
+    } else {
+      // LEGACY: Anthropic inline files path (documentRef is Buffer or undefined)
+      console.log('[Router] → Anthropic legacy executor (Vercel AI SDK) with inline file')
+      return await executeLLMOperationWithRetry(
+        params,
+        supabase,
+        documentRef as any,
+        maxRetries
+      )
+    }
+  }
+
+  throw new Error(
+    `Unknown LLM provider: ${provider}. Supported providers: anthropic, mistral`
+  )
 }
 
 /**

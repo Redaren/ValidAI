@@ -39,6 +39,8 @@ import { executeLLMOperationWithRetry, downloadDocument } from '../_shared/llm-e
 import { executeLLMOperationWithRetryRouter } from '../_shared/llm-executor-router.ts'
 import { Mistral } from 'npm:@mistralai/mistralai'
 import { uploadDocumentToMistral } from '../_shared/llm-executor-mistral.ts'
+import Anthropic from 'npm:@anthropic-ai/sdk'
+import { uploadDocumentToAnthropic } from '../_shared/llm-executor-anthropic.ts'
 import type { OperationSnapshot, DocumentSnapshot, ProcessorSettings } from '../_shared/types.ts'
 
 /**
@@ -112,6 +114,7 @@ interface RunSnapshot {
   operations: OperationSnapshot[]
   document: DocumentSnapshot
   mistral_document_url?: string  // Signed URL for Mistral document reuse (valid 24 hours)
+  anthropic_file_id?: string  // File ID for Anthropic Files API (indefinite storage)
 }
 
 /**
@@ -308,6 +311,67 @@ serve(async (req) => {
         }
       }
 
+      // 7b. If Anthropic with Files API enabled, upload document BEFORE creating run (fail-fast)
+      let anthropicFileId: string | null = null
+
+      if (provider === 'anthropic') {
+        // Check feature flag (defaults to true)
+        const useFilesAPI = processor.configuration?.settings_override?.use_anthropic_files_api ?? true
+
+        if (useFilesAPI) {
+          console.log('Processor uses Anthropic Files API - uploading document before creating run...')
+
+          try {
+            // Resolve Anthropic API key (same pattern as Mistral)
+            let anthropicApiKey: string
+            if (llmConfig.api_key_encrypted) {
+              const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+                p_ciphertext: llmConfig.api_key_encrypted,
+                p_org_id: llmConfig.organization_id
+              })
+
+              if (decryptError || !decryptedKey) {
+                throw new Error(`Failed to decrypt Anthropic API key: ${decryptError?.message}`)
+              }
+              anthropicApiKey = decryptedKey
+            } else {
+              // Use global Anthropic API key
+              const globalKey = Deno.env.get('ANTHROPIC_API_KEY')
+              if (!globalKey) {
+                throw new Error('No Anthropic API key available (neither org-specific nor global)')
+              }
+              anthropicApiKey = globalKey
+            }
+
+            // Download and upload document
+            const documentBuffer = await downloadDocument(supabase, document.storage_path)
+            const anthropicClient = new Anthropic({ apiKey: anthropicApiKey })
+
+            anthropicFileId = await uploadDocumentToAnthropic(
+              anthropicClient,
+              documentBuffer,
+              document.name,
+              document.mime_type
+            )
+
+            console.log(`✅ Anthropic document uploaded successfully`)
+            console.log(`File ID will be stored in snapshot and reused for all ${operations.length} operations`)
+          } catch (error: any) {
+            console.error(`❌ Failed to upload document to Anthropic: ${error.message}`)
+            // FAIL FAST: Return error BEFORE creating run
+            return new Response(
+              JSON.stringify({
+                error: 'Document upload to Anthropic failed',
+                details: error.message
+              }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        } else {
+          console.log('Processor uses Anthropic legacy mode (inline files via Vercel AI SDK)')
+        }
+      }
+
       // 8. Create snapshot (frozen state)
       const snapshot: RunSnapshot = {
         processor: {
@@ -334,12 +398,16 @@ serve(async (req) => {
           mime_type: document.mime_type,
           storage_path: document.storage_path
         },
-        mistral_document_url: mistralDocumentUrl  // NULL for Anthropic, URL for Mistral
+        mistral_document_url: mistralDocumentUrl,  // NULL for non-Mistral
+        anthropic_file_id: anthropicFileId  // NULL for legacy Anthropic or non-Anthropic
       }
 
       console.log(`Snapshot created: ${operations.length} operations, document: ${document.name}`)
       if (mistralDocumentUrl) {
         console.log(`Mistral signed URL stored in snapshot for reuse`)
+      }
+      if (anthropicFileId) {
+        console.log(`Anthropic file_id stored in snapshot for reuse`)
       }
 
       // 7. Create run record
@@ -592,19 +660,35 @@ serve(async (req) => {
       console.log(`Using model: ${settings.selected_model_id}`)
       console.log(`Settings: temp=${settings.temperature}, max_tokens=${settings.max_tokens}, caching=${enableCaching}`)
 
-      // Get Mistral signed URL from snapshot (if applicable)
-      const mistralDocumentUrl = snapshot.mistral_document_url || null
-      if (provider === 'mistral' && mistralDocumentUrl) {
-        console.log(`✅ Reusing Mistral signed URL from snapshot: ${mistralDocumentUrl.substring(0, 50)}...`)
-      }
+      // Prepare document reference for executor
+      // - Mistral: signed URL (string)
+      // - Anthropic Files API: file_id (string)
+      // - Anthropic Legacy: document buffer (Buffer)
+      let documentRef: string | any = null
 
-      // Download document once and cache in memory for all operations in this chunk (Anthropic only)
-      // Mistral uses signed URL, so no need to download
-      let documentBuffer: any = null
-      if (provider === 'anthropic') {
-        console.log(`\n--- Downloading document: ${snapshot.document.name} ---`)
-        documentBuffer = await downloadDocument(supabase, snapshot.document.storage_path)
-        console.log(`Document cached in memory: ${documentBuffer.length} bytes`)
+      if (provider === 'mistral') {
+        // Existing Mistral path
+        const mistralDocumentUrl = snapshot.mistral_document_url || null
+        if (mistralDocumentUrl) {
+          console.log(`✅ Reusing Mistral signed URL from snapshot: ${mistralDocumentUrl.substring(0, 50)}...`)
+          documentRef = mistralDocumentUrl
+        }
+      } else if (provider === 'anthropic') {
+        // Check if Files API was used (file_id in snapshot)
+        const anthropicFileId = snapshot.anthropic_file_id || null
+
+        if (anthropicFileId) {
+          // NEW: Anthropic Files API path
+          console.log(`✅ Reusing Anthropic file_id from snapshot: ${anthropicFileId}`)
+          documentRef = anthropicFileId
+        } else {
+          // LEGACY: Anthropic inline files path
+          console.log(`Using Anthropic legacy mode - downloading document for inline passing`)
+          console.log(`\n--- Downloading document: ${snapshot.document.name} ---`)
+          const documentBuffer = await downloadDocument(supabase, snapshot.document.storage_path)
+          console.log(`Document cached in memory: ${documentBuffer.length} bytes`)
+          documentRef = documentBuffer
+        }
       }
 
       for (const [chunkIndex, operation] of chunk.entries()) {
@@ -617,9 +701,10 @@ serve(async (req) => {
         try {
           const startedAt = new Date().toISOString()
 
-          // Execute LLM operation with retry using router (supports both Anthropic and Mistral)
-          // For Anthropic: uses cachedDocumentBuffer
-          // For Mistral: uses mistralDocumentUrl from snapshot
+          // Execute LLM operation with retry using router (supports all providers)
+          // - Mistral: documentRef is signed URL (string)
+          // - Anthropic Files API: documentRef is file_id (string)
+          // - Anthropic Legacy: documentRef is Buffer
           const result = await executeLLMOperationWithRetryRouter(
             {
               operation,
@@ -630,8 +715,7 @@ serve(async (req) => {
               enableCache: enableCaching && operationIndex === 0 ? true : enableCaching, // First op creates cache (Anthropic only)
             },
             supabase,
-            // Pass appropriate document reference based on provider
-            provider === 'mistral' ? mistralDocumentUrl : documentBuffer
+            documentRef  // Router determines execution path based on type
           )
 
           console.log(`✅ Operation completed successfully`)

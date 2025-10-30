@@ -70,6 +70,7 @@ export interface ProcessorSettings {
   enable_caching?: boolean
   stop_sequences?: string[]
   supports_top_p?: boolean  // Whether model supports top_p parameter alongside temperature
+  use_anthropic_files_api?: boolean  // Enable Anthropic Files API (defaults to true)
 }
 
 /**
@@ -133,6 +134,7 @@ export interface LLMExecutionResult {
   executionTime: number
   cacheHit: boolean
   documentUrl?: string  // Mistral signed URL for document reuse (valid 24 hours)
+  fileId?: string  // Anthropic file_id for document reuse (indefinite storage)
 }
 
 /**
