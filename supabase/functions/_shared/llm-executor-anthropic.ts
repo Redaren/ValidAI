@@ -271,17 +271,27 @@ Do not include any text outside the JSON object. Do not use markdown code blocks
   }
 
   // Build user message with document reference and prompt
+  const documentBlock: any = {
+    type: 'document',
+    source: {
+      type: 'file',
+      file_id: fileId
+    }
+  }
+
+  // Add cache control to document for multi-breakpoint caching strategy
+  // Cache hierarchy: System prompt (prefix 1) → Document (prefix 2) → User prompt (not cached)
+  if (enableCache) {
+    documentBlock.cache_control = { type: 'ephemeral' }
+    console.log('Document marked for caching (multi-breakpoint strategy)')
+  }
+
   const userContent: any[] = [
-    {
-      type: 'document',
-      source: {
-        type: 'file',
-        file_id: fileId
-      }
-    },
+    documentBlock,
     {
       type: 'text',
       text: userPrompt
+      // User prompt is NOT cached - it varies per operation
     }
   ]
 
