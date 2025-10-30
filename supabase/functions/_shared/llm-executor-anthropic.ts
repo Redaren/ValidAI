@@ -253,24 +253,33 @@ Do not include any text outside the JSON object. Do not use markdown code blocks
 
   console.log(`Prompt prepared: ${userPrompt.substring(0, 100)}...`)
 
-  // Build system message with optional cache control
+  // Build system message - only system prompt text
+  // IMPORTANT: System array only accepts type: 'text' blocks (no document references)
   const systemMessages: any[] = []
+
   if (systemPrompt) {
-    const systemBlock: any = {
+    systemMessages.push({
       type: 'text',
       text: systemPrompt
-    }
-
-    // Add cache control to system prompt if caching enabled
-    if (enableCache) {
-      systemBlock.cache_control = { type: 'ephemeral' }
-      console.log('System prompt marked for caching')
-    }
-
-    systemMessages.push(systemBlock)
+      // NO cache_control here - it goes in user message content array
+    })
   }
 
-  // Build user message with document reference and prompt
+  // Build user message content array with single cache breakpoint
+  // CRITICAL: Each operation is an independent API call (no chat history)
+  // Pattern for ALL operations:
+  //   Part 1: Fixed intro text (100% identical)
+  //   Part 2: Document with cache_control (100% identical) - SINGLE cache breakpoint
+  //   Part 3: Operation prompt (varies per operation, comes AFTER cache breakpoint)
+  const userContent: any[] = []
+
+  // Part 1: Fixed intro text (identical for all operations)
+  userContent.push({
+    type: 'text',
+    text: 'Here is a document. Analyze it according to the instructions that follow.'
+  })
+
+  // Part 2: Document reference with cache breakpoint (identical for all operations)
   const documentBlock: any = {
     type: 'document',
     source: {
@@ -279,21 +288,20 @@ Do not include any text outside the JSON object. Do not use markdown code blocks
     }
   }
 
-  // Add cache control to document for multi-breakpoint caching strategy
-  // Cache hierarchy: System prompt (prefix 1) → Document (prefix 2) → User prompt (not cached)
+  // Add cache control to document - this is the ONLY cache breakpoint
+  // Caches: system prompt + intro text + document (everything before this marker)
   if (enableCache) {
     documentBlock.cache_control = { type: 'ephemeral' }
-    console.log('Document marked for caching (multi-breakpoint strategy)')
+    console.log('Cache breakpoint set on document - caches system prompt + intro + document')
   }
 
-  const userContent: any[] = [
-    documentBlock,
-    {
-      type: 'text',
-      text: userPrompt
-      // User prompt is NOT cached - it varies per operation
-    }
-  ]
+  userContent.push(documentBlock)
+
+  // Part 3: Operation-specific prompt (VARIES per operation - comes AFTER cache breakpoint)
+  userContent.push({
+    type: 'text',
+    text: userPrompt
+  })
 
   // Execute LLM call
   const startTime = Date.now()

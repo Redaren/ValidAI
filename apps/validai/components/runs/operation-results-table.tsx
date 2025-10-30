@@ -230,11 +230,16 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                           <div>
                             <p className="text-muted-foreground">Cache</p>
                             <p className="font-mono">
-                              {result.cache_hit ? (
-                                <span className="text-green-600">Hit</span>
-                              ) : (
-                                <span className="text-muted-foreground">Miss</span>
-                              )}
+                              {(() => {
+                                const tokens = result.tokens_used as any
+                                if (tokens?.cached_write > 0) {
+                                  return <span className="text-blue-600">Created: {tokens.cached_write.toLocaleString()} tokens</span>
+                                }
+                                if (tokens?.cached_read > 0) {
+                                  return <span className="text-green-600">Hit: {tokens.cached_read.toLocaleString()} tokens</span>
+                                }
+                                return <span className="text-muted-foreground">Miss</span>
+                              })()}
                             </p>
                           </div>
                         </div>
