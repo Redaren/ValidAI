@@ -34,11 +34,53 @@ import type {
 } from './types.ts'
 
 /**
+ * Normalize MIME type for Anthropic Files API
+ *
+ * @param originalMimeType - Original MIME type from document
+ * @returns Normalized MIME type compatible with Anthropic Files API
+ *
+ * @description
+ * Anthropic Files API only supports:
+ * - application/pdf (PDF files)
+ * - text/plain (plain text files)
+ *
+ * All text-based formats (markdown, CSV, HTML, JSON, etc.) should be mapped to text/plain.
+ * This follows Anthropic's recommendation to treat text-based formats as plaintext.
+ */
+function normalizeAnthropicMimeType(originalMimeType: string): string {
+  // Already supported types - pass through
+  if (originalMimeType === 'application/pdf' || originalMimeType === 'text/plain') {
+    return originalMimeType
+  }
+
+  // Map all text/* MIME types to text/plain
+  // Examples: text/markdown, text/csv, text/html, text/xml
+  if (originalMimeType.startsWith('text/')) {
+    return 'text/plain'
+  }
+
+  // Map specific text-based application formats to text/plain
+  const textBasedFormats = [
+    'application/json',     // JSON files
+    'application/xml',      // XML files
+    'application/x-yaml',   // YAML files
+  ]
+
+  if (textBasedFormats.includes(originalMimeType)) {
+    return 'text/plain'
+  }
+
+  // Unknown/unsupported type - pass through and let Anthropic return proper error
+  return originalMimeType
+}
+
+/**
  * Upload document to Anthropic Files API and get file_id
  *
  * @param anthropicClient - Initialized Anthropic client
  * @param documentBuffer - Document content as Buffer
  * @param documentName - Original document filename
+ * @param mimeType - Original MIME type (will be normalized for Anthropic)
  * @returns file_id valid indefinitely (until explicitly deleted)
  * @throws Error if upload fails
  *
@@ -48,6 +90,11 @@ import type {
  * workspace (accessible across all API keys in the organization).
  *
  * Upload is FREE (doesn't count as tokens), but usage in messages counts as input tokens.
+ *
+ * MIME types are automatically normalized:
+ * - text/markdown, text/csv, text/html → text/plain
+ * - application/json, application/xml → text/plain
+ * - application/pdf → application/pdf (unchanged)
  */
 export async function uploadDocumentToAnthropic(
   anthropicClient: Anthropic,
@@ -55,12 +102,19 @@ export async function uploadDocumentToAnthropic(
   documentName: string,
   mimeType: string = 'application/pdf'
 ): Promise<string> {
-  console.log(`[Anthropic] Uploading document: ${documentName} (${documentBuffer.length} bytes)`)
+  // Normalize MIME type for Anthropic compatibility
+  const normalizedMimeType = normalizeAnthropicMimeType(mimeType)
+
+  if (normalizedMimeType !== mimeType) {
+    console.log(`[Anthropic] MIME type normalized: ${mimeType} → ${normalizedMimeType}`)
+  }
+
+  console.log(`[Anthropic] Uploading document: ${documentName} (${documentBuffer.length} bytes, type: ${normalizedMimeType})`)
 
   // Upload file to Anthropic Files API using beta endpoint
   // Requires toFile() helper and betas parameter
   const uploadedFile = await anthropicClient.beta.files.upload({
-    file: await toFile(documentBuffer, documentName, { type: mimeType }),
+    file: await toFile(documentBuffer, documentName, { type: normalizedMimeType }),
     betas: ['files-api-2025-04-14']  // Required beta version
   })
 
