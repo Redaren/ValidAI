@@ -2,11 +2,37 @@ import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 /**
+ * Helper to strip locale prefix from pathname for multi-language apps.
+ * Handles paths like /en/dashboard → /dashboard, /sv/auth/login → /auth/login
+ *
+ * @param pathname - The full pathname including potential locale prefix
+ * @returns Pathname without locale prefix
+ */
+function stripLocalePrefix(pathname: string): string {
+  return pathname.replace(/^\/[a-z]{2}\//, '/');
+}
+
+/**
+ * Helper to extract locale from pathname.
+ * Returns locale code (e.g., 'en', 'sv') or empty string if no locale present.
+ *
+ * @param pathname - The full pathname
+ * @returns Locale code or empty string
+ */
+function extractLocale(pathname: string): string {
+  const localeMatch = pathname.match(/^\/([a-z]{2})\//);
+  return localeMatch ? localeMatch[1] : '';
+}
+
+/**
  * Updates the user session in middleware.
  *
  * This function should be called in your Next.js middleware to:
  * 1. Refresh the user's session
  * 2. Optionally redirect unauthenticated users
+ *
+ * Multi-language support: Automatically detects and preserves locale prefixes
+ * in redirects (e.g., /sv/dashboard → /sv/auth/login)
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -40,15 +66,22 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims()
   const user = data?.claims
 
+  // Strip locale prefix for path checking (multi-language support)
+  const pathname = request.nextUrl.pathname;
+  const pathWithoutLocale = stripLocalePrefix(pathname);
+  const locale = extractLocale(pathname);
+
   // Optional: Redirect unauthenticated users
+  // Uses locale-stripped path for checking, preserves locale in redirect
   if (
-    request.nextUrl.pathname !== "/" &&
+    pathWithoutLocale !== "/" &&
     !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
+    !pathWithoutLocale.startsWith("/login") &&
+    !pathWithoutLocale.startsWith("/auth")
   ) {
     const url = request.nextUrl.clone()
-    url.pathname = "/auth/login"
+    // Preserve locale prefix in redirect URL
+    url.pathname = locale ? `/${locale}/auth/login` : "/auth/login"
     return NextResponse.redirect(url)
   }
 
