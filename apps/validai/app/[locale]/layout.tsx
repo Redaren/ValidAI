@@ -10,7 +10,7 @@ import { SUPPORTED_LOCALES } from '@/lib/i18n/locales';
 
 type Props = {
   children: React.ReactNode;
-  params: { locale: string };
+  params: Promise<{ locale: string }>;
 };
 
 /**
@@ -31,8 +31,11 @@ export function generateStaticParams() {
  */
 export default async function LocaleLayout({
   children,
-  params: { locale },
+  params,
 }: Props) {
+  // Await params (Next.js 15+ requirement)
+  const { locale } = await params;
+
   // Validate locale
   if (!SUPPORTED_LOCALES.includes(locale as any)) {
     notFound();
