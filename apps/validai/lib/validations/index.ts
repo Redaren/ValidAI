@@ -62,3 +62,15 @@ export {
   type WorkbenchTestResponse,
   type WorkbenchExecution,
 } from './workbench-schemas'
+
+// Bulk operation schemas
+export {
+  operationTypeEnum,
+  bulkOperationRowSchema,
+  bulkImportSchema,
+  normalizeOperationType,
+  type BulkOperationRow,
+  type BulkImportPayload,
+  type RowValidationResult,
+  type BulkValidationResult,
+} from './bulk-operation-schemas'

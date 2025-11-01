@@ -5,6 +5,7 @@ import { useProcessorDetail, useCreateArea } from "@/app/queries/processors/use-
 import { ProcessorHeader } from "@/components/processors/processor-header"
 import { OperationsByArea } from "@/components/processors/operations-by-area"
 import { CreateAreaDialog } from "@/components/processors/create-area-dialog"
+import { BulkImportExportDialog } from "@/components/processors/bulk-import-export-dialog"
 import {
   Button,
   DropdownMenu,
@@ -12,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@playze/shared-ui"
-import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical, Play, History } from "lucide-react"
+import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical, Play, History, FileSpreadsheet } from "lucide-react"
 import Link from "next/link"
 import { ProcessorSettingsSheet } from "@/components/processors/processor-settings-sheet"
 import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
@@ -70,6 +71,7 @@ export function ProcessorDetailClient({
   const createArea = useCreateArea()
   const [isCreateAreaDialogOpen, setIsCreateAreaDialogOpen] = useState(false)
   const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false)
+  const [isBulkImportExportOpen, setIsBulkImportExportOpen] = useState(false)
 
   /**
    * Computed list of existing area names for uniqueness validation.
@@ -171,6 +173,10 @@ export function ProcessorDetailClient({
                 <FolderPlus className="mr-2 h-4 w-4" />
                 New Area
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsBulkImportExportOpen(true)}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Bulk Import/Export
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -188,6 +194,12 @@ export function ProcessorDetailClient({
       <ProcessorSettingsSheet
         open={isSettingsSheetOpen}
         onOpenChange={setIsSettingsSheetOpen}
+        processor={processor}
+      />
+
+      <BulkImportExportDialog
+        open={isBulkImportExportOpen}
+        onOpenChange={setIsBulkImportExportOpen}
         processor={processor}
       />
     </div>
