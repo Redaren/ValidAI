@@ -1,0 +1,34 @@
+{
+  "platform": {
+    "orgSwitcher": {
+      "loading": "Laddar...",
+      "selectOrganization": "Välj organisation",
+      "switchOrganization": "Byt organisation",
+      "failedToSwitch": "Kunde inte byta organisation. Försök igen.",
+      "role": "Roll: {role}"
+    },
+    "appSwitcher": {
+      "selectApp": "Välj app",
+      "switchApp": "Byt app",
+      "noAccess": "(Ingen åtkomst)"
+    },
+    "authGate": {
+      "accessRestricted": "Åtkomst begränsad",
+      "proFeature": "Pro-funktion",
+      "permissionRequired": "Behörighet krävs",
+      "adminAccessRequired": "Administratörsåtkomst krävs",
+      "featureAvailableInHigherTier": "Den här funktionen är tillgänglig i högre prenumerationsnivåer. Nuvarande nivå: {tier}.",
+      "noPermissionForAction": "Du har inte behörighet att utföra den här åtgärden. Nuvarande roll: {role}.",
+      "requiresRoleAccess": "Den här funktionen kräver {requiredRole} åtkomst. Nuvarande roll: {currentRole}.",
+      "requiresMultiple": "Den här funktionen kräver ",
+      "higherTier": "en högre prenumerationsnivå",
+      "specificPermissions": "specifika behörigheter",
+      "roleRequirement": "{role} roll",
+      "and": " och ",
+      "contactForAccess": "Kontakta oss för åtkomst"
+    }
+  },
+  "common": {
+    "loading": "Laddar..."
+  }
+}

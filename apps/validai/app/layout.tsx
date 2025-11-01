@@ -1,10 +1,5 @@
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { QueryProvider } from "@/components/providers/query-provider";
-import { NotificationDisplay } from "@/components/notifications";
-import { ToastContainer } from "@/components/ui/toast-container";
-import { Toaster } from "sonner";
 import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants/app";
 import "./globals.css";
 
@@ -24,27 +19,19 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
+/**
+ * Root layout - minimal setup without locale-specific providers.
+ * Locale-specific providers are in app/[locale]/layout.tsx
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html suppressHydrationWarning>
       <body className={`${geistSans.className} antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          themes={['light', 'dark', 'claude-light', 'claude-dark']}
-          disableTransitionOnChange
-        >
-          <QueryProvider>
-            {children}
-            <NotificationDisplay />
-            <ToastContainer />
-            <Toaster />
-          </QueryProvider>
-        </ThemeProvider>
+        {children}
       </body>
     </html>
   );

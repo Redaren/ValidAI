@@ -1,4 +1,7 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
 
 const nextConfig: NextConfig = {
   // Transpile workspace packages to fix Radix UI context issues
@@ -6,4 +9,4 @@ const nextConfig: NextConfig = {
   transpilePackages: ['@playze/shared-ui', '@playze/shared-auth', '@playze/shared-types'],
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

@@ -1,0 +1,34 @@
+{
+  "platform": {
+    "orgSwitcher": {
+      "loading": "Loading...",
+      "selectOrganization": "Select Organization",
+      "switchOrganization": "Switch Organization",
+      "failedToSwitch": "Failed to switch organization. Please try again.",
+      "role": "Role: {role}"
+    },
+    "appSwitcher": {
+      "selectApp": "Select App",
+      "switchApp": "Switch App",
+      "noAccess": "(No Access)"
+    },
+    "authGate": {
+      "accessRestricted": "Access Restricted",
+      "proFeature": "Pro Feature",
+      "permissionRequired": "Permission Required",
+      "adminAccessRequired": "Admin Access Required",
+      "featureAvailableInHigherTier": "This feature is available in higher subscription tiers. Current tier: {tier}.",
+      "noPermissionForAction": "You don't have permission to perform this action. Current role: {role}.",
+      "requiresRoleAccess": "This feature requires {requiredRole} access. Current role: {currentRole}.",
+      "requiresMultiple": "This feature requires ",
+      "higherTier": "a higher subscription tier",
+      "specificPermissions": "specific permissions",
+      "roleRequirement": "{role} role",
+      "and": " and ",
+      "contactForAccess": "Contact us for access"
+    }
+  },
+  "common": {
+    "loading": "Loading..."
+  }
+}

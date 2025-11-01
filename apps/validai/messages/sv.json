@@ -1,0 +1,26 @@
+{
+  "common": {
+    "save": "Spara",
+    "cancel": "Avbryt",
+    "delete": "Ta bort",
+    "edit": "Redigera",
+    "loading": "Laddar...",
+    "error": "Ett fel uppstod",
+    "success": "Framgång",
+    "confirm": "Bekräfta",
+    "close": "Stäng",
+    "search": "Sök",
+    "filter": "Filtrera",
+    "create": "Skapa",
+    "update": "Uppdatera",
+    "actions": "Åtgärder"
+  },
+  "nav": {
+    "dashboard": "Kontrollpanel",
+    "processors": "Processorer",
+    "operations": "Operationer",
+    "runs": "Körningar",
+    "documents": "Dokument",
+    "settings": "Inställningar"
+  }
+}

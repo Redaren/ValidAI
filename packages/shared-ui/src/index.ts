@@ -25,6 +25,7 @@ export type { ColumnDef, Row, Cell } from '@tanstack/react-table'
 export * from './components/platform/app-switcher'
 export * from './components/platform/org-switcher'
 export * from './components/platform/auth-gate' // Exports both AuthGate and FeatureGate (alias)
+export * from './components/platform/language-switcher'
 
 // Export utilities
 export * from './lib/utils'
