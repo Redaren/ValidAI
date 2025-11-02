@@ -24,6 +24,7 @@ import { useUpdateOperationFromWorkbench } from "@/app/queries/operations/use-op
 import { cn } from "@/lib/utils"
 import { OperationTypeSheet } from "@/components/workbench/operation-type-sheet"
 import { getOperationTypeConfig } from "@/lib/operation-types"
+import { useTranslations } from 'next-intl'
 
 /**
  * Props for WorkbenchInput component
@@ -92,6 +93,7 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
  */
 export function WorkbenchInput({ processor }: WorkbenchInputProps) {
   const router = useRouter()
+  const t = useTranslations('workbench.input')
   const [isModelSheetOpen, setIsModelSheetOpen] = useState(false)
 
   const {
@@ -600,11 +602,11 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
       <div className="space-y-4">
         {/* Settings Header */}
         <div className="space-y-3">
-          <Label>Settings</Label>
+          <Label>{t('settings')}</Label>
           <div className="space-y-3 text-sm text-muted-foreground">
             {/* Mode Toggle */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
-              <span>Mode</span>
+              <span>{t('mode')}</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setMode('stateful')}
@@ -705,7 +707,7 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
 
             {/* Citations */}
             <div className="grid grid-cols-[140px,auto] gap-4 items-center">
-              <span>Citations</span>
+              <span>{t('citations')}</span>
               <Switch
                 checked={citations}
                 onCheckedChange={() => toggleFeature('citations')}
@@ -738,7 +740,7 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
 
         {/* Operation Prompt */}
         <div className="space-y-2">
-          <Label>Prompt</Label>
+          <Label>{t('prompt')}</Label>
           <Textarea
             placeholder="Type your message here..."
             value={operationPrompt}

@@ -15,6 +15,7 @@ import type { ConversationMessage } from "@/lib/validations"
 import { extractStructuredContent } from "@/lib/utils/content-detector"
 import { StructuredOutputVisualizer } from "@/components/workbench/structured-output-visualizer"
 import { OCRResultDisplay } from "@/components/workbench/ocr-result-display"
+import { useTranslations } from 'next-intl'
 
 /**
  * Workbench Output Component
@@ -57,6 +58,10 @@ import { OCRResultDisplay } from "@/components/workbench/ocr-result-display"
  * @returns {JSX.Element} Rendered output display with results
  */
 export function WorkbenchOutput() {
+  const tStatus = useTranslations('workbench.status')
+  const tRoles = useTranslations('workbench.roles')
+  const t = useTranslations('workbench')
+
   const {
     conversationHistory,
     executionStatus,
@@ -102,16 +107,16 @@ export function WorkbenchOutput() {
    */
   const getStatusBadge = () => {
     if (executionStatus === 'pending') {
-      return <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-700">⏳ Pending</Badge>
+      return <Badge variant="outline" className="gap-1 bg-yellow-500/10 text-yellow-700">{tStatus('pending')}</Badge>
     }
     if (executionStatus === 'processing') {
-      return <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700">⚡ Processing</Badge>
+      return <Badge variant="outline" className="gap-1 bg-blue-500/10 text-blue-700">{tStatus('processing')}</Badge>
     }
     if (executionStatus === 'completed') {
-      return <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700">✓ Completed</Badge>
+      return <Badge variant="outline" className="gap-1 bg-green-500/10 text-green-700">{tStatus('completed')}</Badge>
     }
     if (executionStatus === 'failed') {
-      return <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-700">✗ Failed</Badge>
+      return <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-700">{tStatus('failed')}</Badge>
     }
     return null
   }
@@ -256,7 +261,7 @@ export function WorkbenchOutput() {
         <div className="flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
           <div className="flex-1 space-y-2">
-            <p className="text-sm font-medium text-destructive">Error</p>
+            <p className="text-sm font-medium text-destructive">{t('error')}</p>
             <p className="text-sm text-muted-foreground">
               {workbenchTest.error?.message || 'An error occurred'}
             </p>
@@ -533,7 +538,7 @@ export function WorkbenchOutput() {
                   {/* User Message */}
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Badge variant="default" className="text-xs">You</Badge>
+                      <Badge variant="default" className="text-xs">{tRoles('you')}</Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(userMsg.timestamp).toLocaleTimeString()}
                       </span>
@@ -548,7 +553,7 @@ export function WorkbenchOutput() {
                   {/* Assistant Message */}
                   <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">Assistant</Badge>
+                      <Badge variant="secondary" className="text-xs">{tRoles('assistant')}</Badge>
                       <span className="text-xs text-muted-foreground">
                         {new Date(assistantMsg.timestamp).toLocaleTimeString()}
                       </span>

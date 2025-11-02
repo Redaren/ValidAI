@@ -38,14 +38,20 @@
     "billing": "Billing",
     "notifications": "Notifications",
     "logout": "Log out",
-    "upgradeToPro": "Upgrade to Pro"
+    "upgradeToPro": "Upgrade to Pro",
+    "projects": "Projects",
+    "viewProject": "View Project",
+    "shareProject": "Share Project",
+    "deleteProject": "Delete Project",
+    "more": "More"
   },
   "breadcrumb": {
     "processors": "Processors",
     "workbench": "Workbench",
     "history": "History",
     "runDetail": "Run Detail",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "account": "Account"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -112,6 +118,25 @@
       "workbench": "Workbench",
       "newArea": "New Area",
       "bulkImportExport": "Bulk Import/Export"
+    },
+    "form": {
+      "description": "Description",
+      "usageDescription": "Usage Description",
+      "tags": "Tags"
+    },
+    "header": {
+      "status": "Status",
+      "visibility": "Visibility",
+      "run": "Run"
+    },
+    "bulkImport": {
+      "row": "Row",
+      "errors": "Errors",
+      "mode": "Mode",
+      "area": "Area",
+      "name": "Name",
+      "type": "Type",
+      "new": "New"
     }
   },
   "runs": {
@@ -119,7 +144,51 @@
     "loading": "Loading runs...",
     "failed": "Failed to load runs",
     "description": "View executions and their results",
-    "processor": "Processor"
+    "processor": "Processor",
+    "status": {
+      "failed": "Failed",
+      "pending": "Pending",
+      "completed": "Completed",
+      "completedWithErrors": "Completed with Errors",
+      "cancelled": "Cancelled",
+      "processing": "Processing"
+    },
+    "table": {
+      "operation": "Operation",
+      "status": "Status",
+      "time": "Time",
+      "tokens": "Tokens",
+      "document": "Document",
+      "started": "Started",
+      "duration": "Duration",
+      "progress": "Progress"
+    },
+    "detail": {
+      "model": "Model",
+      "cache": "Cache",
+      "cacheMiss": "Miss",
+      "response": "Response",
+      "thinking": "Thinking",
+      "error": "Error",
+      "triggerType": "Trigger Type",
+      "manual": "Manual"
+    },
+    "compliance": {
+      "progress": "Progress",
+      "validations": "Validations",
+      "document": "Document",
+      "date": "Date",
+      "trafficLights": "Traffic Lights",
+      "green": "Green",
+      "yellow": "Yellow",
+      "red": "Red",
+      "passedOf": "passed of",
+      "of": "of",
+      "tests": "# Tests etc",
+      "unknownProcessor": "Unknown Processor",
+      "unknownDocument": "Unknown Document",
+      "notAvailable": "N/A"
+    }
   },
   "auth": {
     "appName": "ValidAI",
@@ -214,6 +283,38 @@
       "description": "Your role and access level in the current organization",
       "currentOrg": "Current Organization",
       "noOrgSelected": "No organization selected"
+    }
+  },
+  "workbench": {
+    "title": "Workbench",
+    "output": "Output",
+    "error": "Error",
+    "status": {
+      "pending": "⏳ Pending",
+      "processing": "⚡ Processing",
+      "completed": "✓ Completed",
+      "failed": "✗ Failed"
+    },
+    "roles": {
+      "you": "You",
+      "assistant": "Assistant"
+    },
+    "input": {
+      "settings": "Settings",
+      "mode": "Mode",
+      "citations": "Citations",
+      "prompt": "Prompt",
+      "document": "Document"
+    },
+    "tabs": {
+      "markdown": "Markdown",
+      "annotations": "Annotations"
+    },
+    "structured": {
+      "rating": "Rating",
+      "classification": "Classification",
+      "conclusion": "Conclusion",
+      "analysis": "Analysis"
     }
   }
 }

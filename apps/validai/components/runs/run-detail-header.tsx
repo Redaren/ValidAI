@@ -15,10 +15,13 @@
  * @since Phase 1.8
  */
 
+'use client'
+
 import { Badge, Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import { Progress } from '@/components/ui/progress'
 import { formatDistanceToNow } from 'date-fns'
 import type { Database } from '@playze/shared-types'
+import { useTranslations } from 'next-intl'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
 
@@ -65,32 +68,34 @@ function formatDateTime(isoString: string): string {
  * @returns Badge component
  */
 function RunStatusBadge({ status, failedCount }: { status: string; failedCount: number }) {
+  const t = useTranslations('runs.status')
+
   if (status === 'completed') {
     if (failedCount > 0) {
-      return <Badge variant="outline" className="border-yellow-500 text-yellow-700">Completed with Errors</Badge>
+      return <Badge variant="outline" className="border-yellow-500 text-yellow-700">{t('completedWithErrors')}</Badge>
     }
-    return <Badge variant="outline" className="border-green-500 text-green-700">Completed</Badge>
+    return <Badge variant="outline" className="border-green-500 text-green-700">{t('completed')}</Badge>
   }
 
   if (status === 'failed') {
-    return <Badge variant="destructive">Failed</Badge>
+    return <Badge variant="destructive">{t('failed')}</Badge>
   }
 
   if (status === 'processing') {
     return (
       <Badge variant="outline" className="border-blue-500 text-blue-700">
         <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500" />
-        Processing
+        {t('processing')}
       </Badge>
     )
   }
 
   if (status === 'pending') {
-    return <Badge variant="secondary">Pending</Badge>
+    return <Badge variant="secondary">{t('pending')}</Badge>
   }
 
   if (status === 'cancelled') {
-    return <Badge variant="outline">Cancelled</Badge>
+    return <Badge variant="outline">{t('cancelled')}</Badge>
   }
 
   return <Badge variant="outline">{status}</Badge>
@@ -121,6 +126,9 @@ function RunStatusBadge({ status, failedCount }: { status: string; failedCount: 
  * ```
  */
 export function RunDetailHeader({ run }: RunDetailHeaderProps) {
+  const tTable = useTranslations('runs.table')
+  const tDetail = useTranslations('runs.detail')
+
   const snapshot = run.snapshot as {
     processor: { name: string }
     document: { name: string }
@@ -145,29 +153,29 @@ export function RunDetailHeader({ run }: RunDetailHeaderProps) {
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
           <div>
-            <p className="text-muted-foreground">Document</p>
+            <p className="text-muted-foreground">{tTable('document')}</p>
             <p className="font-medium">{snapshot.document.name}</p>
           </div>
 
           <div>
-            <p className="text-muted-foreground">Started</p>
+            <p className="text-muted-foreground">{tTable('started')}</p>
             <p className="font-medium">{formatDateTime(run.started_at)}</p>
           </div>
 
           <div>
-            <p className="text-muted-foreground">Duration</p>
+            <p className="text-muted-foreground">{tTable('duration')}</p>
             <p className="font-medium">{formatDuration(duration)}</p>
           </div>
 
           <div>
-            <p className="text-muted-foreground">Trigger Type</p>
-            <p className="font-medium capitalize">{run.trigger_type || 'Manual'}</p>
+            <p className="text-muted-foreground">{tDetail('triggerType')}</p>
+            <p className="font-medium capitalize">{run.trigger_type || tDetail('manual')}</p>
           </div>
         </div>
 
         <div>
           <div className="mb-2 flex justify-between text-sm">
-            <span>Progress</span>
+            <span>{tTable('progress')}</span>
             <span>
               {run.completed_operations + run.failed_operations} / {run.total_operations}
               {run.failed_operations > 0 && (
@@ -180,7 +188,7 @@ export function RunDetailHeader({ run }: RunDetailHeaderProps) {
 
         {run.error_message && (
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
-            <p className="text-sm font-medium text-destructive">Error</p>
+            <p className="text-sm font-medium text-destructive">{tDetail('error')}</p>
             <p className="text-sm text-destructive/90">{run.error_message}</p>
           </div>
         )}

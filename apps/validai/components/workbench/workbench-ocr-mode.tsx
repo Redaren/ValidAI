@@ -18,6 +18,7 @@ import {
 import { Label } from '@playze/shared-ui'
 import { useWorkbenchStore } from '@/stores/workbench-store'
 import { useOCRTest } from '@/hooks/use-ocr-test'
+import { useTranslations } from 'next-intl'
 
 /**
  * Component props
@@ -52,6 +53,8 @@ function formatFileSize(bytes: number): string {
  * - Result display in WorkbenchOutput
  */
 export function WorkbenchOCRMode({ processor, selectedModel }: WorkbenchOCRModeProps) {
+  const t = useTranslations('workbench.input')
+
   const {
     selectedFile,
     ocrAnnotationFormat,
@@ -163,7 +166,7 @@ export function WorkbenchOCRMode({ processor, selectedModel }: WorkbenchOCRModeP
 
       {/* File Upload */}
       <div className="space-y-2">
-        <Label htmlFor="ocr-file-upload">Document</Label>
+        <Label htmlFor="ocr-file-upload">{t('document')}</Label>
         <Button
           id="ocr-file-upload"
           variant="outline"

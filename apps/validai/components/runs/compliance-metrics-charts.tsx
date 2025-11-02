@@ -19,6 +19,7 @@ import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import { ChartConfig, ChartContainer } from '@/components/ui/chart'
 import type { Database } from '@playze/shared-types'
+import { useTranslations } from 'next-intl'
 
 type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
@@ -110,13 +111,15 @@ export function ProgressChart({
   completedOperations,
   failedOperations,
 }: ProgressChartProps) {
+  const t = useTranslations('runs.compliance')
+
   const progressPercent = Math.round(
     ((completedOperations + failedOperations) / totalOperations) * 100
   )
 
   const progressChartConfig = {
     progress: {
-      label: 'Progress',
+      label: t('progress'),
       color: 'hsl(var(--chart-1))',
     },
   } satisfies ChartConfig
@@ -124,7 +127,7 @@ export function ProgressChart({
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-2">
-        <CardTitle className="text-sm font-medium">Progress</CardTitle>
+        <CardTitle className="text-sm font-medium">{t('progress')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 items-center pb-4">
         <ChartContainer
@@ -156,7 +159,7 @@ export function ProgressChart({
                           y={(viewBox.cy || 0) + 12}
                           className="fill-muted-foreground text-xs"
                         >
-                          {completedOperations + failedOperations} of {totalOperations}
+                          {completedOperations + failedOperations} {t('of')} {totalOperations}
                         </tspan>
                       </text>
                     )
@@ -186,11 +189,12 @@ interface ValidationChartProps {
 }
 
 export function ValidationChart({ operationResults }: ValidationChartProps) {
+  const t = useTranslations('runs.compliance')
   const validationMetrics = calculateValidationMetrics(operationResults)
 
   const validationChartConfig = {
     validations: {
-      label: 'Validations',
+      label: t('validations'),
       color: validationMetrics.passRate >= 70 ? 'hsl(142, 76%, 36%)' : 'hsl(0, 84%, 60%)',
     },
   } satisfies ChartConfig
@@ -198,7 +202,7 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-2">
-        <CardTitle className="text-sm font-medium">Validations</CardTitle>
+        <CardTitle className="text-sm font-medium">{t('validations')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 items-center pb-4">
         <ChartContainer
@@ -230,7 +234,7 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
                           y={(viewBox.cy || 0) + 12}
                           className="fill-muted-foreground text-xs"
                         >
-                          {validationMetrics.trueCount} passed of {validationMetrics.total}
+                          {validationMetrics.trueCount} {t('passedOf')} {validationMetrics.total}
                         </tspan>
                       </text>
                     )
@@ -260,19 +264,20 @@ interface TrafficLightChartProps {
 }
 
 export function TrafficLightChart({ operationResults }: TrafficLightChartProps) {
+  const t = useTranslations('runs.compliance')
   const trafficLightMetrics = calculateTrafficLightMetrics(operationResults)
 
   const trafficLightChartConfig = {
     green: {
-      label: 'Green',
+      label: t('green'),
       color: 'hsl(142, 76%, 36%)',
     },
     yellow: {
-      label: 'Yellow',
+      label: t('yellow'),
       color: 'hsl(48, 96%, 53%)',
     },
     red: {
-      label: 'Red',
+      label: t('red'),
       color: 'hsl(0, 84%, 60%)',
     },
   } satisfies ChartConfig
@@ -280,7 +285,7 @@ export function TrafficLightChart({ operationResults }: TrafficLightChartProps) 
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-2">
-        <CardTitle className="text-sm font-medium">Traffic Lights</CardTitle>
+        <CardTitle className="text-sm font-medium">{t('trafficLights')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 items-center pb-4">
         <ChartContainer

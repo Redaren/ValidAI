@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { Download, AlertTriangle } from 'lucide-react'
 import { Button } from '@playze/shared-ui'
+import { useTranslations } from 'next-intl'
 import {
   Tabs,
   TabsContent,
@@ -45,6 +46,7 @@ function truncateMarkdown(markdown: string, maxLines: number): string {
  * - Structured annotations display (JSON)
  */
 export function OCRResultDisplay({ results }: OCRResultDisplayProps) {
+  const t = useTranslations('workbench.tabs')
   const [activeTab, setActiveTab] = useState<'markdown' | 'annotations'>('markdown')
 
   // Truncate markdown to first 500 lines for display
@@ -129,9 +131,9 @@ export function OCRResultDisplay({ results }: OCRResultDisplayProps) {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
         <TabsList>
-          <TabsTrigger value="markdown">Markdown</TabsTrigger>
+          <TabsTrigger value="markdown">{t('markdown')}</TabsTrigger>
           {results.annotations && (
-            <TabsTrigger value="annotations">Annotations</TabsTrigger>
+            <TabsTrigger value="annotations">{t('annotations')}</TabsTrigger>
           )}
         </TabsList>
 

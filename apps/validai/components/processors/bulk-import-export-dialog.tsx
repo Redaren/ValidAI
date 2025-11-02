@@ -21,6 +21,7 @@ import {
 } from '@playze/shared-ui'
 import { Copy, Upload, AlertCircle, CheckCircle2, Info } from 'lucide-react'
 import { ProcessorDetail } from '@/app/queries/processors/use-processor-detail'
+import { useTranslations } from 'next-intl'
 import {
   exportOperationsToTSV,
   parseTSVToOperations,
@@ -60,6 +61,7 @@ export function BulkImportExportDialog({
   onOpenChange,
   processor,
 }: BulkImportExportDialogProps) {
+  const t = useTranslations('processors.bulkImport')
   const bulkImport = useBulkImportOperations()
 
   // Wizard state
@@ -265,8 +267,8 @@ export function BulkImportExportDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-20">Row</TableHead>
-                      <TableHead>Errors</TableHead>
+                      <TableHead className="w-20">{t('row')}</TableHead>
+                      <TableHead>{t('errors')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -357,10 +359,10 @@ export function BulkImportExportDialog({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-32">Mode</TableHead>
-                      <TableHead className="w-32">Area</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead className="w-32">Type</TableHead>
+                      <TableHead className="w-32">{t('mode')}</TableHead>
+                      <TableHead className="w-32">{t('area')}</TableHead>
+                      <TableHead>{t('name')}</TableHead>
+                      <TableHead className="w-32">{t('type')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -395,7 +397,7 @@ export function BulkImportExportDialog({
                                 </div>
                               )}
                               {isNew && (
-                                <span className="text-xs text-muted-foreground">New</span>
+                                <span className="text-xs text-muted-foreground">{t('new')}</span>
                               )}
                             </TableCell>
                             <TableCell className="text-sm">{op.area}</TableCell>

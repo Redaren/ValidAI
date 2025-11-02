@@ -31,6 +31,7 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import type { Database } from '@playze/shared-types'
 import { FileText } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
 
@@ -85,6 +86,8 @@ function formatFileSize(bytes: number): string {
  * Renders run status badge
  */
 function RunStatusBadge({ status, failedCount }: { status: string; failedCount: number }) {
+  const t = useTranslations('runs.status')
+
   if (status === 'completed') {
     if (failedCount > 0) {
       return (
@@ -101,7 +104,7 @@ function RunStatusBadge({ status, failedCount }: { status: string; failedCount: 
   }
 
   if (status === 'failed') {
-    return <Badge variant="destructive">Failed</Badge>
+    return <Badge variant="destructive">{t('failed')}</Badge>
   }
 
   if (status === 'processing') {
@@ -114,11 +117,11 @@ function RunStatusBadge({ status, failedCount }: { status: string; failedCount: 
   }
 
   if (status === 'pending') {
-    return <Badge variant="secondary">Pending</Badge>
+    return <Badge variant="secondary">{t('pending')}</Badge>
   }
 
   if (status === 'cancelled') {
-    return <Badge variant="outline">Cancelled</Badge>
+    return <Badge variant="outline">{t('cancelled')}</Badge>
   }
 
   return <Badge variant="outline">{status}</Badge>
@@ -149,6 +152,7 @@ function RunStatusBadge({ status, failedCount }: { status: string; failedCount: 
  */
 export function RunsTable({ runs, processorId }: RunsTableProps) {
   const router = useRouter()
+  const t = useTranslations('runs.table')
 
   if (runs.length === 0) {
     return (
@@ -169,11 +173,11 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Status</TableHead>
-            <TableHead>Document</TableHead>
-            <TableHead>Started</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead>Progress</TableHead>
+            <TableHead>{t('status')}</TableHead>
+            <TableHead>{t('document')}</TableHead>
+            <TableHead>{t('started')}</TableHead>
+            <TableHead>{t('duration')}</TableHead>
+            <TableHead>{t('progress')}</TableHead>
           </TableRow>
         </TableHeader>
 

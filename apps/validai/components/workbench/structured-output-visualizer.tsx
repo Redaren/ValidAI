@@ -16,6 +16,7 @@
  */
 
 import { useState } from 'react'
+import { useTranslations } from 'next-intl'
 import {
   Card,
   Badge,
@@ -321,6 +322,8 @@ function BadgeListView({ data }: { data: unknown[] | unknown }) {
  * Enhanced for rating, classification, and analysis operation types
  */
 function CardView({ data }: { data: unknown }) {
+  const t = useTranslations('workbench.structured')
+
   if (typeof data !== 'object' || data === null) {
     return <div className="text-sm">{String(data)}</div>
   }
@@ -340,7 +343,7 @@ function CardView({ data }: { data: unknown }) {
           <span className="text-3xl">⭐</span>
           <div>
             <div className="font-semibold text-2xl">{String(dataObj.value)}</div>
-            <div className="text-xs text-muted-foreground">Rating</div>
+            <div className="text-xs text-muted-foreground">{t('rating')}</div>
           </div>
         </div>
         <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
@@ -355,7 +358,7 @@ function CardView({ data }: { data: unknown }) {
           <span className="text-3xl">🏷️</span>
           <div>
             <div className="font-semibold text-lg">{String(dataObj.classification)}</div>
-            <div className="text-xs text-muted-foreground">Classification</div>
+            <div className="text-xs text-muted-foreground">{t('classification')}</div>
           </div>
         </div>
         <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
@@ -369,12 +372,12 @@ function CardView({ data }: { data: unknown }) {
         <div className="flex items-center gap-3">
           <span className="text-3xl">📊</span>
           <div className="flex-1">
-            <div className="text-xs text-muted-foreground mb-1">Conclusion</div>
+            <div className="text-xs text-muted-foreground mb-1">{t('conclusion')}</div>
             <div className="font-semibold text-base">{String(dataObj.conclusion)}</div>
           </div>
         </div>
         <div>
-          <div className="text-xs text-muted-foreground mb-1">Analysis</div>
+          <div className="text-xs text-muted-foreground mb-1">{t('analysis')}</div>
           <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
         </div>
       </div>

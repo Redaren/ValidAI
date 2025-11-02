@@ -38,14 +38,20 @@
     "billing": "Fakturering",
     "notifications": "Notiser",
     "logout": "Logga ut",
-    "upgradeToPro": "Uppgradera till Pro"
+    "upgradeToPro": "Uppgradera till Pro",
+    "projects": "Projekt",
+    "viewProject": "Visa projekt",
+    "shareProject": "Dela projekt",
+    "deleteProject": "Ta bort projekt",
+    "more": "Mer"
   },
   "breadcrumb": {
     "processors": "Processorer",
     "workbench": "Arbetsbänk",
     "history": "Historik",
     "runDetail": "Körningsdetaljer",
-    "loading": "Laddar..."
+    "loading": "Laddar...",
+    "account": "Konto"
   },
   "dashboard": {
     "title": "Kontrollpanel",
@@ -112,6 +118,25 @@
       "workbench": "Arbetsbänk",
       "newArea": "Nytt område",
       "bulkImportExport": "Massimport/export"
+    },
+    "form": {
+      "description": "Beskrivning",
+      "usageDescription": "Användningsbeskrivning",
+      "tags": "Taggar"
+    },
+    "header": {
+      "status": "Status",
+      "visibility": "Synlighet",
+      "run": "Kör"
+    },
+    "bulkImport": {
+      "row": "Rad",
+      "errors": "Fel",
+      "mode": "Läge",
+      "area": "Område",
+      "name": "Namn",
+      "type": "Typ",
+      "new": "Ny"
     }
   },
   "runs": {
@@ -119,7 +144,51 @@
     "loading": "Laddar körningar...",
     "failed": "Kunde inte ladda körningar",
     "description": "Visa körningar och deras resultat",
-    "processor": "Processor"
+    "processor": "Processor",
+    "status": {
+      "failed": "Misslyckades",
+      "pending": "Väntande",
+      "completed": "Slutförd",
+      "completedWithErrors": "Slutförd med fel",
+      "cancelled": "Avbruten",
+      "processing": "Bearbetar"
+    },
+    "table": {
+      "operation": "Operation",
+      "status": "Status",
+      "time": "Tid",
+      "tokens": "Tokens",
+      "document": "Dokument",
+      "started": "Startad",
+      "duration": "Varaktighet",
+      "progress": "Framsteg"
+    },
+    "detail": {
+      "model": "Modell",
+      "cache": "Cache",
+      "cacheMiss": "Miss",
+      "response": "Svar",
+      "thinking": "Tänker",
+      "error": "Fel",
+      "triggerType": "Utlösningstyp",
+      "manual": "Manuell"
+    },
+    "compliance": {
+      "progress": "Framsteg",
+      "validations": "Valideringar",
+      "document": "Dokument",
+      "date": "Datum",
+      "trafficLights": "Trafikljus",
+      "green": "Grön",
+      "yellow": "Gul",
+      "red": "Röd",
+      "passedOf": "godkända av",
+      "of": "av",
+      "tests": "# Tester etc",
+      "unknownProcessor": "Okänd processor",
+      "unknownDocument": "Okänt dokument",
+      "notAvailable": "Ej tillgänglig"
+    }
   },
   "auth": {
     "appName": "ValidAI",
@@ -214,6 +283,38 @@
       "description": "Din roll och åtkomstnivå i den nuvarande organisationen",
       "currentOrg": "Nuvarande organisation",
       "noOrgSelected": "Ingen organisation vald"
+    }
+  },
+  "workbench": {
+    "title": "Arbetsbänk",
+    "output": "Utdata",
+    "error": "Fel",
+    "status": {
+      "pending": "⏳ Väntande",
+      "processing": "⚡ Bearbetar",
+      "completed": "✓ Slutförd",
+      "failed": "✗ Misslyckades"
+    },
+    "roles": {
+      "you": "Du",
+      "assistant": "Assistent"
+    },
+    "input": {
+      "settings": "Inställningar",
+      "mode": "Läge",
+      "citations": "Citeringar",
+      "prompt": "Prompt",
+      "document": "Dokument"
+    },
+    "tabs": {
+      "markdown": "Markdown",
+      "annotations": "Anteckningar"
+    },
+    "structured": {
+      "rating": "Betyg",
+      "classification": "Klassificering",
+      "conclusion": "Slutsats",
+      "analysis": "Analys"
     }
   }
 }

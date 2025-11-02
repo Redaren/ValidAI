@@ -32,6 +32,7 @@ import {
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react'
 import { StructuredOutputVisualizer } from '@/components/workbench/structured-output-visualizer'
 import type { Database } from '@playze/shared-types'
+import { useTranslations } from 'next-intl'
 
 type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
@@ -47,20 +48,22 @@ interface OperationResultsTableProps {
  * Renders operation status badge
  */
 function OperationStatusBadge({ status }: { status: string }) {
+  const t = useTranslations('runs.status')
+
   if (status === 'completed') {
     return (
       <Badge variant="outline" className="border-green-500 text-green-700">
-        Completed
+        {t('completed')}
       </Badge>
     )
   }
 
   if (status === 'failed') {
-    return <Badge variant="destructive">Failed</Badge>
+    return <Badge variant="destructive">{t('failed')}</Badge>
   }
 
   if (status === 'pending') {
-    return <Badge variant="secondary">Pending</Badge>
+    return <Badge variant="secondary">{t('pending')}</Badge>
   }
 
   return <Badge variant="outline">{status}</Badge>
@@ -116,6 +119,8 @@ function formatTokens(tokensUsed: any): string {
  */
 export function OperationResultsTable({ results }: OperationResultsTableProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
+  const t = useTranslations('runs.table')
+  const tDetail = useTranslations('runs.detail')
 
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows)
@@ -142,10 +147,10 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
           <TableRow>
             <TableHead className="w-[40px]"></TableHead>
             <TableHead className="w-[60px]">#</TableHead>
-            <TableHead>Operation</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Time</TableHead>
-            <TableHead className="text-right">Tokens</TableHead>
+            <TableHead>{t('operation')}</TableHead>
+            <TableHead>{t('status')}</TableHead>
+            <TableHead className="text-right">{t('time')}</TableHead>
+            <TableHead className="text-right">{t('tokens')}</TableHead>
           </TableRow>
         </TableHeader>
 
@@ -214,21 +219,21 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                         {/* Metadata */}
                         <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                           <div>
-                            <p className="text-muted-foreground">Model</p>
+                            <p className="text-muted-foreground">{tDetail('model')}</p>
                             <p className="font-mono">{result.model_used || '-'}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Execution Time</p>
+                            <p className="text-muted-foreground">{t('time')}</p>
                             <p className="font-mono">
                               {formatExecutionTime(result.execution_time_ms)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Tokens</p>
+                            <p className="text-muted-foreground">{t('tokens')}</p>
                             <p className="font-mono">{formatTokens(result.tokens_used)}</p>
                           </div>
                           <div>
-                            <p className="text-muted-foreground">Cache</p>
+                            <p className="text-muted-foreground">{tDetail('cache')}</p>
                             <p className="font-mono">
                               {(() => {
                                 const tokens = result.tokens_used as any
@@ -238,7 +243,7 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                                 if (tokens?.cached_read > 0) {
                                   return <span className="text-green-600">Hit: {tokens.cached_read.toLocaleString()} tokens</span>
                                 }
-                                return <span className="text-muted-foreground">Miss</span>
+                                return <span className="text-muted-foreground">{tDetail('cacheMiss')}</span>
                               })()}
                             </p>
                           </div>
@@ -248,7 +253,7 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                         {result.error_message && (
                           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
                             <p className="mb-1 text-sm font-medium text-destructive">
-                              Error {result.error_type && `(${result.error_type})`}
+                              {tDetail('error')} {result.error_type && `(${result.error_type})`}
                             </p>
                             <p className="text-sm text-destructive/90">{result.error_message}</p>
                             {result.retry_count !== null && result.retry_count > 0 && (
@@ -262,7 +267,7 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                         {/* Response Text */}
                         {result.response_text && (
                           <div>
-                            <p className="mb-2 text-sm font-medium">Response</p>
+                            <p className="mb-2 text-sm font-medium">{tDetail('response')}</p>
                             <div className="rounded-lg border bg-card p-4">
                               <pre className="whitespace-pre-wrap text-sm">
                                 {result.response_text}
@@ -285,7 +290,7 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                         {/* Thinking Blocks */}
                         {result.thinking_blocks && Array.isArray(result.thinking_blocks) && (
                           <div>
-                            <p className="mb-2 text-sm font-medium">Thinking</p>
+                            <p className="mb-2 text-sm font-medium">{tDetail('thinking')}</p>
                             <div className="space-y-2">
                               {(result.thinking_blocks as any[]).map((block, idx) => (
                                 <div key={idx} className="rounded-lg border bg-muted/50 p-4">

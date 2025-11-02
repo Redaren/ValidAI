@@ -23,6 +23,7 @@
 import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import type { Database } from '@playze/shared-types'
+import { useTranslations } from 'next-intl'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
 
@@ -65,15 +66,17 @@ function formatCompletionDateTime(isoString: string): string {
  * ```
  */
 export function ComplianceSummaryCard({ run }: ComplianceSummaryCardProps) {
+  const t = useTranslations('runs.compliance')
+
   // Extract data from run snapshot with type safety
   const snapshot = run.snapshot as {
     processor?: { name?: string }
     document?: { name?: string }
   }
 
-  const processorName = snapshot.processor?.name || 'Unknown Processor'
-  const documentName = snapshot.document?.name || 'Unknown Document'
-  const completedAt = run.completed_at ? formatCompletionDateTime(run.completed_at) : 'N/A'
+  const processorName = snapshot.processor?.name || t('unknownProcessor')
+  const documentName = snapshot.document?.name || t('unknownDocument')
+  const completedAt = run.completed_at ? formatCompletionDateTime(run.completed_at) : t('notAvailable')
   const totalTests = run.total_operations
 
   return (
@@ -84,15 +87,15 @@ export function ComplianceSummaryCard({ run }: ComplianceSummaryCardProps) {
       <CardContent className="space-y-3">
         <div className="grid gap-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Document</span>
+            <span className="text-muted-foreground">{t('document')}</span>
             <span className="font-medium">{documentName}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Date</span>
+            <span className="text-muted-foreground">{t('date')}</span>
             <span className="font-medium">{completedAt}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-muted-foreground"># Tests etc</span>
+            <span className="text-muted-foreground">{t('tests')}</span>
             <span className="font-medium">{totalTests}</span>
           </div>
         </div>
