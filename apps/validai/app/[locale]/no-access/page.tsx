@@ -12,7 +12,7 @@ export default function NoAccessPage() {
             <CardTitle>No Access to ValidAI</CardTitle>
           </div>
           <CardDescription>
-            Your organization doesn't have an active ValidAI subscription.
+            Your organization doesn&apos;t have an active ValidAI subscription.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

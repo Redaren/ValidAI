@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
   });
 
   // ============================================================
-  // STEP 3: Skip access check for auth routes and no-access page
+  // STEP 3: Extract path info for routing decisions
   // ============================================================
   const pathname = request.nextUrl.pathname;
 
@@ -68,6 +68,7 @@ export async function middleware(request: NextRequest) {
   // Remove locale prefix for route matching
   const pathWithoutLocale = pathname.replace(/^\/[a-z]{2}\//, '/');
 
+  // Skip access check for auth routes and no-access page
   if (
     pathWithoutLocale.startsWith('/auth') ||
     pathWithoutLocale === '/no-access'
@@ -76,26 +77,38 @@ export async function middleware(request: NextRequest) {
   }
 
   // ============================================================
-  // STEP 4: Check ValidAI access
+  // STEP 4: Check ValidAI access for authenticated users
   // ============================================================
+  // Note: Unauthenticated users are redirected by shared-auth middleware,
+  // so if we reach here, user should be authenticated.
   const supabase = await createServerClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (user) {
-    const orgId = user.app_metadata?.organization_id;
+  // If no user (edge case - shouldn't happen with updated shared-auth),
+  // let it pass through - shared-auth will redirect on next request
+  if (!user) {
+    return intlResponse;
+  }
 
-    if (orgId) {
-      const { data: hasAccess, error } = await supabase
-        .rpc('check_validai_access' as any, { p_org_id: orgId })
-        .single();
+  // Check if user's organization has access to ValidAI
+  const orgId = user.app_metadata?.organization_id;
 
-      if (error || !hasAccess) {
-        // Redirect to no-access page (preserving locale)
-        const url = request.nextUrl.clone();
-        url.pathname = `/${locale}/no-access`;
-        return NextResponse.redirect(url);
-      }
-    }
+  if (!orgId) {
+    // User has no organization - redirect to no-access
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}/no-access`;
+    return NextResponse.redirect(url);
+  }
+
+  const { data: hasAccess, error } = await supabase
+    .rpc('check_validai_access' as any, { p_org_id: orgId })
+    .single();
+
+  if (error || !hasAccess) {
+    // Organization doesn't have ValidAI access - redirect to no-access
+    const url = request.nextUrl.clone();
+    url.pathname = `/${locale}/no-access`;
+    return NextResponse.redirect(url);
   }
 
   return intlResponse;

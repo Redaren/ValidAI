@@ -13,4 +13,4 @@ type AppMessages = typeof import('./messages/en.json');
 type UIMessages = typeof import('@playze/shared-ui/messages/en.json');
 type Messages = AppMessages & UIMessages;
 
-declare interface IntlMessages extends Messages {}
+declare type IntlMessages = Messages;

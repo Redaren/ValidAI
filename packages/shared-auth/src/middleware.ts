@@ -71,14 +71,13 @@ export async function updateSession(request: NextRequest) {
   const pathWithoutLocale = stripLocalePrefix(pathname);
   const locale = extractLocale(pathname);
 
-  // Optional: Redirect unauthenticated users
+  // Define public routes that don't require authentication
+  const publicRoutes = ['/auth'];
+  const isPublicRoute = publicRoutes.some(route => pathWithoutLocale.startsWith(route));
+
+  // Redirect unauthenticated users to login (except for public routes)
   // Uses locale-stripped path for checking, preserves locale in redirect
-  if (
-    pathWithoutLocale !== "/" &&
-    !user &&
-    !pathWithoutLocale.startsWith("/login") &&
-    !pathWithoutLocale.startsWith("/auth")
-  ) {
+  if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone()
     // Preserve locale prefix in redirect URL
     url.pathname = locale ? `/${locale}/auth/login` : "/auth/login"
