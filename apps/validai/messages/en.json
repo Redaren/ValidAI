@@ -13,7 +13,16 @@
     "filter": "Filter",
     "create": "Create",
     "update": "Update",
-    "actions": "Actions"
+    "actions": "Actions",
+    "yes": "Yes",
+    "no": "No",
+    "notSet": "Not set",
+    "never": "Never",
+    "back": "Back",
+    "new": "New",
+    "toggle": "Toggle",
+    "openMenu": "Open menu",
+    "moreOptions": "More options"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -21,6 +30,190 @@
     "operations": "Operations",
     "runs": "Runs",
     "documents": "Documents",
-    "settings": "Settings"
+    "settings": "Settings",
+    "platform": "Platform",
+    "support": "Support",
+    "feedback": "Feedback",
+    "account": "Account",
+    "billing": "Billing",
+    "notifications": "Notifications",
+    "logout": "Log out",
+    "upgradeToPro": "Upgrade to Pro"
+  },
+  "breadcrumb": {
+    "processors": "Processors",
+    "workbench": "Workbench",
+    "history": "History",
+    "runDetail": "Run Detail",
+    "loading": "Loading..."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "welcome": "Welcome",
+    "ready": "Your dashboard is ready for content",
+    "card1": "Dashboard Card 1",
+    "card2": "Dashboard Card 2",
+    "card3": "Dashboard Card 3",
+    "sessionInfo": {
+      "title": "Session Information",
+      "loadingData": "Loading session data...",
+      "noActiveSession": "No active session",
+      "signInPrompt": "Please sign in to view session information.",
+      "completeData": "Complete session and user data",
+      "userIdentity": "User Identity",
+      "id": "ID:",
+      "email": "Email:",
+      "phone": "Phone:",
+      "role": "Role:",
+      "anonymous": "Anonymous:",
+      "sessionDetails": "Session Details",
+      "sessionId": "Session ID:",
+      "tokenType": "Token Type:",
+      "expires": "Expires:",
+      "authLevel": "AAL (Auth Level):",
+      "timestamps": "Timestamps",
+      "created": "Created:",
+      "lastUpdated": "Last Updated:",
+      "emailConfirmed": "Email Confirmed:",
+      "phoneConfirmed": "Phone Confirmed:",
+      "lastSignIn": "Last Sign In:",
+      "confirmedAt": "Confirmed At:",
+      "currentOrg": "Current Organization",
+      "plan": "Plan:",
+      "slug": "Slug:",
+      "authMethods": "Authentication Methods",
+      "identityProviders": "Identity Providers",
+      "noIdentities": "No identities found",
+      "appMetadata": "App Metadata",
+      "userMetadata": "User Metadata",
+      "noMetadata": "No {type}"
+    }
+  },
+  "processors": {
+    "title": "Document Processors",
+    "description": "Create and manage AI-powered document analysis templates",
+    "breadcrumb": "Processors",
+    "loading": "Loading processor...",
+    "loadingProcessors": "Loading processors...",
+    "failed": "Failed to load processor",
+    "failedList": "Failed to load processors",
+    "unknownError": "Unknown error occurred",
+    "backToList": "Back to Processors",
+    "backToProcessor": "Back to Processor",
+    "new": "New",
+    "empty": {
+      "title": "No processors yet",
+      "description": "Get started by creating your first document processor to analyze contracts, invoices, or any other documents.",
+      "createFirst": "Create your first processor"
+    },
+    "detail": {
+      "operations": "Operations",
+      "settings": "Settings",
+      "workbench": "Workbench",
+      "newArea": "New Area",
+      "bulkImportExport": "Bulk Import/Export"
+    }
+  },
+  "runs": {
+    "title": "History",
+    "loading": "Loading runs...",
+    "failed": "Failed to load runs",
+    "description": "View executions and their results",
+    "processor": "Processor"
+  },
+  "auth": {
+    "appName": "ValidAI",
+    "login": {
+      "title": "ValidAI",
+      "description": "Sign in with your email to access ValidAI",
+      "emailLabel": "Email Address",
+      "emailPlaceholder": "you@example.com",
+      "inviteNotice": "You must be invited to an organization to access ValidAI",
+      "sendMagicLink": "Send Magic Link",
+      "sendingMagicLink": "Sending Magic Link...",
+      "magicLinkInfo": "A magic link will be sent to your email. Click the link to sign in.",
+      "checkEmail": "Check your email",
+      "linkSent": "We sent you a login link. Be sure to check your spam folder.",
+      "sentTo": "We've sent a login link to:",
+      "nextSteps": "Next steps:",
+      "step1": "Check your email inbox (and spam folder)",
+      "step2": "Click the magic link in the email",
+      "step3": "You'll be automatically signed in",
+      "sendAnotherLink": "Send Another Link",
+      "linkExpiry": "The link will expire in 60 minutes for security reasons.",
+      "errorSending": "Error sending login link",
+      "unexpectedError": "An unexpected error occurred"
+    },
+    "signUp": {
+      "title": "Sign up",
+      "description": "Create a new account",
+      "emailLabel": "Email",
+      "emailPlaceholder": "m@example.com",
+      "passwordLabel": "Password",
+      "repeatPasswordLabel": "Repeat Password",
+      "passwordsDoNotMatch": "Passwords do not match",
+      "errorOccurred": "An error occurred",
+      "creatingAccount": "Creating an account...",
+      "signUpButton": "Sign up",
+      "alreadyHaveAccount": "Already have an account?",
+      "login": "Login"
+    },
+    "forgotPassword": {
+      "title": "Reset Your Password",
+      "description": "Type in your email and we'll send you a link to reset your password",
+      "emailLabel": "Email",
+      "emailPlaceholder": "m@example.com",
+      "errorOccurred": "An error occurred",
+      "sending": "Sending...",
+      "sendResetEmail": "Send reset email",
+      "alreadyHaveAccount": "Already have an account?",
+      "login": "Login",
+      "checkYourEmail": "Check Your Email",
+      "instructionsSent": "Password reset instructions sent",
+      "checkEmailMessage": "If you registered using your email and password, you will receive a password reset email."
+    },
+    "updatePassword": {
+      "title": "Reset Your Password",
+      "description": "Please enter your new password below.",
+      "newPasswordLabel": "New password",
+      "newPasswordPlaceholder": "New password",
+      "errorOccurred": "An error occurred",
+      "saving": "Saving...",
+      "saveNewPassword": "Save new password"
+    }
+  },
+  "noAccess": {
+    "title": "No Access to ValidAI",
+    "description": "Your organization doesn't have an active ValidAI subscription.",
+    "explanation": "ValidAI is available on Pro and Enterprise plans. Contact your organization administrator or platform support to upgrade your subscription.",
+    "contactSupport": "Contact Support",
+    "backHome": "Back to Home"
+  },
+  "account": {
+    "title": "Account Settings",
+    "description": "Manage your personal preferences and account information",
+    "profile": {
+      "title": "Profile",
+      "description": "Your personal information from authentication provider",
+      "name": "Name",
+      "email": "Email"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize how the application appears for you",
+      "theme": "Theme",
+      "selectTheme": "Select a theme",
+      "themeLight": "Default Light",
+      "themeDark": "Default Dark",
+      "themeClaudeLight": "Claude Light",
+      "themeClaudeDark": "Claude Dark",
+      "themeDescription": "Choose how the application appears. Claude themes use a warm, colorful palette."
+    },
+    "organization": {
+      "title": "Organization Context",
+      "description": "Your role and access level in the current organization",
+      "currentOrg": "Current Organization",
+      "noOrgSelected": "No organization selected"
+    }
   }
 }

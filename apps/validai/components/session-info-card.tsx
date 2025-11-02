@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown, ChevronRight, User as UserIcon, Shield, Clock, Building, Key } from "lucide-react"
 import { createBrowserClient } from "@playze/shared-auth/client"
+import { useTranslations } from 'next-intl'
 
 interface Organization {
   id: string
@@ -55,14 +56,14 @@ function CollapsibleSection({ title, icon, children, defaultOpen = false }: Coll
   )
 }
 
-function formatTimestamp(timestamp: string | undefined) {
-  if (!timestamp) return "Never"
+function formatTimestamp(timestamp: string | undefined, t: any) {
+  if (!timestamp) return t('never')
   return new Date(timestamp).toLocaleString()
 }
 
-function JsonDisplay({ data, title }: { data: Record<string, unknown>, title: string }) {
+function JsonDisplay({ data, title, t }: { data: Record<string, unknown>, title: string, t: any }) {
   if (!data || Object.keys(data).length === 0) {
-    return <p className="text-sm text-muted-foreground">No {title.toLowerCase()}</p>
+    return <p className="text-sm text-muted-foreground">{t('noMetadata', { type: title.toLowerCase() })}</p>
   }
 
   return (
@@ -82,6 +83,8 @@ function JsonDisplay({ data, title }: { data: Record<string, unknown>, title: st
 }
 
 export function SessionInfoCard() {
+  const t = useTranslations('dashboard.sessionInfo')
+  const tCommon = useTranslations('common')
   const [sessionData, setSessionData] = useState<SessionData>({
     user: null,
     session: null,
@@ -148,8 +151,8 @@ export function SessionInfoCard() {
     return (
       <Card className="h-full">
         <CardHeader>
-          <CardTitle>Session Information</CardTitle>
-          <CardDescription>Loading session data...</CardDescription>
+          <CardTitle>{t('title')}</CardTitle>
+          <CardDescription>{t('loadingData')}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -169,11 +172,11 @@ export function SessionInfoCard() {
     return (
       <Card className="h-full">
         <CardHeader>
-          <CardTitle>Session Information</CardTitle>
-          <CardDescription>No active session</CardDescription>
+          <CardTitle>{t('title')}</CardTitle>
+          <CardDescription>{t('noActiveSession')}</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Please sign in to view session information.</p>
+          <p className="text-muted-foreground">{t('signInPrompt')}</p>
         </CardContent>
       </Card>
     )
@@ -182,29 +185,29 @@ export function SessionInfoCard() {
   return (
     <Card className="h-full">
       <CardHeader>
-        <CardTitle>Session Information</CardTitle>
-        <CardDescription>Complete session and user data</CardDescription>
+        <CardTitle>{t('title')}</CardTitle>
+        <CardDescription>{t('completeData')}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Basic User Info */}
         <CollapsibleSection
-          title="User Identity"
+          title={t('userIdentity')}
           icon={<UserIcon className="h-4 w-4" />}
           defaultOpen={true}
         >
           <div className="space-y-3">
             <div className="grid grid-cols-1 gap-2 text-sm">
-              <div><strong>ID:</strong> <span className="font-mono text-muted-foreground">{user.id}</span></div>
-              <div><strong>Email:</strong> {user.email || 'Not set'}</div>
-              <div><strong>Phone:</strong> {user.phone || 'Not set'}</div>
+              <div><strong>{t('id')}</strong> <span className="font-mono text-muted-foreground">{user.id}</span></div>
+              <div><strong>{t('email')}</strong> {user.email || tCommon('notSet')}</div>
+              <div><strong>{t('phone')}</strong> {user.phone || tCommon('notSet')}</div>
               <div className="flex items-center gap-2">
-                <strong>Role:</strong>
+                <strong>{t('role')}</strong>
                 <Badge variant="outline">{user.role}</Badge>
               </div>
               <div className="flex items-center gap-2">
-                <strong>Anonymous:</strong>
+                <strong>{t('anonymous')}</strong>
                 <Badge variant={user.is_anonymous ? "destructive" : "secondary"}>
-                  {user.is_anonymous ? 'Yes' : 'No'}
+                  {user.is_anonymous ? tCommon('yes') : tCommon('no')}
                 </Badge>
               </div>
             </div>
@@ -215,16 +218,16 @@ export function SessionInfoCard() {
 
         {/* Session Details */}
         <CollapsibleSection
-          title="Session Details"
+          title={t('sessionDetails')}
           icon={<Key className="h-4 w-4" />}
         >
           <div className="space-y-3">
             <div className="grid grid-cols-1 gap-2 text-sm">
-              <div><strong>Session ID:</strong> <span className="font-mono text-muted-foreground break-all">{session.access_token.split('.')[0]}...</span></div>
-              <div><strong>Token Type:</strong> {session.token_type}</div>
-              <div><strong>Expires:</strong> {formatTimestamp(new Date(session.expires_at! * 1000).toISOString())}</div>
+              <div><strong>{t('sessionId')}</strong> <span className="font-mono text-muted-foreground break-all">{session.access_token.split('.')[0]}...</span></div>
+              <div><strong>{t('tokenType')}</strong> {session.token_type}</div>
+              <div><strong>{t('expires')}</strong> {formatTimestamp(new Date(session.expires_at! * 1000).toISOString(), tCommon)}</div>
               <div className="flex items-center gap-2">
-                <strong>AAL (Auth Level):</strong>
+                <strong>{t('authLevel')}</strong>
                 <Badge variant="outline">{user.aud}</Badge>
               </div>
             </div>
@@ -235,16 +238,16 @@ export function SessionInfoCard() {
 
         {/* Timestamps */}
         <CollapsibleSection
-          title="Timestamps"
+          title={t('timestamps')}
           icon={<Clock className="h-4 w-4" />}
         >
           <div className="space-y-2 text-sm">
-            <div><strong>Created:</strong> {formatTimestamp(user.created_at)}</div>
-            <div><strong>Last Updated:</strong> {formatTimestamp(user.updated_at)}</div>
-            <div><strong>Email Confirmed:</strong> {formatTimestamp(user.email_confirmed_at)}</div>
-            <div><strong>Phone Confirmed:</strong> {formatTimestamp(user.phone_confirmed_at)}</div>
-            <div><strong>Last Sign In:</strong> {formatTimestamp(user.last_sign_in_at)}</div>
-            <div><strong>Confirmed At:</strong> {formatTimestamp(user.confirmed_at)}</div>
+            <div><strong>{t('created')}</strong> {formatTimestamp(user.created_at, tCommon)}</div>
+            <div><strong>{t('lastUpdated')}</strong> {formatTimestamp(user.updated_at, tCommon)}</div>
+            <div><strong>{t('emailConfirmed')}</strong> {formatTimestamp(user.email_confirmed_at, tCommon)}</div>
+            <div><strong>{t('phoneConfirmed')}</strong> {formatTimestamp(user.phone_confirmed_at, tCommon)}</div>
+            <div><strong>{t('lastSignIn')}</strong> {formatTimestamp(user.last_sign_in_at, tCommon)}</div>
+            <div><strong>{t('confirmedAt')}</strong> {formatTimestamp(user.confirmed_at, tCommon)}</div>
           </div>
         </CollapsibleSection>
 
@@ -254,7 +257,7 @@ export function SessionInfoCard() {
         {currentOrg && (
           <>
             <CollapsibleSection
-              title="Current Organization"
+              title={t('currentOrg')}
               icon={<Building className="h-4 w-4" />}
             >
               <div className="space-y-4">
@@ -265,10 +268,10 @@ export function SessionInfoCard() {
                       <Badge variant="outline">{currentOrg.role}</Badge>
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      Plan: {currentOrg.organization?.plan_type || 'Free'}
+                      {t('plan')} {currentOrg.organization?.plan_type || 'Free'}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Slug: {currentOrg.organization?.slug}
+                      {t('slug')} {currentOrg.organization?.slug}
                     </div>
                   </div>
                 </div>
@@ -280,13 +283,13 @@ export function SessionInfoCard() {
 
         {/* Authentication Methods */}
         <CollapsibleSection
-          title="Authentication Methods"
+          title={t('authMethods')}
           icon={<Shield className="h-4 w-4" />}
         >
           <div className="space-y-3">
             {user.identities && user.identities.length > 0 ? (
               <div>
-                <h4 className="font-medium text-sm mb-2">Identity Providers</h4>
+                <h4 className="font-medium text-sm mb-2">{t('identityProviders')}</h4>
                 <div className="flex flex-wrap gap-2">
                   {user.identities.map((identity, index) => (
                     <Badge key={index} variant="outline">
@@ -296,7 +299,7 @@ export function SessionInfoCard() {
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">No identities found</p>
+              <p className="text-sm text-muted-foreground">{t('noIdentities')}</p>
             )}
           </div>
         </CollapsibleSection>
@@ -305,20 +308,20 @@ export function SessionInfoCard() {
 
         {/* App Metadata */}
         <CollapsibleSection
-          title="App Metadata"
+          title={t('appMetadata')}
           icon={<Key className="h-4 w-4" />}
         >
-          <JsonDisplay data={user.app_metadata} title="App Metadata" />
+          <JsonDisplay data={user.app_metadata} title="App Metadata" t={t} />
         </CollapsibleSection>
 
         <Separator />
 
         {/* User Metadata */}
         <CollapsibleSection
-          title="User Metadata"
+          title={t('userMetadata')}
           icon={<UserIcon className="h-4 w-4" />}
         >
-          <JsonDisplay data={user.user_metadata} title="User Metadata" />
+          <JsonDisplay data={user.user_metadata} title="User Metadata" t={t} />
         </CollapsibleSection>
       </CardContent>
     </Card>

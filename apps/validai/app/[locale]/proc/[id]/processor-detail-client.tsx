@@ -16,6 +16,7 @@ import {
 import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical, FileSpreadsheet } from "lucide-react"
 import { Link } from "@/lib/i18n/navigation"
 import { ProcessorSettingsSheet } from "@/components/processors/processor-settings-sheet"
+import { useTranslations } from 'next-intl'
 
 /**
  * Props for the ProcessorDetailClient component.
@@ -66,6 +67,8 @@ interface ProcessorDetailClientProps {
 export function ProcessorDetailClient({
   processorId,
 }: ProcessorDetailClientProps) {
+  const t = useTranslations('processors')
+  const tCommon = useTranslations('common')
   const { data: processor, isLoading, error } = useProcessorDetail(processorId)
   const createArea = useCreateArea()
   const [isCreateAreaDialogOpen, setIsCreateAreaDialogOpen] = useState(false)
@@ -83,7 +86,7 @@ export function ProcessorDetailClient({
   if (isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-muted-foreground">Loading processor...</div>
+        <div className="text-muted-foreground">{t('loading')}</div>
       </div>
     )
   }
@@ -91,11 +94,11 @@ export function ProcessorDetailClient({
   if (error || !processor) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
-        <div className="text-destructive">Failed to load processor</div>
+        <div className="text-destructive">{t('failed')}</div>
         <Button asChild variant="outline">
           <Link href="/proc">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Processors
+            {t('backToList')}
           </Link>
         </Button>
       </div>
@@ -130,32 +133,32 @@ export function ProcessorDetailClient({
       {/* Operations by Area */}
       <div className="space-y-4 rounded-lg border bg-card p-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Operations</h2>
+          <h2 className="text-xl font-semibold">{t('detail.operations')}</h2>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="More options">
-                <span className="sr-only">Open menu</span>
+              <Button variant="ghost" size="icon" title={tCommon('moreOptions')}>
+                <span className="sr-only">{tCommon('openMenu')}</span>
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setIsSettingsSheetOpen(true)}>
                 <Settings className="mr-2 h-4 w-4" />
-                Settings
+                {t('detail.settings')}
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
                 <Link href={`/proc/${processor.processor_id}/workbench`}>
                   <FlaskConical className="mr-2 h-4 w-4" />
-                  Workbench
+                  {t('detail.workbench')}
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsCreateAreaDialogOpen(true)}>
                 <FolderPlus className="mr-2 h-4 w-4" />
-                New Area
+                {t('detail.newArea')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setIsBulkImportExportOpen(true)}>
                 <FileSpreadsheet className="mr-2 h-4 w-4" />
-                Bulk Import/Export
+                {t('detail.bulkImportExport')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

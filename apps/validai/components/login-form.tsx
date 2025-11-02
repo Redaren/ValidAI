@@ -15,6 +15,7 @@ import {
 import { useToastStore } from "@/stores";
 import { Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
+import { useTranslations } from 'next-intl';
 
 export function LoginForm({
   className,
@@ -24,6 +25,7 @@ export function LoginForm({
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const addToast = useToastStore((state) => state.addToast);
+  const t = useTranslations('auth.login');
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,15 +45,15 @@ export function LoginForm({
       setEmailSent(true);
       addToast({
         variant: "success",
-        title: "Check your email",
-        description: "We sent you a login link. Be sure to check your spam folder.",
+        title: t('checkEmail'),
+        description: t('linkSent'),
         duration: 8000,
       });
     } catch (error) {
       addToast({
         variant: "destructive",
-        title: "Error sending login link",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        title: t('errorSending'),
+        description: error instanceof Error ? error.message : t('unexpectedError'),
         duration: 8000,
       });
     } finally {
@@ -70,21 +72,21 @@ export function LoginForm({
         {!emailSent ? (
           <>
             <CardHeader className="text-center">
-              <CardTitle className="text-3xl">ValidAI</CardTitle>
+              <CardTitle className="text-3xl">{t('title')}</CardTitle>
               <CardDescription>
-                Sign in with your email to access ValidAI
+                {t('description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleLogin} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">{t('emailLabel')}</Label>
                   <div className="relative">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder={t('emailPlaceholder')}
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -93,18 +95,18 @@ export function LoginForm({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    You must be invited to an organization to access ValidAI
+                    {t('inviteNotice')}
                   </p>
                 </div>
 
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  {loading ? "Sending Magic Link..." : "Send Magic Link"}
+                  {loading ? t('sendingMagicLink') : t('sendMagicLink')}
                 </Button>
 
                 <div className="pt-4 border-t text-center">
                   <p className="text-xs text-muted-foreground">
-                    A magic link will be sent to your email. Click the link to sign in.
+                    {t('magicLinkInfo')}
                   </p>
                 </div>
               </form>
@@ -121,31 +123,31 @@ export function LoginForm({
               </div>
 
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold">Check your email</h2>
+                <h2 className="text-2xl font-bold">{t('checkEmail')}</h2>
                 <p className="text-muted-foreground">
-                  We&apos;ve sent a login link to:
+                  {t('sentTo')}
                 </p>
                 <p className="font-medium">{email}</p>
               </div>
 
               <div className="space-y-4 pt-4">
                 <div className="bg-muted rounded-lg p-4 space-y-2">
-                  <p className="text-sm font-medium">Next steps:</p>
+                  <p className="text-sm font-medium">{t('nextSteps')}</p>
                   <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
-                    <li>Check your email inbox (and spam folder)</li>
-                    <li>Click the magic link in the email</li>
-                    <li>You&apos;ll be automatically signed in</li>
+                    <li>{t('step1')}</li>
+                    <li>{t('step2')}</li>
+                    <li>{t('step3')}</li>
                   </ol>
                 </div>
 
                 <Button onClick={handleSendAnother} variant="outline" className="w-full">
-                  Send Another Link
+                  {t('sendAnotherLink')}
                 </Button>
               </div>
 
               <div className="pt-4 border-t">
                 <p className="text-xs text-muted-foreground">
-                  The link will expire in 60 minutes for security reasons.
+                  {t('linkExpiry')}
                 </p>
               </div>
             </div>

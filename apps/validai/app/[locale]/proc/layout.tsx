@@ -2,6 +2,7 @@
 
 import { usePathname } from "@/lib/i18n/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
+import { useTranslations } from 'next-intl'
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -24,6 +25,7 @@ export default function ProcessorsLayout({
 }: {
   children: React.ReactNode
 }) {
+  const t = useTranslations('breadcrumb')
   const pathname = usePathname()
 
   // Extract processor ID from pathname for detail, workbench, or runs pages
@@ -65,9 +67,9 @@ export default function ProcessorsLayout({
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
                   {hasProcessor ? (
-                    <BreadcrumbLink href="/proc">Processors</BreadcrumbLink>
+                    <BreadcrumbLink href="/proc">{t('processors')}</BreadcrumbLink>
                   ) : (
-                    <BreadcrumbPage>Processors</BreadcrumbPage>
+                    <BreadcrumbPage>{t('processors')}</BreadcrumbPage>
                   )}
                 </BreadcrumbItem>
                 {hasProcessor && (
@@ -76,11 +78,11 @@ export default function ProcessorsLayout({
                     <BreadcrumbItem>
                       {isWorkbenchPage || isRunsPage || isRunDetailPage ? (
                         <BreadcrumbLink href={`/proc/${processorId}`}>
-                          {processor?.processor_name || "Loading..."}
+                          {processor?.processor_name || t('loading')}
                         </BreadcrumbLink>
                       ) : (
                         <BreadcrumbPage>
-                          {processor?.processor_name || "Loading..."}
+                          {processor?.processor_name || t('loading')}
                         </BreadcrumbPage>
                       )}
                     </BreadcrumbItem>
@@ -90,7 +92,7 @@ export default function ProcessorsLayout({
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>Workbench</BreadcrumbPage>
+                      <BreadcrumbPage>{t('workbench')}</BreadcrumbPage>
                     </BreadcrumbItem>
                   </>
                 )}
@@ -100,10 +102,10 @@ export default function ProcessorsLayout({
                     <BreadcrumbItem>
                       {isRunDetailPage ? (
                         <BreadcrumbLink href={`/proc/${processorId}/runs`}>
-                          History
+                          {t('history')}
                         </BreadcrumbLink>
                       ) : (
-                        <BreadcrumbPage>History</BreadcrumbPage>
+                        <BreadcrumbPage>{t('history')}</BreadcrumbPage>
                       )}
                     </BreadcrumbItem>
                   </>
@@ -112,7 +114,7 @@ export default function ProcessorsLayout({
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>Run Detail</BreadcrumbPage>
+                      <BreadcrumbPage>{t('runDetail')}</BreadcrumbPage>
                     </BreadcrumbItem>
                   </>
                 )}

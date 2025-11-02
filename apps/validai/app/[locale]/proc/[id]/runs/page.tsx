@@ -27,6 +27,7 @@ import { RunsTable } from '@/components/runs/runs-table'
 import { Button } from '@playze/shared-ui'
 import { ArrowLeft, History } from 'lucide-react'
 import { Link } from '@/lib/i18n/navigation'
+import { useTranslations } from 'next-intl'
 
 /**
  * Props for the ProcessorRunsPage component
@@ -62,6 +63,9 @@ interface ProcessorRunsPageProps {
  */
 export default function ProcessorRunsPage({ params }: ProcessorRunsPageProps) {
   const { id: processorId } = use(params)
+  const t = useTranslations('runs')
+  const tBreadcrumb = useTranslations('breadcrumb')
+  const tProcessors = useTranslations('processors')
 
   const { data: runs, isLoading, error } = useProcessorRuns(processorId)
   const { data: processor, isLoading: processorLoading } = useProcessorDetail(processorId)
@@ -72,7 +76,7 @@ export default function ProcessorRunsPage({ params }: ProcessorRunsPageProps) {
         <div className="flex min-h-[400px] items-center justify-center">
           <div className="text-center">
             <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">Loading runs...</p>
+            <p className="text-sm text-muted-foreground">{t('loading')}</p>
           </div>
         </div>
       </div>
@@ -83,11 +87,11 @@ export default function ProcessorRunsPage({ params }: ProcessorRunsPageProps) {
     return (
       <div className="container mx-auto py-6">
         <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
-          <div className="text-destructive">Failed to load runs</div>
+          <div className="text-destructive">{t('failed')}</div>
           <Button asChild variant="outline">
             <Link href={`/proc/${processorId}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Processor
+              {tProcessors('backToProcessor')}
             </Link>
           </Button>
         </div>
@@ -102,11 +106,11 @@ export default function ProcessorRunsPage({ params }: ProcessorRunsPageProps) {
         <div className="flex items-center gap-2">
           <History className="h-6 w-6" />
           <h1 className="text-2xl font-bold">
-            History - {processorLoading ? 'Loading...' : processor?.processor_name || 'Processor'}
+            {t('title')} - {processorLoading ? tBreadcrumb('loading') : processor?.processor_name || t('processor')}
           </h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          View executions and their results
+          {t('description')}
         </p>
       </div>
 

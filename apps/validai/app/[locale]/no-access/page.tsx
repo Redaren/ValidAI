@@ -1,33 +1,35 @@
 import { Link } from '@/lib/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button } from '@playze/shared-ui'
 import { AlertCircle } from 'lucide-react'
+import { getTranslations } from 'next-intl/server'
 
-export default function NoAccessPage() {
+export default async function NoAccessPage() {
+  const t = await getTranslations('noAccess')
+
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="flex items-center gap-2">
             <AlertCircle className="h-6 w-6 text-destructive" />
-            <CardTitle>No Access to ValidAI</CardTitle>
+            <CardTitle>{t('title')}</CardTitle>
           </div>
           <CardDescription>
-            Your organization doesn&apos;t have an active ValidAI subscription.
+            {t('description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            ValidAI is available on Pro and Enterprise plans. Contact your organization
-            administrator or platform support to upgrade your subscription.
+            {t('explanation')}
           </p>
           <div className="flex gap-2">
             <Button variant="default" asChild>
               <a href="mailto:support@example.com?subject=ValidAI Access Request">
-                Contact Support
+                {t('contactSupport')}
               </a>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/">Back to Home</Link>
+              <Link href="/">{t('backHome')}</Link>
             </Button>
           </div>
         </CardContent>

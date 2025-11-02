@@ -13,7 +13,16 @@
     "filter": "Filtrera",
     "create": "Skapa",
     "update": "Uppdatera",
-    "actions": "Åtgärder"
+    "actions": "Åtgärder",
+    "yes": "Ja",
+    "no": "Nej",
+    "notSet": "Ej angiven",
+    "never": "Aldrig",
+    "back": "Tillbaka",
+    "new": "Ny",
+    "toggle": "Växla",
+    "openMenu": "Öppna meny",
+    "moreOptions": "Fler alternativ"
   },
   "nav": {
     "dashboard": "Kontrollpanel",
@@ -21,6 +30,190 @@
     "operations": "Operationer",
     "runs": "Körningar",
     "documents": "Dokument",
-    "settings": "Inställningar"
+    "settings": "Inställningar",
+    "platform": "Plattform",
+    "support": "Support",
+    "feedback": "Feedback",
+    "account": "Konto",
+    "billing": "Fakturering",
+    "notifications": "Notiser",
+    "logout": "Logga ut",
+    "upgradeToPro": "Uppgradera till Pro"
+  },
+  "breadcrumb": {
+    "processors": "Processorer",
+    "workbench": "Arbetsbänk",
+    "history": "Historik",
+    "runDetail": "Körningsdetaljer",
+    "loading": "Laddar..."
+  },
+  "dashboard": {
+    "title": "Kontrollpanel",
+    "welcome": "Välkommen",
+    "ready": "Din kontrollpanel är redo för innehåll",
+    "card1": "Kontrollpanelkort 1",
+    "card2": "Kontrollpanelkort 2",
+    "card3": "Kontrollpanelkort 3",
+    "sessionInfo": {
+      "title": "Sessionsinformation",
+      "loadingData": "Laddar sessionsdata...",
+      "noActiveSession": "Ingen aktiv session",
+      "signInPrompt": "Vänligen logga in för att se sessionsinformation.",
+      "completeData": "Fullständig sessions- och användardata",
+      "userIdentity": "Användaridentitet",
+      "id": "ID:",
+      "email": "E-post:",
+      "phone": "Telefon:",
+      "role": "Roll:",
+      "anonymous": "Anonym:",
+      "sessionDetails": "Sessionsdetaljer",
+      "sessionId": "Sessions-ID:",
+      "tokenType": "Tokentyp:",
+      "expires": "Utgår:",
+      "authLevel": "AAL (Autentiseringsnivå):",
+      "timestamps": "Tidsstämplar",
+      "created": "Skapad:",
+      "lastUpdated": "Senast uppdaterad:",
+      "emailConfirmed": "E-post bekräftad:",
+      "phoneConfirmed": "Telefon bekräftad:",
+      "lastSignIn": "Senaste inloggning:",
+      "confirmedAt": "Bekräftad:",
+      "currentOrg": "Nuvarande organisation",
+      "plan": "Plan:",
+      "slug": "Slug:",
+      "authMethods": "Autentiseringsmetoder",
+      "identityProviders": "Identitetsleverantörer",
+      "noIdentities": "Inga identiteter hittades",
+      "appMetadata": "App-metadata",
+      "userMetadata": "Användarmetadata",
+      "noMetadata": "Ingen {type}"
+    }
+  },
+  "processors": {
+    "title": "Dokumentprocessorer",
+    "description": "Skapa och hantera AI-drivna dokumentanalysmallar",
+    "breadcrumb": "Processorer",
+    "loading": "Laddar processor...",
+    "loadingProcessors": "Laddar processorer...",
+    "failed": "Kunde inte ladda processor",
+    "failedList": "Kunde inte ladda processorer",
+    "unknownError": "Okänt fel uppstod",
+    "backToList": "Tillbaka till processorer",
+    "backToProcessor": "Tillbaka till processor",
+    "new": "Ny",
+    "empty": {
+      "title": "Inga processorer än",
+      "description": "Kom igång genom att skapa din första dokumentprocessor för att analysera kontrakt, fakturor eller andra dokument.",
+      "createFirst": "Skapa din första processor"
+    },
+    "detail": {
+      "operations": "Operationer",
+      "settings": "Inställningar",
+      "workbench": "Arbetsbänk",
+      "newArea": "Nytt område",
+      "bulkImportExport": "Massimport/export"
+    }
+  },
+  "runs": {
+    "title": "Historik",
+    "loading": "Laddar körningar...",
+    "failed": "Kunde inte ladda körningar",
+    "description": "Visa körningar och deras resultat",
+    "processor": "Processor"
+  },
+  "auth": {
+    "appName": "ValidAI",
+    "login": {
+      "title": "ValidAI",
+      "description": "Logga in med din e-post för att få tillgång till ValidAI",
+      "emailLabel": "E-postadress",
+      "emailPlaceholder": "du@exempel.se",
+      "inviteNotice": "Du måste vara inbjuden till en organisation för att få tillgång till ValidAI",
+      "sendMagicLink": "Skicka magisk länk",
+      "sendingMagicLink": "Skickar magisk länk...",
+      "magicLinkInfo": "En magisk länk kommer att skickas till din e-post. Klicka på länken för att logga in.",
+      "checkEmail": "Kontrollera din e-post",
+      "linkSent": "Vi har skickat dig en inloggningslänk. Glöm inte att kontrollera din skräppost.",
+      "sentTo": "Vi har skickat en inloggningslänk till:",
+      "nextSteps": "Nästa steg:",
+      "step1": "Kontrollera din e-post (och skräppost)",
+      "step2": "Klicka på den magiska länken i e-postmeddelandet",
+      "step3": "Du kommer automatiskt att loggas in",
+      "sendAnotherLink": "Skicka en ny länk",
+      "linkExpiry": "Länken går ut om 60 minuter av säkerhetsskäl.",
+      "errorSending": "Fel vid skickande av inloggningslänk",
+      "unexpectedError": "Ett oväntat fel uppstod"
+    },
+    "signUp": {
+      "title": "Registrera dig",
+      "description": "Skapa ett nytt konto",
+      "emailLabel": "E-post",
+      "emailPlaceholder": "du@exempel.se",
+      "passwordLabel": "Lösenord",
+      "repeatPasswordLabel": "Upprepa lösenord",
+      "passwordsDoNotMatch": "Lösenorden matchar inte",
+      "errorOccurred": "Ett fel uppstod",
+      "creatingAccount": "Skapar ett konto...",
+      "signUpButton": "Registrera dig",
+      "alreadyHaveAccount": "Har du redan ett konto?",
+      "login": "Logga in"
+    },
+    "forgotPassword": {
+      "title": "Återställ ditt lösenord",
+      "description": "Skriv in din e-post så skickar vi dig en länk för att återställa ditt lösenord",
+      "emailLabel": "E-post",
+      "emailPlaceholder": "du@exempel.se",
+      "errorOccurred": "Ett fel uppstod",
+      "sending": "Skickar...",
+      "sendResetEmail": "Skicka återställnings-e-post",
+      "alreadyHaveAccount": "Har du redan ett konto?",
+      "login": "Logga in",
+      "checkYourEmail": "Kontrollera din e-post",
+      "instructionsSent": "Instruktioner för lösenordsåterställning skickade",
+      "checkEmailMessage": "Om du registrerade dig med din e-post och ditt lösenord kommer du att få ett e-postmeddelande för lösenordsåterställning."
+    },
+    "updatePassword": {
+      "title": "Återställ ditt lösenord",
+      "description": "Ange ditt nya lösenord nedan.",
+      "newPasswordLabel": "Nytt lösenord",
+      "newPasswordPlaceholder": "Nytt lösenord",
+      "errorOccurred": "Ett fel uppstod",
+      "saving": "Sparar...",
+      "saveNewPassword": "Spara nytt lösenord"
+    }
+  },
+  "noAccess": {
+    "title": "Ingen åtkomst till ValidAI",
+    "description": "Din organisation har ingen aktiv ValidAI-prenumeration.",
+    "explanation": "ValidAI finns tillgängligt i Pro- och Enterprise-planer. Kontakta din organisationsadministratör eller plattformssupport för att uppgradera din prenumeration.",
+    "contactSupport": "Kontakta support",
+    "backHome": "Tillbaka hem"
+  },
+  "account": {
+    "title": "Kontoinställningar",
+    "description": "Hantera dina personliga preferenser och kontoinformation",
+    "profile": {
+      "title": "Profil",
+      "description": "Din personliga information från autentiseringsleverantör",
+      "name": "Namn",
+      "email": "E-post"
+    },
+    "appearance": {
+      "title": "Utseende",
+      "description": "Anpassa hur applikationen ser ut för dig",
+      "theme": "Tema",
+      "selectTheme": "Välj ett tema",
+      "themeLight": "Standard ljus",
+      "themeDark": "Standard mörk",
+      "themeClaudeLight": "Claude ljus",
+      "themeClaudeDark": "Claude mörk",
+      "themeDescription": "Välj hur applikationen visas. Claude-teman använder en varm, färgrik palett."
+    },
+    "organization": {
+      "title": "Organisationskontext",
+      "description": "Din roll och åtkomstnivå i den nuvarande organisationen",
+      "currentOrg": "Nuvarande organisation",
+      "noOrgSelected": "Ingen organisation vald"
+    }
   }
 }

@@ -14,12 +14,15 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { APP_NAME } from "@/lib/constants/app"
+import { getTranslations } from 'next-intl/server'
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const t = await getTranslations('nav')
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -40,7 +43,7 @@ export default function DashboardLayout({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Dashboard</BreadcrumbPage>
+                  <BreadcrumbPage>{t('dashboard')}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

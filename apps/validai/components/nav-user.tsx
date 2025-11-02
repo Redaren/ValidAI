@@ -10,6 +10,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "@/lib/i18n/navigation"
 import { useEffect, useState } from "react"
+import { useTranslations } from 'next-intl'
 
 import {
   Avatar,
@@ -41,6 +42,8 @@ export function NavUser() {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const t = useTranslations('nav')
+  const tCommon = useTranslations('common')
 
   useEffect(() => {
     const supabase = createBrowserClient()
@@ -74,7 +77,7 @@ export function NavUser() {
               <AvatarFallback className="rounded-lg">...</AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">Loading...</span>
+              <span className="truncate font-medium">{tCommon('loading')}</span>
               <span className="truncate text-xs">...</span>
             </div>
           </SidebarMenuButton>
@@ -132,28 +135,28 @@ export function NavUser() {
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <Sparkles />
-                Upgrade to Pro
+                {t('upgradeToPro')}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem onClick={() => router.push('/account')}>
                 <BadgeCheck />
-                Account
+                {t('account')}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <CreditCard />
-                Billing
+                {t('billing')}
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <Bell />
-                Notifications
+                {t('notifications')}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogout}>
               <LogOut />
-              Log out
+              {t('logout')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

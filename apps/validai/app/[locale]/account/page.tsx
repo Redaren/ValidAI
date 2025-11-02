@@ -22,6 +22,7 @@ import {
   Label,
 } from "@playze/shared-ui"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useTranslations } from 'next-intl'
 
 type User = {
   name: string
@@ -30,6 +31,8 @@ type User = {
 }
 
 export default function AccountPage() {
+  const t = useTranslations('account')
+  const tCommon = useTranslations('common')
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -73,18 +76,18 @@ export default function AccountPage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
         <p className="text-muted-foreground">
-          Manage your personal preferences and account information
+          {t('description')}
         </p>
       </div>
 
       {/* Profile Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
+          <CardTitle>{t('profile.title')}</CardTitle>
           <CardDescription>
-            Your personal information from authentication provider
+            {t('profile.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -113,11 +116,11 @@ export default function AccountPage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground">Name</Label>
+                  <Label className="text-muted-foreground">{t('profile.name')}</Label>
                   <p className="text-sm font-medium">{user?.name}</p>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-muted-foreground">Email</Label>
+                  <Label className="text-muted-foreground">{t('profile.email')}</Label>
                   <p className="text-sm font-medium">{user?.email}</p>
                 </div>
               </div>
@@ -129,27 +132,27 @@ export default function AccountPage() {
       {/* Appearance Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
+          <CardTitle>{t('appearance.title')}</CardTitle>
           <CardDescription>
-            Customize how the application looks for you
+            {t('appearance.description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="theme-select">Theme</Label>
+            <Label htmlFor="theme-select">{t('appearance.theme')}</Label>
             <Select value={theme} onValueChange={setTheme}>
               <SelectTrigger id="theme-select" className="w-full sm:w-[300px]">
-                <SelectValue placeholder="Select a theme" />
+                <SelectValue placeholder={t('appearance.selectTheme')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="light">Default Light</SelectItem>
-                <SelectItem value="dark">Default Dark</SelectItem>
-                <SelectItem value="claude-light">Claude Light</SelectItem>
-                <SelectItem value="claude-dark">Claude Dark</SelectItem>
+                <SelectItem value="light">{t('appearance.themeLight')}</SelectItem>
+                <SelectItem value="dark">{t('appearance.themeDark')}</SelectItem>
+                <SelectItem value="claude-light">{t('appearance.themeClaudeLight')}</SelectItem>
+                <SelectItem value="claude-dark">{t('appearance.themeClaudeDark')}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Choose how the application appears. Claude themes use a warm, colorful palette.
+              {t('appearance.themeDescription')}
             </p>
           </div>
         </CardContent>
@@ -158,9 +161,9 @@ export default function AccountPage() {
       {/* Organization Context Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Organization Context</CardTitle>
+          <CardTitle>{t('organization.title')}</CardTitle>
           <CardDescription>
-            Your role and access level in the current organization
+            {t('organization.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -171,12 +174,12 @@ export default function AccountPage() {
             </div>
           ) : currentOrg ? (
             <div className="space-y-2">
-              <Label className="text-muted-foreground">Current Organization</Label>
+              <Label className="text-muted-foreground">{t('organization.currentOrg')}</Label>
               <p className="text-sm font-medium">{currentOrg.name}</p>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No organization selected
+              {t('organization.noOrgSelected')}
             </p>
           )}
         </CardContent>

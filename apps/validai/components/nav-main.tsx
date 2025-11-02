@@ -1,6 +1,7 @@
 "use client"
 
 import { ChevronRight, type LucideIcon } from "lucide-react"
+import { useTranslations } from 'next-intl'
 
 import {
   Collapsible,
@@ -33,9 +34,12 @@ export function NavMain({
     }[]
   }[]
 }) {
+  const t = useTranslations('nav')
+  const tCommon = useTranslations('common')
+
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupLabel>{t('platform')}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
@@ -51,7 +55,7 @@ export function NavMain({
                   <CollapsibleTrigger asChild>
                     <SidebarMenuAction className="data-[state=open]:rotate-90">
                       <ChevronRight />
-                      <span className="sr-only">Toggle</span>
+                      <span className="sr-only">{tCommon('toggle')}</span>
                     </SidebarMenuAction>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
