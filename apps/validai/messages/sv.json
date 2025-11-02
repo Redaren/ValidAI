@@ -127,8 +127,10 @@
     "header": {
       "status": "Status",
       "visibility": "Synlighet",
+      "tags": "Taggar",
       "run": "Kör"
     },
+    "actions": "Åtgärder",
     "bulkImport": {
       "row": "Rad",
       "errors": "Fel",

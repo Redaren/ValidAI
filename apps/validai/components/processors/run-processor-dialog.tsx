@@ -42,6 +42,7 @@ import { useCreateRun } from '@/app/queries/runs'
 import { toast } from 'sonner'
 import { DropZone } from '@/components/ui/dropzone'
 import { validateDocumentFile } from '@/lib/constants/documents'
+import { useTranslations } from 'next-intl'
 
 // Dialog component wrappers (mirroring @playze/shared-ui structure)
 const Dialog = DialogPrimitive.Root
@@ -52,8 +53,9 @@ const DialogOverlay = DialogPrimitive.Overlay
 const DialogContent = ({
   children,
   className,
+  closeLabel = 'Close',
   ...props
-}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) => (
+}: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { closeLabel?: string }) => (
   <DialogPortal>
     <DialogOverlay className="fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
     <DialogPrimitive.Content
@@ -63,7 +65,7 @@ const DialogContent = ({
       {children}
       <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+        <span className="sr-only">{closeLabel}</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
@@ -133,6 +135,8 @@ export function RunProcessorDialog({
   processorName,
   defaultView = 'compliance',
 }: RunProcessorDialogProps) {
+  const t = useTranslations('common')
+
   const [open, setOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const router = useRouter()
@@ -204,7 +208,7 @@ export function RunProcessorDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
 
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px]" closeLabel={t('close')}>
         <DialogHeader>
           <div className="flex items-center gap-2">
             <Play className="h-5 w-5" />

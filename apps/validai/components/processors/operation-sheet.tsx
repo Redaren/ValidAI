@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 /**
  * All available operation types from the database enum.
@@ -139,6 +140,8 @@ export function OperationSheet({
   operation,
   mode = operation ? 'edit' : 'create',
 }: OperationSheetProps) {
+  const t = useTranslations('processors.form')
+
   // Local state for collapsible advanced section
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -291,7 +294,7 @@ export function OperationSheet({
 
             {/* Description - Optional Textarea */}
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('description')}</Label>
               <Textarea
                 id="description"
                 {...form.register('description')}

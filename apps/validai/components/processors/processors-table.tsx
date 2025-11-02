@@ -33,6 +33,7 @@ import {
 import { ProcessorStatusBadge } from "./processor-status-badge"
 import { RunProcessorDialog } from "./run-processor-dialog"
 import { Processor } from "@/app/queries/processors/use-processors"
+import { useTranslations } from 'next-intl'
 
 interface ProcessorsTableProps {
   data: Processor[]
@@ -40,6 +41,8 @@ interface ProcessorsTableProps {
 
 export function ProcessorsTable({ data }: ProcessorsTableProps) {
   const router = useRouter()
+  const t = useTranslations('processors')
+
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "processor_name", desc: false }
   ])
@@ -161,7 +164,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
                   <DropdownMenuItem
                     onClick={() => router.push(`/proc/${processor.processor_id}`)}
                   >

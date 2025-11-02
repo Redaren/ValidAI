@@ -127,8 +127,10 @@
     "header": {
       "status": "Status",
       "visibility": "Visibility",
+      "tags": "Tags",
       "run": "Run"
     },
+    "actions": "Actions",
     "bulkImport": {
       "row": "Row",
       "errors": "Errors",

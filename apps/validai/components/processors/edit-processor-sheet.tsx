@@ -32,6 +32,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight, Lock, Users } from 'lucide-react'
 import { AVAILABLE_VIEWS, type ViewType } from '@/components/runs/views'
+import { useTranslations } from 'next-intl'
 
 /**
  * Props for the EditProcessorSheet component
@@ -125,6 +126,8 @@ interface EditProcessorSheetProps {
  * @see {@link UpdateProcessorInput} for TypeScript type definition
  */
 export function EditProcessorSheet({ open, onOpenChange, processor }: EditProcessorSheetProps) {
+  const t = useTranslations('processors.form')
+
   // Local state for collapsible advanced section
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -274,7 +277,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('description')}</Label>
               <Textarea
                 id="description"
                 {...form.register('description')}
@@ -290,7 +293,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
 
             {/* Usage Description */}
             <div className="space-y-2">
-              <Label htmlFor="usage_description">Usage Description</Label>
+              <Label htmlFor="usage_description">{t('usageDescription')}</Label>
               <Textarea
                 id="usage_description"
                 {...form.register('usage_description')}
@@ -453,7 +456,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
                  * - Zod validates the resulting array
                  */}
                 <div className="space-y-2">
-                  <Label htmlFor="tags">Tags</Label>
+                  <Label htmlFor="tags">{t('tags')}</Label>
                   <Input
                     id="tags"
                     placeholder="contracts, legal, software, vendor"

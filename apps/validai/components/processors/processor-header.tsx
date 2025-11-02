@@ -31,12 +31,15 @@ import {
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
+import { useTranslations } from 'next-intl'
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
 }
 
 export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
+  const t = useTranslations('processors.header')
+
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
@@ -110,9 +113,9 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
             processorName={processor.processor_name}
             defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
             trigger={
-              <Button variant="default" size="icon" title="Run">
+              <Button variant="default" size="icon" title={t('run')}>
                 <Play className="h-4 w-4" />
-                <span className="sr-only">Run</span>
+                <span className="sr-only">{t('run')}</span>
               </Button>
             }
           />
@@ -158,7 +161,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         <div className="flex gap-8 items-start hover:bg-accent/50 cursor-pointer transition-colors rounded-md p-2 -mx-2">
           {/* Status Column */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Status</span>
+            <span className="text-xs text-muted-foreground">{t('status')}</span>
             <Badge className={getStatusColor(processor.status)}>
               {processor.status}
             </Badge>
@@ -166,7 +169,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
 
           {/* Visibility Column */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Visibility</span>
+            <span className="text-xs text-muted-foreground">{t('visibility')}</span>
             <div className="flex items-center gap-1.5 text-sm">
               <VisibilityIcon className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="capitalize">{processor.visibility}</span>
@@ -192,7 +195,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
             {/* Tags */}
             {processor.tags && processor.tags.length > 0 && (
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-muted-foreground">Tags</span>
+                <span className="text-xs text-muted-foreground">{t('tags')}</span>
                 <div className="flex flex-wrap gap-1.5">
                   {processor.tags.map((tag, index) => (
                     <Badge

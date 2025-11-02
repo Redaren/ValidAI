@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChevronRight, Lock, Users } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 /**
  * Props for the CreateProcessorSheet component
@@ -133,6 +134,8 @@ interface CreateProcessorSheetProps {
  * @see {@link CreateProcessorInput} for TypeScript type definition
  */
 export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorSheetProps) {
+  const t = useTranslations('processors.form')
+
   // Local state for collapsible advanced section
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -252,7 +255,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
 
             {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t('description')}</Label>
               <Textarea
                 id="description"
                 {...form.register('description')}
@@ -268,7 +271,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
 
             {/* Usage Description */}
             <div className="space-y-2">
-              <Label htmlFor="usage_description">Usage Description</Label>
+              <Label htmlFor="usage_description">{t('usageDescription')}</Label>
               <Textarea
                 id="usage_description"
                 {...form.register('usage_description')}
@@ -388,7 +391,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
                * - Useful for complex input transformations before validation
                */}
               <div className="space-y-2">
-                <Label htmlFor="tags">Tags</Label>
+                <Label htmlFor="tags">{t('tags')}</Label>
                 <Input
                   id="tags"
                   placeholder="contracts, legal, software, vendor"

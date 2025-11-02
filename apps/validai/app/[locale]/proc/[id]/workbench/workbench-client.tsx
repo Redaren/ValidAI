@@ -23,6 +23,7 @@ import { WorkbenchOCRMode } from "@/components/workbench/workbench-ocr-mode"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import type { Database } from "@playze/shared-types"
+import { useTranslations } from 'next-intl'
 import type { Operation } from "@/app/queries/processors/use-processor-detail"
 
 /**
@@ -56,6 +57,8 @@ export function WorkbenchClient({
   processorId,
   initialProcessor
 }: WorkbenchClientProps) {
+  const t = useTranslations('workbench')
+
   const searchParams = useSearchParams()
   const operationId = searchParams.get('op')
 
@@ -220,7 +223,7 @@ export function WorkbenchClient({
 
       {/* Output Section - Shared between both modes */}
       <div className="space-y-4">
-        <h2 className="text-lg font-medium">Output</h2>
+        <h2 className="text-lg font-medium">{t('output')}</h2>
         <WorkbenchOutput />
       </div>
     </div>

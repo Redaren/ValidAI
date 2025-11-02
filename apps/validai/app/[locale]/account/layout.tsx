@@ -14,12 +14,15 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { APP_NAME } from "@/lib/constants/app"
+import { getTranslations } from 'next-intl/server'
 
-export default function AccountLayout({
+export default async function AccountLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const t = await getTranslations('breadcrumb')
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -40,7 +43,7 @@ export default function AccountLayout({
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Account</BreadcrumbPage>
+                  <BreadcrumbPage>{t('account')}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
