@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { ChevronRight, MoreHorizontal } from "lucide-react"
-import Link from "next/link"
+import { Link } from "@/lib/i18n/navigation"
 
 import { cn } from "@/lib/utils"
 

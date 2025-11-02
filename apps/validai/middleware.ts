@@ -43,12 +43,18 @@ export async function middleware(request: NextRequest) {
   // ============================================================
   const authResponse = await updateSession(request);
 
-  // Merge intl cookies and headers into auth response
-  intlResponse.cookies.getAll().forEach((cookie: { name: string; value: string }) => {
-    authResponse.cookies.set(cookie);
-  });
-  intlResponse.headers.forEach((value: string, key: string) => {
-    authResponse.headers.set(key, value);
+  // ⚠️ CRITICAL: Check if auth middleware wants to redirect (e.g., to /auth/login)
+  const isAuthRedirect = authResponse.status >= 300 && authResponse.status < 400;
+
+  if (isAuthRedirect) {
+    // Auth middleware is redirecting (unauthenticated user)
+    // Return the auth redirect directly - don't merge with intl
+    return authResponse;
+  }
+
+  // No auth redirect - merge auth cookies INTO intlResponse (preserves URL rewrite)
+  authResponse.cookies.getAll().forEach((cookie: { name: string; value: string }) => {
+    intlResponse.cookies.set(cookie);
   });
 
   // ============================================================
@@ -66,7 +72,7 @@ export async function middleware(request: NextRequest) {
     pathWithoutLocale.startsWith('/auth') ||
     pathWithoutLocale === '/no-access'
   ) {
-    return authResponse;
+    return intlResponse;
   }
 
   // ============================================================
@@ -92,7 +98,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  return authResponse;
+  return intlResponse;
 }
 
 export const config = {

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "@/lib/i18n/navigation";
 import { Button } from "@playze/shared-ui";
 import { createServerClient } from "@playze/shared-auth/server";
 import { LogoutButton } from "./logout-button";

@@ -12,11 +12,16 @@ import { createServerClient } from '@supabase/ssr'
  * Unlike Server Components, Route Handlers need direct access to request/response cookies.
  */
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
+  const { searchParams, pathname } = new URL(request.url)
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/dashboard'
+
+  // Extract locale from pathname (e.g., /sv/auth/callback → "sv")
+  const localeMatch = pathname.match(/^\/([a-z]{2})\//)
+  const locale = localeMatch ? localeMatch[1] : 'en'
+
+  const next = searchParams.get('next') ?? `/${locale}/dashboard`
 
   // Create a response that we'll use to set cookies
   const response = NextResponse.next({
@@ -51,9 +56,9 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('Magic link verification error:', error)
-      // Redirect to login with error message
+      // Redirect to login with error message (locale-aware)
       const errorResponse = NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(error.message)}`, request.url)
+        new URL(`/${locale}/auth/login?error=${encodeURIComponent(error.message)}`, request.url)
       )
       return errorResponse
     }
@@ -64,9 +69,9 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('OAuth code exchange error:', error)
-      // Redirect to login with error message
+      // Redirect to login with error message (locale-aware)
       const errorResponse = NextResponse.redirect(
-        new URL(`/auth/login?error=${encodeURIComponent(error.message)}`, request.url)
+        new URL(`/${locale}/auth/login?error=${encodeURIComponent(error.message)}`, request.url)
       )
       return errorResponse
     }

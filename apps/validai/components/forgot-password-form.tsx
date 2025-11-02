@@ -12,7 +12,7 @@ import {
   Input,
   Label,
 } from "@playze/shared-ui";
-import Link from "next/link";
+import { Link } from "@/lib/i18n/navigation";
 import { useState } from "react";
 
 export function ForgotPasswordForm({

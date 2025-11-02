@@ -16,7 +16,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { Loader2, Save } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter } from "@/lib/i18n/navigation"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useAvailableLLMModels } from "@/hooks/use-llm-config"
 import { useWorkbenchTest } from "@/hooks/use-workbench-test"

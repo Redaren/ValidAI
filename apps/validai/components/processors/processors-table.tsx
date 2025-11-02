@@ -12,8 +12,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { Lock, Users, Eye, History, MoreHorizontal, Play } from "lucide-react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import { useRouter, Link } from "@/lib/i18n/navigation"
 
 import {
   Table,

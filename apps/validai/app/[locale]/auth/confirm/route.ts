@@ -1,13 +1,17 @@
 import { createServerClient } from "@playze/shared-auth/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
-import { redirect } from "next/navigation";
-import { type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, pathname } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/";
+
+  // Extract locale from pathname (e.g., /sv/auth/confirm → "sv")
+  const localeMatch = pathname.match(/^\/([a-z]{2})\//);
+  const locale = localeMatch ? localeMatch[1] : 'en';
+
+  const next = searchParams.get("next") ?? `/${locale}`;
 
   if (token_hash && type) {
     const supabase = await createServerClient();
@@ -17,14 +21,18 @@ export async function GET(request: NextRequest) {
       token_hash,
     });
     if (!error) {
-      // redirect user to specified redirect URL or root of app
-      redirect(next);
+      // Redirect user to specified redirect URL or root of app (locale-aware)
+      return NextResponse.redirect(new URL(next, request.url));
     } else {
-      // redirect the user to an error page with some instructions
-      redirect(`/auth/error?error=${error?.message}`);
+      // Redirect the user to an error page with some instructions (locale-aware)
+      return NextResponse.redirect(
+        new URL(`/${locale}/auth/error?error=${encodeURIComponent(error?.message)}`, request.url)
+      );
     }
   }
 
-  // redirect the user to an error page with some instructions
-  redirect(`/auth/error?error=No token hash or type`);
+  // Redirect the user to an error page with some instructions (locale-aware)
+  return NextResponse.redirect(
+    new URL(`/${locale}/auth/error?error=No%20token%20hash%20or%20type`, request.url)
+  );
 }

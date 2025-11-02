@@ -21,7 +21,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/lib/i18n/navigation'
 import { Button } from '@playze/shared-ui'
 /**
  * TECHNICAL DEBT: Using direct @radix-ui/react-dialog import

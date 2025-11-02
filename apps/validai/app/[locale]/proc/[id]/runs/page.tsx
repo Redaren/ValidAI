@@ -26,7 +26,7 @@ import { useProcessorDetail } from '@/app/queries/processors/use-processor-detai
 import { RunsTable } from '@/components/runs/runs-table'
 import { Button } from '@playze/shared-ui'
 import { ArrowLeft, History } from 'lucide-react'
-import Link from 'next/link'
+import { Link } from '@/lib/i18n/navigation'
 
 /**
  * Props for the ProcessorRunsPage component

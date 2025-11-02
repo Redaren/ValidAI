@@ -28,12 +28,12 @@
 'use client'
 
 import { use } from 'react'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useRouter, Link } from '@/lib/i18n/navigation'
 import { useRun, useOperationResults } from '@/app/queries/runs'
 import { getViewComponent, ViewSwitcher, type ViewType } from '@/components/runs/views'
 import { Button } from '@playze/shared-ui'
 import { ArrowLeft } from 'lucide-react'
-import Link from 'next/link'
 
 /**
  * Props for the RunDetailPage component

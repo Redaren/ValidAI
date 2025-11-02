@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { Database } from '@playze/shared-types'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter } from '@/lib/i18n/navigation'
 import type { CreateProcessorInput } from '@/lib/validations'
 
 type ProcessorStatus = Database['public']['Enums']['processor_status']

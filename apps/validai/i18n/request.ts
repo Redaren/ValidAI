@@ -24,18 +24,12 @@ export default getRequestConfig(async ({ locale }) => {
   // Load app-specific messages
   const appMessages = (await import(`../messages/${locale}.json`)).default;
 
-  // Load shared UI component messages
-  const uiMessages = (await import(
-    `@playze/shared-ui/messages/${locale}.json`
-  )).default;
+  // TODO: Load shared UI component messages once package exports are configured
+  // const uiMessages = (await import(`@playze/shared-ui/messages/${locale}.json`)).default;
 
-  // Merge messages (app-specific overrides shared)
   return {
     locale: locale,
-    messages: {
-      ...uiMessages,      // Shared UI component strings
-      ...appMessages,     // App-specific strings (can override shared)
-    },
+    messages: appMessages,
     timeZone: 'UTC' as const,      // Or detect from user preferences
     now: new Date(),
     // Date/time/number formatting for localization

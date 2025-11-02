@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@playze/shared-ui"
 import { ArrowLeft, MoreHorizontal, FolderPlus, Settings, FlaskConical, FileSpreadsheet } from "lucide-react"
-import Link from "next/link"
+import { Link } from "@/lib/i18n/navigation"
 import { ProcessorSettingsSheet } from "@/components/processors/processor-settings-sheet"
 
 /**

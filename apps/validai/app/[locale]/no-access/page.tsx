@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { Link } from '@/lib/i18n/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Button } from '@playze/shared-ui'
 import { AlertCircle } from 'lucide-react'
 
