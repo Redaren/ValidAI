@@ -1,20 +1,27 @@
-import { Metadata } from 'next'
-import { UsersTable } from '@/components/users/users-table'
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@playze/shared-ui'
+'use client'
 
-export const metadata: Metadata = {
-  title: 'Users | Admin Portal',
-  description: 'View all users across organizations',
-}
+import { useState } from 'react'
+import { UsersTable } from '@/components/users/users-table'
+import { CreateUserDialog } from '@/components/users/create-user-dialog'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, Button } from '@playze/shared-ui'
+import { UserPlus } from 'lucide-react'
 
 export default function UsersPage() {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Users</h1>
-        <p className="text-muted-foreground">
-          View all users and their organization memberships
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Users</h1>
+          <p className="text-muted-foreground">
+            View all users and their organization memberships
+          </p>
+        </div>
+        <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Create User
+        </Button>
       </div>
 
       <Card>
@@ -28,6 +35,11 @@ export default function UsersPage() {
           <UsersTable />
         </CardContent>
       </Card>
+
+      <CreateUserDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+      />
     </div>
   )
 }

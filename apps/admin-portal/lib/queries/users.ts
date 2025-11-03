@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
-import type { UserSearchInput } from '@/lib/validations'
+import type { UserSearchInput, CreateUserInput } from '@/lib/validations'
 
 /**
  * Query keys factory for users
@@ -144,5 +144,44 @@ export function useUserPreferences(userId: string) {
       return data?.[0] || null
     },
     enabled: !!userId,
+  })
+}
+
+/**
+ * Hook: Create user
+ * Creates new user via Edge Function (admin only)
+ * Supports two flows:
+ *   1. Direct creation with password (user can login immediately)
+ *   2. Invitation email (user sets password during acceptance)
+ *
+ * Uses Edge Function to call Supabase Admin API
+ * The existing handle_invited_user() trigger automatically creates profile and preferences
+ *
+ * @returns Mutation result with user creation
+ */
+export function useCreateUser() {
+  const queryClient = useQueryClient()
+  const supabase = createBrowserClient()
+
+  return useMutation({
+    mutationFn: async (input: CreateUserInput) => {
+      // Call Edge Function (requires admin auth)
+      const { data, error } = await supabase.functions.invoke('create-user', {
+        body: input
+      })
+
+      if (error) throw error
+
+      // Edge Functions return { success: boolean, data: any, error?: string }
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to create user')
+      }
+
+      return data.data
+    },
+    onSuccess: () => {
+      // Invalidate user list to refetch with new user
+      queryClient.invalidateQueries({ queryKey: userKeys.lists() })
+    },
   })
 }
