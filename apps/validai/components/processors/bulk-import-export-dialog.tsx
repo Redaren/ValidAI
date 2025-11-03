@@ -89,9 +89,9 @@ export function BulkImportExportDialog({
   // Step 1: Export operations to clipboard
   const handleExport = async () => {
     try {
-      const tsv = exportOperationsToTSV(processor.operations, areaDisplayOrder)
+      const tsv = exportOperationsToTSV(processor.operations ?? [], areaDisplayOrder)
       await copyToClipboard(tsv)
-      console.log(`✓ Copied ${processor.operations.length} operations to clipboard`)
+      console.log(`✓ Copied ${processor.operations?.length ?? 0} operations to clipboard`)
       // Note: Could add a success indicator in the UI here if needed
     } catch (error) {
       console.error('Failed to copy:', error)
@@ -108,7 +108,7 @@ export function BulkImportExportDialog({
       // Detect changes
       const changes = detectChanges(
         result.rows.map(r => r.operation!),
-        processor.operations,
+        processor.operations ?? [],
         areaDisplayOrder
       )
       setChangeDetection(changes)
@@ -189,7 +189,7 @@ export function BulkImportExportDialog({
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">Export Operations</h3>
                 <p className="text-sm text-muted-foreground">
-                  Copy all {processor.operations.length} operations to clipboard in TSV format.
+                  Copy all {processor.operations?.length ?? 0} operations to clipboard in TSV format.
                   Paste into Excel or Google Sheets to edit.
                 </p>
                 <Button onClick={handleExport} variant="outline" className="w-full">

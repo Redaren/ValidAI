@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import { createServerClient } from "@playze/shared-auth/server"
 import { WorkbenchClient } from "./workbench-client"
 import { Skeleton } from "@/components/ui/skeleton"
+import { transformProcessorData } from "@/lib/transform-processor-data"
 
 /**
  * Workbench Page - Server Component
@@ -28,7 +29,8 @@ export default async function WorkbenchPage({
     notFound()
   }
 
-  const processor = processors[0]
+  // Transform flat rows to nested structure
+  const processor = transformProcessorData(processors as any)
 
   return (
     <div className="container mx-auto py-6 space-y-6">

@@ -148,8 +148,8 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
       groups.set(areaName, [])
     })
 
-    // Group operations
-    processor.operations.forEach((op) => {
+    // Group operations (with defensive check)
+    processor.operations?.forEach((op) => {
       const areaName = op.area || "default"
       if (!groups.has(areaName)) {
         groups.set(areaName, [])
@@ -290,7 +290,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
       }
     } else {
       // We're over an operation, check which area it belongs to
-      const overOperation = processor.operations.find((op) => op.id === overId)
+      const overOperation = processor.operations?.find((op) => op.id === overId)
       if (overOperation && overOperation.area) {
         targetAreaName = overOperation.area
       }
@@ -390,7 +390,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
     }
 
     // Otherwise, we're dragging an operation (existing logic)
-    const activeOperation = processor.operations.find((op) => op.id === activeId)
+    const activeOperation = processor.operations?.find((op) => op.id === activeId)
     if (!activeOperation) return
 
     // Determine target area and position
@@ -419,7 +419,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
       targetPosition = areaOps.length > 0 ? areaOps[areaOps.length - 1].position + 1 : 1
     } else {
       // Dropped over another operation
-      const overOperation = processor.operations.find((op) => op.id === overId)
+      const overOperation = processor.operations?.find((op) => op.id === overId)
       if (!overOperation) return
 
       targetArea = overOperation.area
@@ -465,7 +465,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
   }
 
   const activeOperation = activeId
-    ? processor.operations.find((op) => op.id === activeId)
+    ? processor.operations?.find((op) => op.id === activeId)
     : null
 
   // Render static version during SSR, DnD version after hydration

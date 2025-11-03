@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { Database, Json } from '@playze/shared-types'
+import { transformProcessorData } from '@/lib/transform-processor-data'
 
 type OperationType = Database['public']['Enums']['operation_type']
 type ProcessorStatus = Database['public']['Enums']['processor_status']
@@ -67,10 +68,8 @@ export function useProcessorDetail(processorId: string, options?: { enabled?: bo
         throw new Error('Processor not found')
       }
 
-      // The RPC returns an array with single result
-      const processor = data[0] as unknown as ProcessorDetail
-
-      return processor
+      // Transform flat rows to nested structure using shared utility
+      return transformProcessorData(data as any)
     },
     staleTime: 30 * 1000, // 30 seconds
     enabled: options?.enabled !== false && !!processorId,

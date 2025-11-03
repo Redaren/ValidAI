@@ -231,7 +231,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
               <span className="text-xs text-muted-foreground">
                 Operations Count
               </span>
-              <span className="text-sm">{processor.operations.length}</span>
+              <span className="text-sm">{processor.operations?.length ?? 0}</span>
             </div>
           </div>
 

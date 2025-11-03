@@ -3,6 +3,7 @@ import { createServerClient } from '@playze/shared-auth/server'
 import { createQueryClient } from '@/lib/query-client'
 import { ProcessorDetailClient } from './processor-detail-client'
 import { notFound } from 'next/navigation'
+import { transformProcessorData } from '@/lib/transform-processor-data'
 
 /**
  * Props for the ProcessorDetailPage component.
@@ -59,7 +60,8 @@ export default async function ProcessorDetailPage({
           throw new Error('Processor not found')
         }
 
-        return data[0]
+        // Transform flat rows to nested structure
+        return transformProcessorData(data as any)
       },
     })
   } catch (error) {
