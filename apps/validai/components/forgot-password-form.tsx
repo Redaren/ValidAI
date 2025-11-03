@@ -14,7 +14,7 @@ import {
 } from "@playze/shared-ui";
 import { Link } from "@/lib/i18n/navigation";
 import { useState } from "react";
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 export function ForgotPasswordForm({
   className,
@@ -25,6 +25,7 @@ export function ForgotPasswordForm({
   const [success, setSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const t = useTranslations('auth.forgotPassword');
+  const locale = useLocale();
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ export function ForgotPasswordForm({
     try {
       // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/update-password`,
+        redirectTo: `${window.location.origin}/${locale}/auth/update-password`,
       });
       if (error) throw error;
       setSuccess(true);

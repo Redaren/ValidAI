@@ -15,7 +15,7 @@ import {
 import { useToastStore } from "@/stores";
 import { Loader2, Mail, CheckCircle2 } from "lucide-react";
 import { useState } from "react";
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 export function LoginForm({
   className,
@@ -26,6 +26,7 @@ export function LoginForm({
   const [emailSent, setEmailSent] = useState(false);
   const addToast = useToastStore((state) => state.addToast);
   const t = useTranslations('auth.login');
+  const locale = useLocale();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +37,7 @@ export function LoginForm({
       const { error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/${locale}/auth/callback`,
         },
       });
 

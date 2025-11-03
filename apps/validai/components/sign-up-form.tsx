@@ -14,7 +14,7 @@ import {
 } from "@playze/shared-ui";
 import { Link, useRouter } from "@/lib/i18n/navigation";
 import { useState } from "react";
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 
 export function SignUpForm({
   className,
@@ -27,6 +27,7 @@ export function SignUpForm({
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const t = useTranslations('auth.signUp');
+  const locale = useLocale();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +46,7 @@ export function SignUpForm({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: `${window.location.origin}/${locale}/dashboard`,
         },
       });
       if (error) throw error;

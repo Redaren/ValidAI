@@ -77,6 +77,37 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Enrich JWT with organization metadata after successful authentication
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (session) {
+      console.log('Enriching JWT with organization metadata for user:', session.user.id)
+
+      const { data, error: enrichError } = await supabase.functions.invoke('enrich-jwt', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`
+        }
+      })
+
+      if (enrichError) {
+        console.error('JWT enrichment failed:', enrichError)
+        // Don't block authentication - user can still login and switch orgs manually
+      } else {
+        console.log('JWT enriched successfully:', data)
+
+        // Refresh session to get updated JWT with organization metadata
+        const { error: refreshError } = await supabase.auth.refreshSession()
+        if (refreshError) {
+          console.error('Session refresh after enrichment failed:', refreshError)
+        }
+      }
+    }
+  } catch (enrichErr) {
+    console.error('JWT enrichment error:', enrichErr)
+    // Don't block authentication - continue with redirect
+  }
+
   // Successfully authenticated - redirect with cookies
   const successResponse = NextResponse.redirect(new URL(next, request.url))
 
