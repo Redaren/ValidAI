@@ -79,7 +79,7 @@ export function exportOperationsToTSV(
     })
   })
 
-  return [commentLine, headerRow, ...dataRows].join('\n')
+  return [commentLine, headerRow, ...dataRows].join('\r\n')
 }
 
 /**
@@ -285,8 +285,9 @@ export function detectChanges(
 /**
  * Copy text to clipboard
  *
- * Uses battle-tested copy-to-clipboard library that handles all edge cases
- * (secure/non-secure contexts, browsers, mobile devices, dialogs/modals).
+ * Uses hybrid approach:
+ * 1. Try modern Clipboard API first (works on localhost/HTTPS, preserves formatting)
+ * 2. Fallback to copy-to-clipboard library (works on non-secure contexts like 192.168.x.x)
  *
  * @param text - Text to copy
  * @returns Promise that resolves when copy is complete
@@ -294,16 +295,33 @@ export function detectChanges(
  */
 export async function copyToClipboard(text: string): Promise<void> {
   console.log('[copyToClipboard] Text length:', text.length)
+  console.log('[copyToClipboard] navigator.clipboard available:', !!navigator.clipboard)
+  console.log('[copyToClipboard] window.isSecureContext:', window.isSecureContext)
 
+  // Try modern Clipboard API first (works on localhost/HTTPS)
+  if (navigator.clipboard && window.isSecureContext) {
+    console.log('[copyToClipboard] Using modern Clipboard API')
+    try {
+      await navigator.clipboard.writeText(text)
+      console.log('[copyToClipboard] ✓ Modern API succeeded')
+      return
+    } catch (error) {
+      console.error('[copyToClipboard] Modern API failed, trying library fallback:', error)
+      // Fall through to library fallback
+    }
+  }
+
+  // Fallback: Use copy-to-clipboard library (works everywhere)
+  console.log('[copyToClipboard] Using copy-to-clipboard library')
   const success = copy(text, {
-    debug: false, // Set to true for library debugging
+    debug: false,
     message: 'Copy to clipboard', // iOS message
   })
 
   if (!success) {
-    console.error('[copyToClipboard] Copy failed')
+    console.error('[copyToClipboard] Library fallback failed')
     throw new Error('Failed to copy to clipboard')
   }
 
-  console.log('[copyToClipboard] ✓ Copy succeeded')
+  console.log('[copyToClipboard] ✓ Library fallback succeeded')
 }
