@@ -88,14 +88,23 @@ export function BulkImportExportDialog({
 
   // Step 1: Export operations to clipboard
   const handleExport = async () => {
+    console.log('[handleExport] Starting export...')
+    console.log('[handleExport] Operations count:', processor.operations?.length ?? 0)
+    console.log('[handleExport] Area display order:', areaDisplayOrder)
+
     try {
       const tsv = exportOperationsToTSV(processor.operations ?? [], areaDisplayOrder)
+      console.log('[handleExport] TSV generated, length:', tsv.length)
+      console.log('[handleExport] TSV preview (first 200 chars):', tsv.substring(0, 200))
+
       await copyToClipboard(tsv)
+
       console.log(`✓ Copied ${processor.operations?.length ?? 0} operations to clipboard`)
       // Note: Could add a success indicator in the UI here if needed
     } catch (error) {
-      console.error('Failed to copy:', error)
-      alert('Failed to copy operations to clipboard')
+      console.error('[handleExport] Failed to copy:', error)
+      console.error('[handleExport] Error details:', error instanceof Error ? error.message : 'Unknown error')
+      alert('Failed to copy operations to clipboard: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
 

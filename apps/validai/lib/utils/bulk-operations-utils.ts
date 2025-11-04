@@ -7,6 +7,7 @@
  * @module lib/utils/bulk-operations-utils
  */
 
+import copy from 'copy-to-clipboard'
 import {
   bulkOperationRowSchema,
   normalizeOperationType,
@@ -284,23 +285,25 @@ export function detectChanges(
 /**
  * Copy text to clipboard
  *
- * Uses modern Clipboard API with fallback.
+ * Uses battle-tested copy-to-clipboard library that handles all edge cases
+ * (secure/non-secure contexts, browsers, mobile devices, dialogs/modals).
  *
  * @param text - Text to copy
  * @returns Promise that resolves when copy is complete
+ * @throws Error if clipboard operation fails
  */
 export async function copyToClipboard(text: string): Promise<void> {
-  if (navigator.clipboard && window.isSecureContext) {
-    await navigator.clipboard.writeText(text)
-  } else {
-    // Fallback for older browsers or non-HTTPS
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textarea)
+  console.log('[copyToClipboard] Text length:', text.length)
+
+  const success = copy(text, {
+    debug: false, // Set to true for library debugging
+    message: 'Copy to clipboard', // iOS message
+  })
+
+  if (!success) {
+    console.error('[copyToClipboard] Copy failed')
+    throw new Error('Failed to copy to clipboard')
   }
+
+  console.log('[copyToClipboard] ✓ Copy succeeded')
 }
