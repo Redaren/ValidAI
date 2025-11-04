@@ -23,7 +23,7 @@
  * @since 2025-10-29
  */
 
-import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
+import { Buffer } from 'node:buffer'
 import { Mistral } from 'npm:@mistralai/mistralai'
 import { z } from 'npm:zod'
 import type {

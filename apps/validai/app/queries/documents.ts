@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import type { Database } from '@playze/shared-types'
 import { validateDocumentFile } from '@/lib/constants/documents'
+import { v4 as uuidv4 } from 'uuid'
 
 type Document = Database['public']['Tables']['validai_documents']['Row']
 
@@ -90,7 +91,7 @@ export function useUploadDocument() {
       if (!organizationId) throw new Error('No organization found')
 
       // 3. Generate unique file path: {org_id}/{uuid}-{filename}
-      const fileId = crypto.randomUUID()
+      const fileId = uuidv4()
       const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
       const storagePath = `${organizationId}/${fileId}-${sanitizedFilename}`
 

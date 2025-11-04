@@ -34,7 +34,7 @@
  * @since 2025-10-14
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { executeLLMOperationWithRetry, downloadDocument } from '../_shared/llm-executor.ts'
 import { executeLLMOperationWithRetryRouter } from '../_shared/llm-executor-router.ts'
 import { Mistral } from 'npm:@mistralai/mistralai'
@@ -228,7 +228,7 @@ serve(async (req) => {
       } else {
         // Regular user: verify organization membership
         const { data: membership, error: memberError } = await supabase
-          .from('validai_organization_members')
+          .from('organization_members')
           .select('organization_id')
           .eq('user_id', user.id)
           .single()

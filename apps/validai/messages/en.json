@@ -26,8 +26,8 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "processors": "Processors",
-    "operations": "Operations",
+    "processors": "Templates",
+    "operations": "Checks",
     "runs": "Runs",
     "documents": "Documents",
     "settings": "Settings",
@@ -46,7 +46,7 @@
     "more": "More"
   },
   "breadcrumb": {
-    "processors": "Processors",
+    "processors": "Templates",
     "workbench": "Workbench",
     "history": "History",
     "runDetail": "Run Detail",
@@ -96,24 +96,24 @@
     }
   },
   "processors": {
-    "title": "Document Processors",
+    "title": "Document Templates",
     "description": "Create and manage AI-powered document analysis templates",
-    "breadcrumb": "Processors",
+    "breadcrumb": "Templates",
     "loading": "Loading processor...",
-    "loadingProcessors": "Loading processors...",
+    "loadingProcessors": "Loading templates...",
     "failed": "Failed to load processor",
-    "failedList": "Failed to load processors",
+    "failedList": "Failed to load templates",
     "unknownError": "Unknown error occurred",
-    "backToList": "Back to Processors",
+    "backToList": "Back to Templates",
     "backToProcessor": "Back to Processor",
     "new": "New",
     "empty": {
-      "title": "No processors yet",
-      "description": "Get started by creating your first document processor to analyze contracts, invoices, or any other documents.",
-      "createFirst": "Create your first processor"
+      "title": "No templates yet",
+      "description": "Get started by creating your first template to analyze contracts, invoices, or any other documents.",
+      "createFirst": "Create your first template"
     },
     "detail": {
-      "operations": "Operations",
+      "operations": "Checks",
       "settings": "Settings",
       "workbench": "Workbench",
       "newArea": "New Area",
@@ -143,8 +143,8 @@
   },
   "runs": {
     "title": "History",
-    "loading": "Loading runs...",
-    "failed": "Failed to load runs",
+    "loading": "Loading history...",
+    "failed": "Failed to load history",
     "description": "View executions and their results",
     "processor": "Processor",
     "status": {
@@ -156,7 +156,7 @@
       "processing": "Processing"
     },
     "table": {
-      "operation": "Operation",
+      "operation": "Test",
       "status": "Status",
       "time": "Time",
       "tokens": "Tokens",
@@ -177,7 +177,7 @@
     },
     "compliance": {
       "progress": "Progress",
-      "validations": "Validations",
+      "validations": "Tests",
       "document": "Document",
       "date": "Date",
       "trafficLights": "Traffic Lights",
@@ -193,13 +193,13 @@
     }
   },
   "auth": {
-    "appName": "ValidAI",
+    "appName": "SanityCheck",
     "login": {
-      "title": "ValidAI",
-      "description": "Sign in with your email to access ValidAI",
+      "title": "SanityCheck",
+      "description": "Sign in with your email to access SanityCheck",
       "emailLabel": "Email Address",
       "emailPlaceholder": "you@example.com",
-      "inviteNotice": "You must be invited to an organization to access ValidAI",
+      "inviteNotice": "You must be invited to an organization to access SanityCheck",
       "sendMagicLink": "Send Magic Link",
       "sendingMagicLink": "Sending Magic Link...",
       "magicLinkInfo": "A magic link will be sent to your email. Click the link to sign in.",
@@ -254,9 +254,9 @@
     }
   },
   "noAccess": {
-    "title": "No Access to ValidAI",
-    "description": "Your organization doesn't have an active ValidAI subscription.",
-    "explanation": "ValidAI is available on Pro and Enterprise plans. Contact your organization administrator or platform support to upgrade your subscription.",
+    "title": "No Access to SanityCheck",
+    "description": "Your organization doesn't have an active SanityCheck subscription.",
+    "explanation": "SanityCheck is available on Pro and Enterprise plans. Contact your organization administrator or platform support to upgrade your subscription.",
     "contactSupport": "Contact Support",
     "backHome": "Back to Home"
   },

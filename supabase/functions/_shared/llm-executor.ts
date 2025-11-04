@@ -17,7 +17,7 @@
  * @since 2025-10-14
  */
 
-import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
+import { Buffer } from 'node:buffer'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
 import { generateText, Output } from 'npm:ai'
 import { z } from 'npm:zod'

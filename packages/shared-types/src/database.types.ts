@@ -464,25 +464,31 @@ export type Database = {
       organizations: {
         Row: {
           created_at: string | null
+          created_by: string | null
           description: string | null
           id: string
           is_active: boolean | null
+          llm_configuration: Json | null
           name: string
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
+          llm_configuration?: Json | null
           name: string
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
+          created_by?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
+          llm_configuration?: Json | null
           name?: string
           updated_at?: string | null
         }
@@ -596,10 +602,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "documents_organization_id_fkey"
+            foreignKeyName: "validai_documents_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "validai_organizations"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -798,10 +804,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "organization_members_organization_id_fkey"
+            foreignKeyName: "validai_organization_members_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "validai_organizations"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -896,10 +902,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "processors_organization_id_fkey"
+            foreignKeyName: "validai_processors_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "validai_organizations"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -989,17 +995,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "runs_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "validai_organizations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "runs_processor_id_fkey"
             columns: ["processor_id"]
             isOneToOne: false
             referencedRelation: "validai_processors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validai_runs_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1064,10 +1070,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "workbench_executions_organization_id_fkey"
+            foreignKeyName: "validai_workbench_executions_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
-            referencedRelation: "validai_organizations"
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
           {
@@ -1545,6 +1551,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }[]
       }
+      has_app_access: { Args: { app_name: string }; Returns: boolean }
       increment_app_usage: {
         Args: {
           app_id: string

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { v4 as uuidv4 } from 'uuid'
 
 interface Notification {
   id: string
@@ -24,7 +25,7 @@ export const useNotificationStore = create<NotificationState>()(
         set((state) => ({
           notifications: [
             ...state.notifications,
-            { ...notification, id: crypto.randomUUID() },
+            { ...notification, id: uuidv4() },
           ],
         })),
       removeNotification: (id) =>

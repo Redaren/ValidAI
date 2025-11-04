@@ -40,8 +40,8 @@
  * @since 2025-10-14
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { Buffer } from 'https://deno.land/std@0.168.0/node/buffer.ts'
+import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
+import { Buffer } from 'node:buffer'
 import { createAnthropic } from 'npm:@ai-sdk/anthropic'
 import { generateText, Output } from 'npm:ai'
 import { z } from 'npm:zod'
