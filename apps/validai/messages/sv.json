@@ -107,6 +107,7 @@
     "backToList": "Tillbaka till mallar",
     "backToProcessor": "Tillbaka till mall",
     "new": "Ny",
+    "filterPlaceholder": "Filtrera...",
     "empty": {
       "title": "Inga mallar än",
       "description": "Kom igång genom att skapa din första mall för att analysera kontrakt, fakturor eller andra dokument.",

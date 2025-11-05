@@ -1,16 +1,13 @@
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { APP_NAME } from "@/lib/constants/app"
 import { getTranslations } from 'next-intl/server'
 
 export default async function AccountLayout({
@@ -31,12 +28,6 @@ export default async function AccountLayout({
           />
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem className="hidden md:block">
-                <BreadcrumbLink href="/dashboard">
-                  {APP_NAME}
-                </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
                 <BreadcrumbPage>{t('account')}</BreadcrumbPage>
               </BreadcrumbItem>

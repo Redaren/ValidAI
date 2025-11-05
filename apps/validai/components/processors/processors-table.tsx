@@ -217,7 +217,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
     <div>
       <div className="flex items-center py-4">
         <Input
-          placeholder="Filter processors..."
+          placeholder={t('filterPlaceholder')}
           value={(table.getColumn("processor_name")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
             table.getColumn("processor_name")?.setFilterValue(event.target.value)

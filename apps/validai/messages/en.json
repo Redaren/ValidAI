@@ -107,6 +107,7 @@
     "backToList": "Back to Templates",
     "backToProcessor": "Back to Processor",
     "new": "New",
+    "filterPlaceholder": "Filter...",
     "empty": {
       "title": "No templates yet",
       "description": "Get started by creating your first template to analyze contracts, invoices, or any other documents.",

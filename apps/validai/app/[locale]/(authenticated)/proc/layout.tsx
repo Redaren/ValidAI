@@ -14,7 +14,6 @@ import { Separator } from "@/components/ui/separator"
 import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { APP_NAME } from "@/lib/constants/app"
 import { useProcessorDetail } from "@/app/queries/processors/use-processor-detail"
 
 export default function ProcessorsLayout({
@@ -54,12 +53,6 @@ export default function ProcessorsLayout({
             />
             <Breadcrumb>
               <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/dashboard">
-                    {APP_NAME}
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
                   {hasProcessor ? (
                     <BreadcrumbLink href="/proc">{t('processors')}</BreadcrumbLink>
