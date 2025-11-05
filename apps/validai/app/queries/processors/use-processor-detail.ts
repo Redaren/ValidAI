@@ -47,6 +47,7 @@ export interface ProcessorDetail {
   updated_at: string
   published_at: string | null
   operations: Operation[]
+  [key: string]: unknown
 }
 
 export function useProcessorDetail(processorId: string, options?: { enabled?: boolean }) {

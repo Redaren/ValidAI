@@ -121,14 +121,14 @@ export const config = {
      * - API routes (/api/*) - Never have locale prefixes
      * - Edge Functions (/functions/*) - Never have locale prefixes
      * - Next.js internals (/_next/*) - Static files, images, etc.
+     * - Static files with extensions (.*\..*)  - favicon, robots.txt, etc.
      *
-     * Simplified pattern: Since API routes and functions should never
-     * have locale prefixes, we can safely exclude any path starting
-     * with /api, /functions, or /_next (which covers /static and /image).
+     * The pattern .*\..* excludes any path containing a dot (file extensions),
+     * allowing Next.js to serve static files like icon.ico, favicon.ico,
+     * robots.txt, sitemap.xml directly without locale prefixes.
      *
-     * This prevents issues where locale-prefixed paths like /en/api/test
-     * would incorrectly match with more complex negative lookaheads.
+     * This follows next-intl best practices for handling static assets.
      */
-    "/((?!api|functions|_next).*)",
+    "/((?!api|functions|_next|.*\\..*).*)",
   ],
 };

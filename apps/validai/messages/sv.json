@@ -25,10 +25,10 @@
     "moreOptions": "Fler alternativ"
   },
   "nav": {
-    "dashboard": "Kontrollpanel",
-    "processors": "Processorer",
-    "operations": "Operationer",
-    "runs": "Körningar",
+    "dashboard": "Översikt",
+    "processors": "Mallar",
+    "operations": "Tester",
+    "runs": "Historik",
     "documents": "Dokument",
     "settings": "Inställningar",
     "platform": "Plattform",
@@ -39,24 +39,24 @@
     "notifications": "Notiser",
     "logout": "Logga ut",
     "upgradeToPro": "Uppgradera till Pro",
-    "projects": "Projekt",
+    "projects": "Gallerier",
     "viewProject": "Visa projekt",
     "shareProject": "Dela projekt",
     "deleteProject": "Ta bort projekt",
     "more": "Mer"
   },
   "breadcrumb": {
-    "processors": "Processorer",
-    "workbench": "Arbetsbänk",
+    "processors": "Mallar",
+    "workbench": "Verktygslåda",
     "history": "Historik",
     "runDetail": "Körningsdetaljer",
     "loading": "Laddar...",
     "account": "Konto"
   },
   "dashboard": {
-    "title": "Kontrollpanel",
+    "title": "Översikt",
     "welcome": "Välkommen",
-    "ready": "Din kontrollpanel är redo för innehåll",
+    "ready": "SanityCheck det enkla sättet att kontrollera dokument",
     "card1": "Kontrollpanelkort 1",
     "card2": "Kontrollpanelkort 2",
     "card3": "Kontrollpanelkort 3",
@@ -96,26 +96,26 @@
     }
   },
   "processors": {
-    "title": "Dokumentprocessorer",
+    "title": "Dokumentmallar",
     "description": "Skapa och hantera AI-drivna dokumentanalysmallar",
-    "breadcrumb": "Processorer",
-    "loading": "Laddar processor...",
-    "loadingProcessors": "Laddar processorer...",
-    "failed": "Kunde inte ladda processor",
-    "failedList": "Kunde inte ladda processorer",
+    "breadcrumb": "Mallar",
+    "loading": "Laddar mall...",
+    "loadingProcessors": "Laddar mallar...",
+    "failed": "Kunde inte ladda mall",
+    "failedList": "Kunde inte ladda mallar",
     "unknownError": "Okänt fel uppstod",
-    "backToList": "Tillbaka till processorer",
-    "backToProcessor": "Tillbaka till processor",
+    "backToList": "Tillbaka till mallar",
+    "backToProcessor": "Tillbaka till mall",
     "new": "Ny",
     "empty": {
-      "title": "Inga processorer än",
-      "description": "Kom igång genom att skapa din första dokumentprocessor för att analysera kontrakt, fakturor eller andra dokument.",
-      "createFirst": "Skapa din första processor"
+      "title": "Inga mallar än",
+      "description": "Kom igång genom att skapa din första mall för att analysera kontrakt, fakturor eller andra dokument.",
+      "createFirst": "Skapa din första mall"
     },
     "detail": {
-      "operations": "Operationer",
+      "operations": "Tester",
       "settings": "Inställningar",
-      "workbench": "Arbetsbänk",
+      "workbench": "Verktygslåda",
       "newArea": "Nytt område",
       "bulkImportExport": "Massimport/export"
     },
@@ -193,13 +193,13 @@
     }
   },
   "auth": {
-    "appName": "ValidAI",
+    "appName": "SanityCheck",
     "login": {
-      "title": "ValidAI",
-      "description": "Logga in med din e-post för att få tillgång till ValidAI",
+      "title": "SanityCheck",
+      "description": "Logga in med din e-post för att få tillgång till SanityCheck",
       "emailLabel": "E-postadress",
       "emailPlaceholder": "du@exempel.se",
-      "inviteNotice": "Du måste vara inbjuden till en organisation för att få tillgång till ValidAI",
+      "inviteNotice": "Du måste vara inbjuden till en organisation för att få tillgång till SanityCheck",
       "sendMagicLink": "Skicka magisk länk",
       "sendingMagicLink": "Skickar magisk länk...",
       "magicLinkInfo": "En magisk länk kommer att skickas till din e-post. Klicka på länken för att logga in.",
@@ -254,9 +254,9 @@
     }
   },
   "noAccess": {
-    "title": "Ingen åtkomst till ValidAI",
-    "description": "Din organisation har ingen aktiv ValidAI-prenumeration.",
-    "explanation": "ValidAI finns tillgängligt i Pro- och Enterprise-planer. Kontakta din organisationsadministratör eller plattformssupport för att uppgradera din prenumeration.",
+    "title": "Ingen åtkomst till SanityCheck",
+    "description": "Din organisation har ingen aktiv SanityCheck-prenumeration.",
+    "explanation": "SanityCheck finns tillgängligt i Pro- och Enterprise-planer. Kontakta din organisationsadministratör eller plattformssupport för att uppgradera din prenumeration.",
     "contactSupport": "Kontakta support",
     "backHome": "Tillbaka hem"
   },
@@ -278,17 +278,17 @@
       "themeDark": "Standard mörk",
       "themeClaudeLight": "Claude ljus",
       "themeClaudeDark": "Claude mörk",
-      "themeDescription": "Välj hur applikationen visas. Claude-teman använder en varm, färgrik palett."
+      "themeDescription": "Välj hur applikationen visas."
     },
     "organization": {
       "title": "Organisationskontext",
-      "description": "Din roll och åtkomstnivå i den nuvarande organisationen",
+      "description": "Din roll och åtkomstnivå i denna organisationen",
       "currentOrg": "Nuvarande organisation",
       "noOrgSelected": "Ingen organisation vald"
     }
   },
   "workbench": {
-    "title": "Arbetsbänk",
+    "title": "Verktygslåda",
     "output": "Utdata",
     "error": "Fel",
     "status": {
