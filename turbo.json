@@ -11,9 +11,7 @@
       ],
       "outputs": [
         ".next/**",
-        "!.next/cache/**",
-        "dist/**",
-        "tsconfig.tsbuildinfo"
+        "!.next/cache/**"
       ]
     },
     "dev": {
