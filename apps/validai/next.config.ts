@@ -51,8 +51,8 @@ const nextConfig: NextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Scripts: Permissive in dev (unsafe-eval for HMR), strict in prod
-              `script-src 'self'${isDevelopment ? " 'unsafe-eval' 'unsafe-inline'" : ""}`,
+              // Scripts: Always allow unsafe-inline (required for Next.js), unsafe-eval only in dev (for HMR)
+              `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
               // Styles: Always allow unsafe-inline (required for Radix UI/shadcn)
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // Images: Self + data URIs + Supabase Storage

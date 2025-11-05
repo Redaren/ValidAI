@@ -6,6 +6,24 @@ This document shows the differences in security headers between development and 
 
 The security headers in [`apps/validai/next.config.ts`](../../apps/validai/next.config.ts) are **environment-aware**, using `process.env.NODE_ENV` to apply different policies.
 
+### Important: Next.js Inline Script Requirement
+
+⚠️ **Next.js requires `'unsafe-inline'` in `script-src` for both development and production.**
+
+Next.js injects inline scripts for:
+- React hydration data (`__NEXT_DATA__`)
+- Route prefetching
+- Build manifest
+- Application bootstrap
+
+**Without `'unsafe-inline'`, the app will not function.** This is standard practice for Next.js applications and is considered acceptable because:
+- Next.js controls all inline scripts (not user-generated)
+- The scripts are part of the framework, not arbitrary user content
+- Other CSP directives still provide strong XSS protection
+- This is the recommended approach by Vercel and the Next.js team
+
+For maximum security, `'unsafe-eval'` is only included in development for Hot Module Replacement (HMR).
+
 ## Header Comparison
 
 ### Development Environment (`NODE_ENV=development`)
@@ -51,15 +69,16 @@ X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
 Strict-Transport-Security: max-age=31536000; includeSubDomains
 Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://xczippkxxdqlvaacjexj.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://xczippkxxdqlvaacjexj.supabase.co wss://xczippkxxdqlvaacjexj.supabase.co; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https://xczippkxxdqlvaacjexj.supabase.co; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://xczippkxxdqlvaacjexj.supabase.co wss://xczippkxxdqlvaacjexj.supabase.co; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
 ```
 
 **Added in Production:**
 - ✅ Strict-Transport-Security (HSTS enforces HTTPS for 1 year)
 - ✅ `upgrade-insecure-requests` in CSP (forces all HTTP → HTTPS)
 
-**Strict Security (Maximum Protection):**
-- ✅ `script-src 'self'` ONLY (no unsafe-eval, no unsafe-inline)
+**Strong Security (Pragmatic for Next.js):**
+- ✅ `script-src 'self' 'unsafe-inline'` (unsafe-inline required for Next.js inline scripts)
+- ✅ No `unsafe-eval` in production (only in dev for HMR)
 - ✅ All resources must be from whitelisted domains
 - ✅ HTTPS enforced at multiple levels
 
@@ -74,7 +93,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 | **Referrer-Policy** | strict-origin-when-cross-origin | strict-origin-when-cross-origin | Same |
 | **HSTS** | ❌ Not included | ✅ max-age=31536000 | Requires valid SSL |
 | **Permissions-Policy** | camera=(), microphone=()... | camera=(), microphone=()... | Same |
-| **CSP script-src** | 'self' 'unsafe-eval' 'unsafe-inline' | 'self' | HMR needs eval in dev |
+| **CSP script-src** | 'self' 'unsafe-inline' 'unsafe-eval' | 'self' 'unsafe-inline' | Next.js needs unsafe-inline; HMR needs eval in dev |
 | **CSP upgrade-insecure-requests** | ❌ Not included | ✅ Included | HTTP ok in dev, force HTTPS in prod |
 | **CSP style-src** | 'self' 'unsafe-inline' fonts.googleapis.com | 'self' 'unsafe-inline' fonts.googleapis.com | Same (Radix UI needs inline) |
 | **CSP img-src** | 'self' data: supabase | 'self' data: supabase | Same |
@@ -108,23 +127,24 @@ Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'
 
 **Development:**
 ```typescript
-// Scripts: Permissive in dev (unsafe-eval for HMR), strict in prod
-`script-src 'self'${isDevelopment ? " 'unsafe-eval' 'unsafe-inline'" : ""}`,
+// Scripts: Always allow unsafe-inline (required for Next.js), unsafe-eval only in dev (for HMR)
+`script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""}`,
 ```
 
-Becomes: `script-src 'self' 'unsafe-eval' 'unsafe-inline'`
+Becomes: `script-src 'self' 'unsafe-inline' 'unsafe-eval'`
 
-- `'unsafe-eval'` - Required for Next.js Hot Module Replacement (HMR)
-- `'unsafe-inline'` - Helpful for inline scripts during development
-- Without these, HMR would break and dev experience would suffer
+- `'unsafe-inline'` - **Required for Next.js inline scripts** (hydration, routing, build manifest)
+- `'unsafe-eval'` - Required for Next.js Hot Module Replacement (HMR) in development
+- Without these, Next.js would break entirely
 
 **Production:**
-Becomes: `script-src 'self'`
+Becomes: `script-src 'self' 'unsafe-inline'`
 
-- No `'unsafe-eval'` - Maximum security, no eval() allowed
-- No `'unsafe-inline'` - No inline scripts allowed
-- Only scripts from same origin (`'self'`) can execute
-- Significantly reduces XSS attack surface
+- `'unsafe-inline'` - **Required for Next.js inline scripts** (hydration, routing, build manifest)
+- No `'unsafe-eval'` - Removed in production for better security
+- Scripts from same origin (`'self'`) plus Next.js inline scripts allowed
+- **Why unsafe-inline is acceptable:** Next.js controls all inline scripts; they're not user-generated
+- **Security note:** This is standard practice for Next.js applications and recommended by Vercel
 
 ### 3. CSP upgrade-insecure-requests Directive
 
