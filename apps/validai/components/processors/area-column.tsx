@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Operation } from "@/app/queries/processors/use-processor-detail"
 import {
   Card,
@@ -113,6 +113,11 @@ export function AreaColumn({
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isCreateOperationOpen, setIsCreateOperationOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   /**
    * Make the area itself sortable for reordering.
@@ -205,43 +210,45 @@ export function AreaColumn({
             </CollapsibleTrigger>
 
             {/* Area Options Menu - outside of CollapsibleTrigger */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 shrink-0"
-                  disabled={isRenaming || isDeleting}
-                  title="Area options"
-                >
-                  <span className="sr-only">Open area menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setIsCreateOperationOpen(true)}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Operation
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsRenameDialogOpen(true)}
-                  disabled={isRenaming}
-                >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Rename
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsDeleteDialogOpen(true)}
-                  disabled={isDeleting || isLastArea}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {mounted && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    disabled={isRenaming || isDeleting}
+                    title="Area options"
+                  >
+                    <span className="sr-only">Open area menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => setIsCreateOperationOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Operation
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setIsRenameDialogOpen(true)}
+                    disabled={isRenaming}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Rename
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    disabled={isDeleting || isLastArea}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </CardTitle>
         </CardHeader>
 

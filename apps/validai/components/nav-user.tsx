@@ -42,6 +42,7 @@ export function NavUser() {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
+  const [mounted, setMounted] = useState(false)
   const t = useTranslations('nav')
   const tCommon = useTranslations('common')
 
@@ -57,6 +58,7 @@ export function NavUser() {
           avatar: authUser.user_metadata?.avatar_url
         })
       }
+      setMounted(true)
     }
 
     getUser()
@@ -68,18 +70,25 @@ export function NavUser() {
     router.push('/auth/login')
   }
 
-  if (!user) {
+  if (!user || !mounted) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
           <SidebarMenuButton size="lg">
             <Avatar className="h-8 w-8 rounded-lg">
-              <AvatarFallback className="rounded-lg">...</AvatarFallback>
+              <AvatarFallback className="rounded-lg">
+                {!mounted ? '...' : user?.name?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+              </AvatarFallback>
             </Avatar>
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-medium">{tCommon('loading')}</span>
-              <span className="truncate text-xs">...</span>
+              <span className="truncate font-medium">
+                {!mounted ? tCommon('loading') : user?.name || 'User'}
+              </span>
+              <span className="truncate text-xs">
+                {!mounted ? '...' : user?.email || ''}
+              </span>
             </div>
+            <ChevronsUpDown className="ml-auto size-4" />
           </SidebarMenuButton>
         </SidebarMenuItem>
       </SidebarMenu>

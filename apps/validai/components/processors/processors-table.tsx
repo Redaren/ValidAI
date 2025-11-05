@@ -42,11 +42,16 @@ interface ProcessorsTableProps {
 export function ProcessorsTable({ data }: ProcessorsTableProps) {
   const router = useRouter()
   const t = useTranslations('processors')
+  const [mounted, setMounted] = React.useState(false)
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: "processor_name", desc: false }
   ])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const columns = React.useMemo<ColumnDef<Processor>[]>(
     () => [
@@ -156,41 +161,43 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 <span className="sr-only">View runs</span>
               </Button>
 
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="ghost" className="h-8 w-8 p-0">
-                    <span className="sr-only">Open menu</span>
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
-                  <DropdownMenuItem
-                    onClick={() => router.push(`/proc/${processor.processor_id}`)}
-                  >
-                    View details
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled
-                    onClick={() => console.log("Edit:", processor.processor_id)}
-                  >
-                    Edit processor
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    disabled
-                    onClick={() => console.log("Delete:", processor.processor_id)}
-                  >
-                    Delete processor
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {mounted && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="ghost" className="h-8 w-8 p-0">
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/proc/${processor.processor_id}`)}
+                    >
+                      View details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled
+                      onClick={() => console.log("Edit:", processor.processor_id)}
+                    >
+                      Edit processor
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      disabled
+                      onClick={() => console.log("Delete:", processor.processor_id)}
+                    >
+                      Delete processor
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           )
         },
       },
     ],
-    [router]
+    [router, mounted, t]
   )
 
   const table = useReactTable({

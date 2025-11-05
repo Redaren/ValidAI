@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "@/lib/i18n/navigation"
 import { ProcessorDetail } from "@/app/queries/processors/use-processor-detail"
 import {
@@ -42,7 +42,12 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -125,34 +130,36 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
               <span className="sr-only">View Runs</span>
             </Link>
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" title="More options">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setIsEditSheetOpen(true)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <Upload className="mr-2 h-4 w-4" />
-                Publish
-              </DropdownMenuItem>
-              <DropdownMenuItem disabled>
-                <Eye className="mr-2 h-4 w-4" />
-                Preview
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem disabled>
-                <Archive className="mr-2 h-4 w-4" />
-                Archive
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {mounted && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" title="More options">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setIsEditSheetOpen(true)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Publish
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Preview
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem disabled>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archive
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 

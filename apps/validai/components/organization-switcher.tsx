@@ -6,6 +6,7 @@ import {
   Settings,
 } from "lucide-react"
 import { useRouter } from "@/lib/i18n/navigation"
+import { useEffect, useState } from "react"
 
 import {
   DropdownMenu,
@@ -26,6 +27,7 @@ import { useCurrentOrganization, useUserOrganizations, useSwitchOrganization } f
 export function OrganizationSwitcher() {
   const { isMobile } = useSidebar()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
 
   // Queries (shared hooks return data directly, not wrapped in objects)
   const { data: currentOrg, isLoading: currentLoading } = useCurrentOrganization()
@@ -33,6 +35,10 @@ export function OrganizationSwitcher() {
   const switchOrgMutation = useSwitchOrganization()
 
   const isLoading = currentLoading || orgsLoading || switchOrgMutation.isPending
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (isLoading) {
     return (
@@ -76,6 +82,33 @@ export function OrganizationSwitcher() {
       // Use organization ID instead of slug for settings route
       router.push(`/dashboard/organizations/${currentOrg.id}/settings`)
     }
+  }
+
+  // Render button without dropdown during SSR
+  if (!mounted) {
+    return (
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <SidebarMenuButton
+            size="lg"
+            disabled={isLoading}
+          >
+            <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
+              <Building2 className="size-4" />
+            </div>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold">
+                {currentOrg?.name || 'No Organization'}
+              </span>
+              <span className="truncate text-xs">
+                Slogan here
+              </span>
+            </div>
+            <ChevronsUpDown className="ml-auto size-4" />
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      </SidebarMenu>
+    )
   }
 
   return (
