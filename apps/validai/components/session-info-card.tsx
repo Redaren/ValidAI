@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { User, Session } from "@supabase/supabase-js"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button } from "@playze/shared-ui"
 import { Separator } from "@/components/ui/separator"
@@ -138,7 +139,7 @@ export function SessionInfoCard() {
           currentOrg
         })
       } catch (error) {
-        console.error('Error fetching session data:', error)
+        logger.error('Error fetching session data:', extractErrorDetails(error))
       } finally {
         setLoading(false)
       }

@@ -6,6 +6,7 @@
  */
 
 import { useMutation } from '@tanstack/react-query'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import type { WorkbenchTestInput, WorkbenchTestResponse } from '@/lib/validations'
 
@@ -14,7 +15,6 @@ export function useWorkbenchTest() {
 
   return useMutation({
     mutationFn: async (input: WorkbenchTestInput): Promise<WorkbenchTestResponse> => {
-      console.log('Sending request to Edge Function:', input)
 
       const { data, error } = await supabase.functions.invoke<WorkbenchTestResponse>(
         'execute-workbench-test',
@@ -24,7 +24,7 @@ export function useWorkbenchTest() {
       )
 
       if (error) {
-        console.error('Edge Function error details:', {
+        logger.error('Edge Function error details:', {
           message: error.message,
           context: error.context,
           error: error
@@ -37,7 +37,6 @@ export function useWorkbenchTest() {
       }
 
       // Log response for debugging
-      console.log('Edge Function response:', data)
 
       return data
     }

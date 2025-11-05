@@ -5,6 +5,7 @@
 
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import type { ConversationMessage, WorkbenchExecution } from '@/lib/validations'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import type { RealtimeChannel } from '@supabase/supabase-js'
@@ -513,7 +514,6 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
               filter: `id=eq.${executionId}`
             },
             (payload) => {
-              console.log('Realtime update received:', payload)
               const execution = payload.new as WorkbenchExecution
               get().handleExecutionUpdate(execution)
             }
@@ -540,7 +540,6 @@ export const useWorkbenchStore = create<WorkbenchStore>()(
       },
 
       handleExecutionUpdate: (execution: WorkbenchExecution) => {
-        console.log('Processing execution update:', execution)
 
         // Update execution status
         set({ executionStatus: execution.status as any })

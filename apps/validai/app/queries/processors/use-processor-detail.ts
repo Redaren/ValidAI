@@ -1,6 +1,7 @@
 'use client'
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { Database, Json } from '@playze/shared-types'
 import { transformProcessorData } from '@/lib/transform-processor-data'
@@ -61,7 +62,7 @@ export function useProcessorDetail(processorId: string, options?: { enabled?: bo
       })
 
       if (error) {
-        console.error('Error fetching processor:', error)
+        logger.error('Error fetching processor:', extractErrorDetails(error))
         throw new Error(error.message || 'Failed to fetch processor')
       }
 

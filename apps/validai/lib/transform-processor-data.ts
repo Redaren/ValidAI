@@ -9,6 +9,7 @@
  */
 
 import { Operation, ProcessorDetail } from '@/app/queries/processors/use-processor-detail'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 
 /**
  * Raw row structure returned by get_processor_with_operations RPC.
@@ -68,7 +69,6 @@ interface ProcessorWithOperationsRow {
  * ```typescript
  * const { data } = await supabase.rpc('get_processor_with_operations', { p_processor_id: id })
  * const processor = transformProcessorData(data)
- * console.log(processor.operations.length) // Safe: always an array
  * ```
  */
 export function transformProcessorData(

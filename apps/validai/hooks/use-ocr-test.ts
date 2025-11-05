@@ -4,6 +4,7 @@
  */
 
 import { useMutation } from '@tanstack/react-query'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import type { OCRResult } from '@/stores/workbench-store'
 
@@ -38,7 +39,6 @@ interface OCRTestInput {
  *     file_content: base64String,
  *     file_type: 'application/pdf'
  *   })
- *   console.log(result.markdown, result.annotations)
  * }
  * ```
  */

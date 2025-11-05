@@ -26,6 +26,7 @@ const eslintConfig = [
   {
     rules: {
       "@typescript-eslint/no-explicit-any": "warn", // Changed from error to warning
+      "no-console": "error", // Ban all console usage - use logger from @/lib/utils/logger instead
     },
   },
 ];

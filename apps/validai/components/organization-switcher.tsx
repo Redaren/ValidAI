@@ -6,6 +6,7 @@ import {
   Settings,
 } from "lucide-react"
 import { useRouter } from "@/lib/i18n/navigation"
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useEffect, useState } from "react"
 
 import {
@@ -72,7 +73,7 @@ export function OrganizationSwitcher() {
         window.location.reload()
       }
     } catch (error) {
-      console.error('Failed to switch organization:', error)
+      logger.error('Failed to switch organization:', extractErrorDetails(error))
       // TODO: Show error notification
     }
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -103,7 +104,7 @@ export function ProcessorSettingsSheet({
       form.reset()
       onOpenChange(false)
     } catch (error) {
-      console.error('Failed to update processor settings:', error)
+      logger.error('Failed to update processor settings:', extractErrorDetails(error))
     }
   }
 

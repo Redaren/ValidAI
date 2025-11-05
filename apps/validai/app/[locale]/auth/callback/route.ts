@@ -1,4 +1,5 @@
 import { type EmailOtpType } from '@supabase/supabase-js'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { type NextRequest, NextResponse } from 'next/server'
 import { createServerClient } from '@supabase/ssr'
 
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (error) {
-      console.error('Magic link verification error:', error)
+      logger.error('Magic link verification error:', extractErrorDetails(error))
       // Redirect to login with error message (locale-aware)
       const errorResponse = NextResponse.redirect(
         new URL(`/${locale}/auth/login?error=${encodeURIComponent(error.message)}`, request.url)
@@ -68,7 +69,7 @@ export async function GET(request: NextRequest) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
-      console.error('OAuth code exchange error:', error)
+      logger.error('OAuth code exchange error:', extractErrorDetails(error))
       // Redirect to login with error message (locale-aware)
       const errorResponse = NextResponse.redirect(
         new URL(`/${locale}/auth/login?error=${encodeURIComponent(error.message)}`, request.url)
@@ -82,7 +83,6 @@ export async function GET(request: NextRequest) {
     const { data: { session } } = await supabase.auth.getSession()
 
     if (session) {
-      console.log('Enriching JWT with organization metadata for user:', session.user.id)
 
       const { data, error: enrichError } = await supabase.functions.invoke('enrich-jwt', {
         headers: {
@@ -91,20 +91,19 @@ export async function GET(request: NextRequest) {
       })
 
       if (enrichError) {
-        console.error('JWT enrichment failed:', enrichError)
+        logger.error('JWT enrichment failed:', extractErrorDetails(enrichError))
         // Don't block authentication - user can still login and switch orgs manually
       } else {
-        console.log('JWT enriched successfully:', data)
 
         // Refresh session to get updated JWT with organization metadata
         const { error: refreshError } = await supabase.auth.refreshSession()
         if (refreshError) {
-          console.error('Session refresh after enrichment failed:', refreshError)
+          logger.error('Session refresh after enrichment failed:', extractErrorDetails(refreshError))
         }
       }
     }
   } catch (enrichErr) {
-    console.error('JWT enrichment error:', enrichErr)
+    logger.error('JWT enrichment error:', extractErrorDetails(enrichErr))
     // Don't block authentication - continue with redirect
   }
 

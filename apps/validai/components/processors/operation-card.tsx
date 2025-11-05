@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { Operation } from "@/app/queries/processors/use-processor-detail"
 import { Badge, Button } from "@playze/shared-ui"
 import { useSortable } from "@dnd-kit/sortable"
@@ -127,7 +128,7 @@ export function OperationCard({ operation, processorId }: OperationCardProps) {
       })
       setIsDeleteDialogOpen(false)
     } catch (error) {
-      console.error("Failed to delete operation:", error)
+      logger.error("Failed to delete operation:", extractErrorDetails(error))
     }
   }
 

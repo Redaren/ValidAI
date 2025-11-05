@@ -21,6 +21,7 @@
 'use client'
 
 import { useState } from 'react'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useRouter } from '@/lib/i18n/navigation'
 import { Button } from '@playze/shared-ui'
 /**
@@ -175,7 +176,7 @@ export function RunProcessorDialog({
           'Processing in background. You can monitor progress on the run detail page.',
       })
     } catch (error) {
-      console.error('Failed to upload document or create run:', error)
+      logger.error('Failed to upload document or create run:', extractErrorDetails(error))
       const errorMessage =
         error instanceof Error
           ? error.message

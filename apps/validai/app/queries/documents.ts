@@ -11,6 +11,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import type { Database } from '@playze/shared-types'
 import { validateDocumentFile } from '@/lib/constants/documents'
@@ -61,7 +62,6 @@ export function useDocuments() {
  *
  * const handleFile = async (file: File) => {
  *   const document = await uploadDocument.mutateAsync(file)
- *   console.log('Uploaded:', document.id)
  * }
  * ```
  */

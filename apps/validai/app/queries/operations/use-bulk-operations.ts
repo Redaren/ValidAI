@@ -9,6 +9,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import type { BulkOperationRow } from '@/lib/validations'
 import type { ProcessorDetail } from '../processors/use-processor-detail'
@@ -212,10 +213,9 @@ export function useBulkImportOperations() {
       queryClient.invalidateQueries({
         queryKey: ['processor', variables.processorId],
       })
-      console.log('Bulk import completed:', result)
     },
     onError: (error) => {
-      console.error('Failed to bulk import operations:', error)
+      logger.error('Failed to bulk import operations:', extractErrorDetails(error))
     },
   })
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -186,7 +187,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
       onOpenChange(false)
     } catch (error) {
       // Error is displayed via createProcessor.isError state in UI
-      console.error('Failed to create processor:', error)
+      logger.error('Failed to create processor:', extractErrorDetails(error))
     }
   }
 

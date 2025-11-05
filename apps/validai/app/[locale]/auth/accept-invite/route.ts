@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createServerClient } from '@playze/shared-auth/server'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     })
 
     if (error || !user) {
-      console.error('Error verifying invitation:', error)
+      logger.error('Error verifying invitation:', extractErrorDetails(error))
       return NextResponse.redirect(new URL('/auth/error', request.url))
     }
 
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     const organizationName = user.user_metadata?.organization_name
 
     if (!orgId || !role) {
-      console.error('Invalid invitation data in user metadata')
+      logger.error('Invalid invitation data in user metadata')
       return NextResponse.redirect(new URL('/auth/error', request.url))
     }
 
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       .single()
 
     if (orgError || !organization) {
-      console.error('Organization not found:', orgError)
+      logger.error('Organization not found:', extractErrorDetails(orgError))
       return NextResponse.redirect(new URL('/auth/error', request.url))
     }
 
@@ -62,7 +63,7 @@ export async function GET(request: NextRequest) {
       })
 
     if (membershipError) {
-      console.error('Error creating organization membership:', membershipError)
+      logger.error('Error creating organization membership:', extractErrorDetails(membershipError))
       return NextResponse.redirect(new URL('/auth/error', request.url))
     }
 
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
     )
 
     if (updateError) {
-      console.error('Error updating user metadata:', updateError)
+      logger.error('Error updating user metadata:', extractErrorDetails(updateError))
       // Continue anyway as the membership was created
     }
 
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(dashboardUrl)
   } catch (error) {
-    console.error('Error in accept invitation route:', error)
+    logger.error('Error in accept invitation route:', extractErrorDetails(error))
     return NextResponse.redirect(new URL('/auth/error', request.url))
   }
 }

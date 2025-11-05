@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -206,7 +207,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
       onOpenChange(false)
     } catch (error) {
       // Error is displayed via updateProcessor.isError state in UI
-      console.error('Failed to update processor:', error)
+      logger.error('Failed to update processor:', extractErrorDetails(error))
     }
   }
 

@@ -6,6 +6,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { Button, Label, Textarea } from "@playze/shared-ui"
 import { Switch } from "@/components/ui/switch"
 import {
@@ -468,7 +469,7 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
       }, 1000) // Small delay to ensure we receive the final update
 
     } catch (error) {
-      console.error('Test execution failed:', error)
+      logger.error('Test execution failed:', extractErrorDetails(error))
       unsubscribeFromExecution()
     }
   }
@@ -497,7 +498,7 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
       // Redirect back to processor detail page after successful save
       router.push(`/proc/${processor.processor_id}`)
     } catch (error) {
-      console.error('Failed to save operation:', error)
+      logger.error('Failed to save operation:', extractErrorDetails(error))
       // Error will be visible in the UI through the mutation state
     }
   }

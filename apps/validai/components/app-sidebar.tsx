@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import {
   FileText,
   LifeBuoy,
@@ -91,7 +92,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           }, { onConflict: 'user_id' })
       }
     } catch (error) {
-      console.error('Failed to update language preference in database:', error)
+      logger.error('Failed to update language preference in database:', extractErrorDetails(error))
       // Note: The language switch will still work via cookie even if DB update fails
     }
   }

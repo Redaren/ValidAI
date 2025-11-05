@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -223,7 +224,7 @@ export function OperationSheet({
       onOpenChange(false)
     } catch (error) {
       // Error is displayed via mutation.isError state in UI
-      console.error('Failed to save operation:', error)
+      logger.error('Failed to save operation:', extractErrorDetails(error))
     }
   }
 

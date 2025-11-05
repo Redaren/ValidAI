@@ -8,6 +8,7 @@
  */
 
 import copy from 'copy-to-clipboard'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import {
   bulkOperationRowSchema,
   normalizeOperationType,
@@ -294,34 +295,27 @@ export function detectChanges(
  * @throws Error if clipboard operation fails
  */
 export async function copyToClipboard(text: string): Promise<void> {
-  console.log('[copyToClipboard] Text length:', text.length)
-  console.log('[copyToClipboard] navigator.clipboard available:', !!navigator.clipboard)
-  console.log('[copyToClipboard] window.isSecureContext:', window.isSecureContext)
 
   // Try modern Clipboard API first (works on localhost/HTTPS)
   if (navigator.clipboard && window.isSecureContext) {
-    console.log('[copyToClipboard] Using modern Clipboard API')
     try {
       await navigator.clipboard.writeText(text)
-      console.log('[copyToClipboard] ✓ Modern API succeeded')
       return
     } catch (error) {
-      console.error('[copyToClipboard] Modern API failed, trying library fallback:', error)
+      logger.error('[copyToClipboard] Modern API failed, trying library fallback:', extractErrorDetails(error))
       // Fall through to library fallback
     }
   }
 
   // Fallback: Use copy-to-clipboard library (works everywhere)
-  console.log('[copyToClipboard] Using copy-to-clipboard library')
   const success = copy(text, {
     debug: false,
     message: 'Copy to clipboard', // iOS message
   })
 
   if (!success) {
-    console.error('[copyToClipboard] Library fallback failed')
+    logger.error('[copyToClipboard] Library fallback failed')
     throw new Error('Failed to copy to clipboard')
   }
 
-  console.log('[copyToClipboard] ✓ Library fallback succeeded')
 }

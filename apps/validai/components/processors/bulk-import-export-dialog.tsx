@@ -1,5 +1,6 @@
 'use client'
 
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useState } from 'react'
 import {
   Button,
@@ -88,22 +89,16 @@ export function BulkImportExportDialog({
 
   // Step 1: Export operations to clipboard
   const handleExport = async () => {
-    console.log('[handleExport] Starting export...')
-    console.log('[handleExport] Operations count:', processor.operations?.length ?? 0)
-    console.log('[handleExport] Area display order:', areaDisplayOrder)
 
     try {
       const tsv = exportOperationsToTSV(processor.operations ?? [], areaDisplayOrder)
-      console.log('[handleExport] TSV generated, length:', tsv.length)
-      console.log('[handleExport] TSV preview (first 200 chars):', tsv.substring(0, 200))
 
       await copyToClipboard(tsv)
 
-      console.log(`✓ Copied ${processor.operations?.length ?? 0} operations to clipboard`)
       // Note: Could add a success indicator in the UI here if needed
     } catch (error) {
-      console.error('[handleExport] Failed to copy:', error)
-      console.error('[handleExport] Error details:', error instanceof Error ? error.message : 'Unknown error')
+      logger.error('[handleExport] Failed to copy:', extractErrorDetails(error))
+      logger.error('[handleExport] Error details:', { message: error instanceof Error ? error.message : 'Unknown error' })
       alert('Failed to copy operations to clipboard: ' + (error instanceof Error ? error.message : 'Unknown error'))
     }
   }
@@ -156,10 +151,9 @@ export function BulkImportExportDialog({
         newAreas: changeDetection.newAreas,
       })
 
-      console.log(`✓ Import completed: Created ${result.operationsCreated} operations, updated ${result.operationsUpdated} operations`)
       handleOpenChange(false)
     } catch (error) {
-      console.error('Import failed:', error)
+      logger.error('Import failed:', extractErrorDetails(error))
       alert(error instanceof Error ? error.message : 'Failed to import operations')
     }
   }

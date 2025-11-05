@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import {
   ColumnDef,
   ColumnFiltersState,
@@ -178,14 +179,12 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled
-                      onClick={() => console.log("Edit:", processor.processor_id)}
                     >
                       Edit processor
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       disabled
-                      onClick={() => console.log("Delete:", processor.processor_id)}
                     >
                       Delete processor
                     </DropdownMenuItem>

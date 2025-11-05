@@ -6,6 +6,7 @@ import { Database } from '@playze/shared-types'
 import { useEffect, useState } from 'react'
 import { useRouter } from '@/lib/i18n/navigation'
 import type { CreateProcessorInput } from '@/lib/validations'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 
 type ProcessorStatus = Database['public']['Enums']['processor_status']
 type ProcessorVisibility = Database['public']['Enums']['processor_visibility']
@@ -36,8 +37,6 @@ export function useUserProcessors(includeArchived: boolean = false) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session)
       if (session) {
-        console.log('User authenticated, organization_id:',
-          session.user?.app_metadata?.organization_id)
       }
     })
   }, [supabase])
@@ -52,16 +51,13 @@ export function useUserProcessors(includeArchived: boolean = false) {
         throw new Error('Not authenticated')
       }
 
-      // Log the current user context
-      console.log('Fetching processors for user:', session.user.id)
-      console.log('Organization ID:', session.user.app_metadata?.organization_id)
 
       const { data, error } = await supabase.rpc('get_user_processors', {
         p_include_archived: includeArchived
       })
 
       if (error) {
-        console.error('Error fetching processors:', {
+        logger.error('Error fetching processors:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
@@ -70,7 +66,6 @@ export function useUserProcessors(includeArchived: boolean = false) {
         throw new Error(error.message || 'Failed to fetch processors')
       }
 
-      console.log('Processors fetched:', data?.length || 0)
 
       // The RPC function returns data in the correct format already
       return data as Processor[]
@@ -120,9 +115,6 @@ export function useCreateProcessor() {
         throw new Error('No organization found for user')
       }
 
-      console.log('Creating processor with input:', input)
-      console.log('User ID:', user.id)
-      console.log('Organization ID:', organizationId)
 
       const insertData = {
         name: input.name,
@@ -137,7 +129,6 @@ export function useCreateProcessor() {
         created_by: user.id, // Required by RLS policy
       }
 
-      console.log('Insert data:', insertData)
 
       const { data, error } = await supabase
         .from('validai_processors')
@@ -146,7 +137,7 @@ export function useCreateProcessor() {
         .single()
 
       if (error) {
-        console.error('Error creating processor:', {
+        logger.error('Error creating processor:', {
           message: error.message,
           details: error.details,
           hint: error.hint,
@@ -155,7 +146,6 @@ export function useCreateProcessor() {
         throw new Error(error.message || 'Failed to create processor')
       }
 
-      console.log('Processor created successfully:', data)
       return data
     },
     onSuccess: (newProcessor) => {
@@ -166,7 +156,7 @@ export function useCreateProcessor() {
       router.push(`/proc/${newProcessor.id}`)
     },
     onError: (error) => {
-      console.error('Create processor mutation failed:', error)
+      logger.error('Create processor mutation failed:', extractErrorDetails(error))
     },
   })
 }

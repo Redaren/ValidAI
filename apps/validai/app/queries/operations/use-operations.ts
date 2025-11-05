@@ -6,6 +6,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { CreateOperationPayload, UpdateGenericOperationInput } from '@/lib/validations'
 
@@ -73,10 +74,9 @@ export function useCreateOperation() {
       queryClient.invalidateQueries({
         queryKey: ['processor', data.processor_id],
       })
-      console.log('Operation created successfully:', data)
     },
     onError: (error) => {
-      console.error('Failed to create operation:', error)
+      logger.error('Failed to create operation:', extractErrorDetails(error))
     },
   })
 }
@@ -121,10 +121,9 @@ export function useUpdateOperation() {
       queryClient.invalidateQueries({
         queryKey: ['processor', data.processor_id],
       })
-      console.log('Operation updated successfully:', data)
     },
     onError: (error) => {
-      console.error('Failed to update operation:', error)
+      logger.error('Failed to update operation:', extractErrorDetails(error))
     },
   })
 }
@@ -181,10 +180,9 @@ export function useUpdateOperationFromWorkbench() {
       queryClient.invalidateQueries({
         queryKey: ['processor', processorId],
       })
-      console.log('Operation updated from workbench successfully')
     },
     onError: (error) => {
-      console.error('Failed to update operation from workbench:', error)
+      logger.error('Failed to update operation from workbench:', extractErrorDetails(error))
     },
   })
 }
@@ -227,10 +225,9 @@ export function useDeleteOperation() {
       queryClient.invalidateQueries({
         queryKey: ['processor', processorId],
       })
-      console.log('Operation deleted successfully')
     },
     onError: (error) => {
-      console.error('Failed to delete operation:', error)
+      logger.error('Failed to delete operation:', extractErrorDetails(error))
     },
   })
 }

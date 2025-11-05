@@ -17,7 +17,7 @@ import { SUPPORTED_LOCALES } from '@/lib/i18n/locales';
 
 export default getRequestConfig(async ({ requestLocale }) => {
   // Wait for the locale from the request (next-intl v3 App Router pattern)
-  let locale = await requestLocale;
+  const locale = await requestLocale;
 
   // Validate locale
   if (!locale || !SUPPORTED_LOCALES.includes(locale as any)) {

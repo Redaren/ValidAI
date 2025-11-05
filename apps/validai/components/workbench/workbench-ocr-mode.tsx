@@ -6,6 +6,7 @@
 'use client'
 
 import { useState } from 'react'
+import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { FlaskConical, Loader2, Upload } from 'lucide-react'
 import { Button } from '@playze/shared-ui'
 import {
@@ -144,7 +145,7 @@ export function WorkbenchOCRMode({ processor, selectedModel }: WorkbenchOCRModeP
       // Store results in state
       setOCRResults(result)
     } catch (error) {
-      console.error('OCR processing failed:', error)
+      logger.error('OCR processing failed:', extractErrorDetails(error))
     }
   }
 
