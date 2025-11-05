@@ -88,7 +88,8 @@
       "Bash(pnpm typecheck:*)",
       "Bash(do sed -i \"s|from ''''@/components/ui/button''''|from ''''@playze/shared-ui''''|g\" \"$file\")",
       "Bash(pnpm --filter @playze/shared-types gen:types:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(ls:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -7,7 +7,10 @@
     "declarationMap": true,
     "composite": true,
     "jsx": "react-jsx",
-    "noEmit": false
+    "noEmit": false,
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "target": "ES2020"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
