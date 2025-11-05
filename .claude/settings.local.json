@@ -89,7 +89,12 @@
       "Bash(do sed -i \"s|from ''''@/components/ui/button''''|from ''''@playze/shared-ui''''|g\" \"$file\")",
       "Bash(pnpm --filter @playze/shared-types gen:types:*)",
       "Bash(git commit:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "mcp__vercel__list_deployments",
+      "mcp__vercel__list_projects",
+      "mcp__vercel__list_teams",
+      "mcp__vercel__get_project",
+      "mcp__vercel__get_deployment_build_logs"
     ]
   },
   "enableAllProjectMcpServers": true,
