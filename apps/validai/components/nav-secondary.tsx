@@ -1,5 +1,9 @@
+"use client"
+
 import * as React from "react"
 import { type LucideIcon } from "lucide-react"
+import { useTranslations } from 'next-intl'
+import { Link } from "@/lib/i18n/navigation"
 
 import {
   SidebarGroup,
@@ -14,22 +18,24 @@ export function NavSecondary({
   ...props
 }: {
   items: {
-    title: string
+    titleKey: string
     url: string
     icon: LucideIcon
   }[]
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
+  const t = useTranslations('nav')
+
   return (
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
+            <SidebarMenuItem key={item.titleKey}>
               <SidebarMenuButton asChild size="sm">
-                <a href={item.url}>
+                <Link href={item.url}>
                   <item.icon />
-                  <span>{item.title}</span>
-                </a>
+                  <span>{t(item.titleKey)}</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

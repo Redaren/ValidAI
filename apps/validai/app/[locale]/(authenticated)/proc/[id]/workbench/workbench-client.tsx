@@ -22,25 +22,18 @@ import { WorkbenchAdvancedSettings } from "@/components/workbench/workbench-adva
 import { WorkbenchOCRMode } from "@/components/workbench/workbench-ocr-mode"
 import { useWorkbenchStore } from "@/stores/workbench-store"
 import { useAvailableLLMModels } from "@/hooks/use-llm-config"
-import type { Database } from "@playze/shared-types"
 import { useTranslations } from 'next-intl'
-import type { Operation } from "@/app/queries/processors/use-processor-detail"
-
-/**
- * Type alias for processor data with operations
- * Retrieved from get_processor_with_operations() database function
- */
-type ProcessorWithOperations = Database["public"]["Functions"]["get_processor_with_operations"]["Returns"][0]
+import type { ProcessorDetail, Operation } from "@/app/queries/processors/use-processor-detail"
 
 /**
  * Props for WorkbenchClient component
  *
  * @property processorId - UUID of the current processor
- * @property initialProcessor - Processor data with operations from server-side fetch
+ * @property initialProcessor - Processor data with operations from server-side fetch (transformed)
  */
 interface WorkbenchClientProps {
   processorId: string
-  initialProcessor: ProcessorWithOperations
+  initialProcessor: ProcessorDetail
 }
 
 /**

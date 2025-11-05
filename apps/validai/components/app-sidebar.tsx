@@ -24,17 +24,18 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 
-const data = {
+// Static navigation configuration - translation keys passed to child components
+const navConfig = {
   navMain: [
     {
-      title: "Dashboard",
+      titleKey: "dashboard",
       url: "/dashboard",
       icon: SquareTerminal,
       isActive: true,
       items: [],
     },
     {
-      title: "Processors",
+      titleKey: "processors",
       url: "/proc",
       icon: FileText,
       isActive: false,
@@ -43,12 +44,12 @@ const data = {
   ],
   navSecondary: [
     {
-      title: "Support",
+      titleKey: "support",
       url: "#",
       icon: LifeBuoy,
     },
     {
-      title: "Feedback",
+      titleKey: "feedback",
       url: "#",
       icon: Send,
     },
@@ -73,6 +74,7 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+
   // Callback to update database when user explicitly switches language
   const handleLocaleChange = async (locale: string) => {
     try {
@@ -100,9 +102,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <OrganizationSwitcher />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain items={navConfig.navMain} />
+        <NavProjects projects={navConfig.projects} />
+        <NavSecondary items={navConfig.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <div className="flex items-center justify-between px-2 py-2">

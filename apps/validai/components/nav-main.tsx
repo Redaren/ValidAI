@@ -2,6 +2,7 @@
 
 import { ChevronRight, type LucideIcon } from "lucide-react"
 import { useTranslations } from 'next-intl'
+import { Link } from "@/lib/i18n/navigation"
 
 import {
   Collapsible,
@@ -24,7 +25,7 @@ export function NavMain({
   items,
 }: {
   items: {
-    title: string
+    titleKey: string
     url: string
     icon: LucideIcon
     isActive?: boolean
@@ -42,13 +43,13 @@ export function NavMain({
       <SidebarGroupLabel>{t('platform')}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
-          <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
+          <Collapsible key={item.titleKey} asChild defaultOpen={item.isActive}>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip={item.title}>
-                <a href={item.url}>
+              <SidebarMenuButton asChild tooltip={t(item.titleKey)}>
+                <Link href={item.url}>
                   <item.icon />
-                  <span>{item.title}</span>
-                </a>
+                  <span>{t(item.titleKey)}</span>
+                </Link>
               </SidebarMenuButton>
               {item.items?.length ? (
                 <>
@@ -63,14 +64,13 @@ export function NavMain({
                       {item.items?.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
                           <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
+                            <Link href={subItem.url}>
                               <span>{subItem.title}</span>
-                            </a>
+                            </Link>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                       ))}
-                    </SidebarMenuSub>
-                  </CollapsibleContent>
+                    </SidebarMenuSub>                  </CollapsibleContent>
                 </>
               ) : null}
             </SidebarMenuItem>
