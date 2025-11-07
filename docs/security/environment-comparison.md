@@ -31,7 +31,7 @@ For maximum security, `'unsafe-eval'` is only included in development for Hot Mo
 **Test Command:**
 ```bash
 pnpm --filter @playze/validai dev
-curl -I http://192.168.86.239:3000
+curl -I http://localhost:3000
 ```
 
 **Headers Applied:**
@@ -173,7 +173,7 @@ Becomes: `script-src 'self' 'unsafe-inline'`
 pnpm --filter @playze/validai dev
 
 # Check headers
-curl -I http://192.168.86.239:3000
+curl -I http://localhost:3000
 
 # Look for:
 # ✅ CSP with 'unsafe-eval' 'unsafe-inline'

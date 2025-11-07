@@ -1,16 +1,21 @@
 /**
- * Google Gemini LLM Executor Utility (Native SDK with Caching)
+ * Google Gemini LLM Executor Utility (New SDK v1.29.0)
  *
  * @module _shared/llm-executor-gemini
  * @description
- * Gemini-specific LLM execution logic using native Google Generative AI SDK
- * with explicit caching support. Follows the same architectural pattern as
- * Anthropic and Mistral executors.
+ * Gemini-specific LLM execution logic using the production-ready @google/genai SDK
+ * (v1.29.0) with explicit caching support. Follows the same architectural pattern
+ * as Anthropic and Mistral executors.
+ *
+ * ## SDK Migration
+ * - Migrated from @google/generative-ai@0.21.0 (deprecated, EOL Aug 31, 2025)
+ * - Now using @google/genai@1.29.0 (GA - production ready)
+ * - Migration date: 2025-11-07
  *
  * ## Features
- * - Native Google Generative AI SDK integration
- * - Document upload to Gemini File API (48-hour storage)
- * - Explicit cache creation for multi-operation efficiency (5-minute TTL)
+ * - Unified GoogleGenAI client architecture
+ * - Document upload via ai.files.upload() (48-hour storage)
+ * - Explicit cache creation via ai.caches.create() (5-minute TTL)
  * - Native JSON Schema structured output (best-in-class reliability)
  * - Configurable thinking mode with budget control
  * - Comprehensive error handling and retry logic
@@ -20,15 +25,14 @@
  * - Native JSON Schema support (vs manual parsing)
  * - Thinking budget configuration (-1 dynamic, 0 disabled, fixed values)
  * - 1M token context window
- * - File API returns URI (vs file_id or signed URL)
+ * - File API returns name + URI (for cleanup)
  *
- * @version 1.0.0
+ * @version 2.0.0
  * @since 2025-11-07
  */
 
 import { Buffer } from 'node:buffer'
-import { GoogleGenerativeAI } from 'npm:@google/generative-ai@0.21.0'
-import { GoogleAICacheManager } from 'npm:@google/generative-ai@0.21.0/server'
+import { GoogleGenAI } from 'npm:@google/genai@1.29.0'
 import { zodToJsonSchema } from 'npm:zod-to-json-schema@3.23.0'
 import { z } from 'npm:zod'
 import type {
@@ -46,8 +50,8 @@ import type {
  */
 export interface GeminiCacheRef {
   fileUri: string        // File API URI (48-hour validity)
+  fileName: string       // File name for cleanup (NEW in SDK v1.29.0)
   cacheName: string      // CachedContent name (5-minute TTL)
-  mimeType: string       // MIME type for file reference
 }
 
 /**
@@ -131,19 +135,19 @@ function getOperationTypeSchema(operationType: OperationType): z.ZodSchema {
 // ============================================================================
 
 /**
- * Upload document to Gemini File API
+ * Upload document to Gemini File API (New SDK v1.29.0)
  *
- * @param genAI - Initialized Google Generative AI client
- * @param documentBuffer - Document content as Buffer
+ * @param ai - Initialized GoogleGenAI client
+ * @param documentBuffer - Document content as ArrayBuffer
  * @param fileName - Original document filename
  * @param mimeType - Document MIME type
- * @returns File URI and MIME type for referencing in requests
+ * @returns File name, URI, and MIME type for referencing in requests
  * @throws Error if upload fails
  *
  * @description
- * Uploads document to Gemini's file storage and retrieves a URI that can be
- * reused for 48 hours. This is similar to Mistral's signed URL but with longer
- * validity. Upload is optimized to happen once per run.
+ * Uploads document to Gemini's file storage using the new SDK's ai.files.upload() API.
+ * Files are stored for 48 hours and auto-deleted afterward. Much simpler than the
+ * legacy REST API approach.
  *
  * Supported formats:
  * - PDFs up to 1,000 pages (50MB max)
@@ -151,66 +155,34 @@ function getOperationTypeSchema(operationType: OperationType): z.ZodSchema {
  * - Each page ≈ 258 tokens
  */
 export async function uploadDocumentToGemini(
-  apiKey: string,
+  ai: GoogleGenAI,
   documentBuffer: ArrayBuffer,
   fileName: string,
   mimeType: string = 'application/pdf'
-): Promise<{ fileUri: string; mimeType: string }> {
-  const BASE_URL = 'https://generativelanguage.googleapis.com'
-  const fileSize = documentBuffer.byteLength
-
+): Promise<{ name: string; uri: string; mimeType: string }> {
   try {
+    const fileSize = documentBuffer.byteLength
     console.log(`[Gemini] Uploading document: ${fileName} (${fileSize} bytes, type: ${mimeType})`)
 
-    // Step 1: Initiate resumable upload (Google's official protocol)
-    console.log('[Gemini] Step 1: Initiating resumable upload...')
-    const initResponse = await fetch(`${BASE_URL}/upload/v1beta/files`, {
-      method: 'POST',
-      headers: {
-        'X-Goog-Upload-Protocol': 'resumable',
-        'X-Goog-Upload-Command': 'start',
-        'X-Goog-Upload-Header-Content-Length': fileSize.toString(),
-        'X-Goog-Upload-Header-Content-Type': mimeType,
-        'x-goog-api-key': apiKey
+    // Convert ArrayBuffer to Blob for SDK upload
+    const blob = new Blob([documentBuffer], { type: mimeType })
+
+    const file = await ai.files.upload({
+      file: blob,
+      config: {
+        displayName: fileName,
+        mimeType: mimeType
       }
     })
 
-    if (!initResponse.ok) {
-      const errorText = await initResponse.text()
-      throw new Error(`Resumable upload init failed (${initResponse.status}): ${errorText}`)
-    }
-
-    const uploadUrl = initResponse.headers.get('X-Goog-Upload-URL')
-    if (!uploadUrl) {
-      throw new Error('No upload URL returned from Gemini API')
-    }
-
-    console.log('[Gemini] Step 2: Uploading file bytes...')
-
-    // Step 2: Upload file bytes to the returned URL
-    const uploadResponse = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: {
-        'Content-Length': fileSize.toString(),
-        'X-Goog-Upload-Offset': '0',
-        'X-Goog-Upload-Command': 'upload, finalize'
-      },
-      body: documentBuffer
-    })
-
-    if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text()
-      throw new Error(`File upload failed (${uploadResponse.status}): ${errorText}`)
-    }
-
-    const result = await uploadResponse.json()
-
-    console.log(`[Gemini] File uploaded successfully: ${result.file.uri}`)
-    console.log(`[Gemini] File URI valid for 48 hours`)
+    console.log(`[Gemini] File uploaded successfully: ${file.uri}`)
+    console.log(`[Gemini] File name: ${file.name}`)
+    console.log(`[Gemini] File valid for 48 hours`)
 
     return {
-      fileUri: result.file.uri,
-      mimeType: result.file.mimeType || mimeType
+      name: file.name,      // For cleanup
+      uri: file.uri,        // For cache creation
+      mimeType: file.mimeType
     }
   } catch (error: any) {
     console.error('[Gemini] File upload failed:', error.message)
@@ -223,10 +195,10 @@ export async function uploadDocumentToGemini(
 // ============================================================================
 
 /**
- * Create explicit Gemini cache for multi-operation efficiency
+ * Create explicit Gemini cache for multi-operation efficiency (New SDK v1.29.0)
  *
- * @param apiKey - Gemini API key
- * @param modelName - Model to use (must include explicit version suffix)
+ * @param ai - Initialized GoogleGenAI client
+ * @param modelName - Model to use (no 'models/' prefix needed)
  * @param fileUri - File URI from uploadDocumentToGemini
  * @param mimeType - Document MIME type
  * @param systemPrompt - Base system instruction to cache
@@ -234,67 +206,55 @@ export async function uploadDocumentToGemini(
  * @throws Error if cache creation fails
  *
  * @description
- * Creates a CachedContent object containing the document and system instructions.
+ * Creates a CachedContent object using the new SDK's ai.caches.create() API.
  * This cache is reused across all operations in a run for significant cost savings.
  *
  * Cache TTL: 5 minutes (sufficient for typical processor runs)
- * Minimum cached tokens: 2,048-4,096 (easily met with documents)
+ * Minimum cached tokens: 1,024 (Flash) or 4,096 (Pro)
  *
  * Cost benefits:
  * - First operation: Pays for cache creation
- * - Subsequent operations: Reduced rate for cached reads + only new prompt tokens
+ * - Subsequent operations: 75% discount on cached tokens + only new prompt tokens
  */
 export async function createGeminiCache(
-  apiKey: string,
+  ai: GoogleGenAI,
   modelName: string,
   fileUri: string,
   mimeType: string,
   systemPrompt: string
 ): Promise<string> {
-  const cacheManager = new GoogleAICacheManager(apiKey)
-
   try {
     console.log(`[Gemini] Creating cache for model: ${modelName}`)
 
-    // Ensure model name has proper prefix
-    const fullModelName = modelName.startsWith('models/') ? modelName : `models/${modelName}`
-
-    const cacheResult = await cacheManager.create({
-      model: fullModelName,
-      ttl: '300s',  // 5 minutes
-      systemInstruction: {
-        parts: [{
-          text: systemPrompt || 'You are a helpful AI assistant that analyzes documents and provides structured responses.'
-        }]
-      },
-      contents: [{
-        role: 'user',
-        parts: [
-          { text: 'Here is a document. Analyze it according to the instructions that follow.' },
-          {
-            fileData: {
-              mimeType,
-              fileUri
-            }
-          }
-        ]
-      }]
+    const cache = await ai.caches.create({
+      model: modelName,  // No 'models/' prefix needed in new SDK
+      config: {
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: 'Here is a document. Analyze it according to the instructions that follow.' },
+            { fileData: { fileUri, mimeType } }
+          ]
+        }],
+        systemInstruction: systemPrompt || 'You are a helpful AI assistant that analyzes documents and provides structured responses.',
+        ttl: '300s'  // 5 minutes
+      }
     })
 
-    console.log(`[Gemini] Cache created: ${cacheResult.name}`)
-    console.log(`[Gemini] Cache valid for 5 minutes`)
+    console.log(`[Gemini] Cache created: ${cache.name}`)
+    console.log(`[Gemini] Cache expires: ${cache.expireTime}`)
 
-    return cacheResult.name
+    return cache.name  // Format: cachedContents/{id}
   } catch (error: any) {
-    console.error('[Gemini] Cache creation failed:', error)
+    console.error('[Gemini] Cache creation failed:', error.message)
     throw new Error(`Gemini cache creation failed: ${error.message}`)
   }
 }
 
 /**
- * Cleanup Gemini cache after run completion
+ * Cleanup Gemini cache after run completion (New SDK v1.29.0)
  *
- * @param apiKey - Gemini API key
+ * @param ai - Initialized GoogleGenAI client
  * @param cacheName - Cache name to delete
  *
  * @description
@@ -302,18 +262,40 @@ export async function createGeminiCache(
  * caches auto-expire after 5 minutes. Failures are logged but don't throw.
  */
 export async function cleanupGeminiCache(
-  apiKey: string,
+  ai: GoogleGenAI,
   cacheName: string
 ): Promise<void> {
-  const cacheManager = new GoogleAICacheManager(apiKey)
-
   try {
     console.log(`[Gemini] Cleaning up cache: ${cacheName}`)
-    await cacheManager.delete(cacheName)
+    await ai.caches.delete({ name: cacheName })
     console.log(`[Gemini] Cache deleted successfully`)
   } catch (error: any) {
     // Non-critical error - cache will auto-expire in 5 minutes
     console.warn(`[Gemini] Cache cleanup failed (non-critical):`, error.message)
+  }
+}
+
+/**
+ * Cleanup uploaded Gemini file after run completion (New SDK v1.29.0)
+ *
+ * @param ai - Initialized GoogleGenAI client
+ * @param fileName - File name to delete
+ *
+ * @description
+ * Deletes the uploaded file to clean up resources. Non-critical operation since
+ * files auto-delete after 48 hours. Failures are logged but don't throw.
+ */
+export async function cleanupGeminiFile(
+  ai: GoogleGenAI,
+  fileName: string
+): Promise<void> {
+  try {
+    console.log(`[Gemini] Cleaning up file: ${fileName}`)
+    await ai.files.delete({ name: fileName })
+    console.log(`[Gemini] File deleted successfully`)
+  } catch (error: any) {
+    // Non-critical error - file will auto-delete in 48 hours
+    console.warn(`[Gemini] File cleanup failed (non-critical):`, error.message)
   }
 }
 
@@ -322,27 +304,27 @@ export async function cleanupGeminiCache(
 // ============================================================================
 
 /**
- * Execute LLM operation with Gemini using cached document
+ * Execute LLM operation with Gemini using cached document (New SDK v1.29.0)
  *
  * @param params - Execution parameters including operation, document, settings, and API key
  * @param supabase - Supabase client (unused for Gemini, kept for signature consistency)
- * @param cacheRef - Cache reference with fileUri and cacheName
+ * @param cacheRef - Cache reference with fileUri, fileName, and cacheName
  * @returns Execution result with response, structured output, tokens, and metadata
  * @throws Error if execution fails
  *
  * @description
- * Core Gemini LLM execution logic with caching:
- * 1. Reference pre-created cache (no upload needed)
+ * Core Gemini LLM execution logic with caching using new SDK v1.29.0:
+ * 1. Initialize GoogleGenAI client
  * 2. Build generation config with JSON Schema for structured output
  * 3. Configure thinking mode if enabled
- * 4. Execute via native Gemini SDK
+ * 4. Execute via unified ai.models.generateContent() API with cachedContent
  * 5. Parse and validate structured output (automatic via JSON Schema)
  * 6. Extract thinking summaries if requested
  * 7. Return result with token usage and cache metrics
  *
  * **Performance Optimization:**
  * Pass cacheRef to reuse cached document and system prompt across operations.
- * Cache hits reduce costs significantly (similar to Anthropic's prompt caching).
+ * Cache hits reduce costs by 75% on cached tokens.
  */
 export async function executeLLMOperationGemini(
   params: GeminiExecutionParams,
@@ -354,12 +336,12 @@ export async function executeLLMOperationGemini(
   console.log('=== Gemini LLM Executor: Starting Execution ===')
   console.log(`Operation: ${operation.name} (${operation.operation_type})`)
   console.log(`Document: ${document.name} (${document.mime_type})`)
-  console.log(`Model: ${settings.selected_model_id || 'gemini-2.5-flash-002'}`)
+  console.log(`Model: ${settings.selected_model_id || 'gemini-2.5-flash'}`)
   console.log(`Cache: ${cacheRef.cacheName}`)
   console.log(`File URI: ${cacheRef.fileUri}`)
 
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const modelToUse = settings.selected_model_id || 'gemini-2.5-flash-002'
+  const ai = new GoogleGenAI({ apiKey })
+  const modelToUse = settings.selected_model_id || 'gemini-2.5-flash'
 
   // Get operation schema and convert to JSON Schema
   const operationSchema = getOperationTypeSchema(operation.operation_type)
@@ -368,12 +350,19 @@ export async function executeLLMOperationGemini(
     $refStrategy: 'none'  // Inline all references for Gemini compatibility
   })
 
+  // Clean the schema - remove fields Google doesn't accept
+  const cleanedSchema = { ...jsonSchema }
+  delete cleanedSchema.$schema
+  delete cleanedSchema.definitions
+  delete cleanedSchema.$ref
+
   // Build generation config
   const generationConfig: any = {
     temperature: settings.temperature ?? 1.0,
     maxOutputTokens: settings.max_tokens ?? 8192,
     responseMimeType: 'application/json',
-    responseSchema: jsonSchema
+    responseSchema: cleanedSchema,  // Use cleaned schema
+    cachedContent: cacheRef.cacheName  // NEW: Reference cached content
   }
 
   // Add top_p if supported and specified
@@ -400,21 +389,17 @@ export async function executeLLMOperationGemini(
   try {
     console.log(`[Gemini] Executing ${operation.operation_type} operation with cached document`)
 
-    // Execute generation with cached content (using legacy SDK API)
-    // Get model from cached content, then generate
-    const model = genAI.getGenerativeModelFromCachedContent(cacheRef.cacheName)
-    const response = await model.generateContent({
-      contents: [{
-        role: 'user',
-        parts: [{ text: operation.prompt }]
-      }],
-      generationConfig
+    // NEW: Unified API call with cached content
+    const response = await ai.models.generateContent({
+      model: modelToUse,
+      contents: operation.prompt,  // Simplified - just the prompt text
+      config: generationConfig
     })
 
     const executionTime = Date.now() - startTime
 
-    // Extract response text (JSON)
-    const rawText = response.response.text()
+    // NEW: Direct .text property
+    const rawText = response.text
     console.log(`[Gemini] Response received (${rawText.length} chars in ${executionTime}ms)`)
 
     // Parse JSON (guaranteed valid by Gemini's structured output)
@@ -430,8 +415,8 @@ export async function executeLLMOperationGemini(
 
     // Extract thinking summary if includeThoughts is enabled
     let thinkingSummary: string | undefined
-    if (settings.include_thoughts && response.response.candidates?.[0]?.content?.parts) {
-      const thoughtParts = response.response.candidates[0].content.parts
+    if (settings.include_thoughts && response.candidates?.[0]?.content?.parts) {
+      const thoughtParts = response.candidates[0].content.parts
         .filter((part: any) => part.thought)
         .map((part: any) => part.text)
 
@@ -441,8 +426,8 @@ export async function executeLLMOperationGemini(
       }
     }
 
-    // Extract token usage
-    const usage = response.response.usageMetadata || {}
+    // NEW: Direct usage metadata access
+    const usage = response.usageMetadata || {}
     const cachedTokens = usage.cachedContentTokenCount || 0
     const cacheHit = cachedTokens > 0
 

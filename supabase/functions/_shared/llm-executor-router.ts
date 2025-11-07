@@ -161,7 +161,7 @@ export async function executeLLMOperationWithRetryRouter(
 
   if (provider === 'google') {
     // Google/Gemini path: documentRef is GeminiCacheRef object
-    if (!documentRef || typeof documentRef === 'string' || documentRef instanceof Buffer) {
+    if (!documentRef || typeof documentRef === 'string') {
       throw new Error('Google provider requires GeminiCacheRef with fileUri and cacheName')
     }
     console.log('[Router] → Gemini executor with cached document')
