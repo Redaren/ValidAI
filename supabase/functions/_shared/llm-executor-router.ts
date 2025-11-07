@@ -32,12 +32,17 @@
 import { executeLLMOperation, executeLLMOperationWithRetry } from './llm-executor.ts'
 import { executeLLMOperationMistral, executeLLMOperationMistralWithRetry } from './llm-executor-mistral.ts'
 import { executeLLMOperationAnthropic, executeLLMOperationAnthropicWithRetry } from './llm-executor-anthropic.ts'
+import {
+  executeLLMOperationGemini,
+  executeLLMOperationGeminiWithRetry,
+  type GeminiCacheRef
+} from './llm-executor-gemini.ts'
 import type { LLMExecutionParams, LLMExecutionResult } from './types.ts'
 
 /**
  * Supported LLM providers
  */
-export type LLMProvider = 'anthropic' | 'mistral'
+export type LLMProvider = 'anthropic' | 'mistral' | 'google'
 
 /**
  * Factory map of LLM executors by provider (without retry)
@@ -51,8 +56,8 @@ export type LLMProvider = 'anthropic' | 'mistral'
  * const executors = {
  *   anthropic: executeLLMOperation,
  *   mistral: executeLLMOperationMistral,
+ *   google: executeLLMOperationGoogle,
  *   openai: executeLLMOperationOpenAI,    // Future
- *   google: executeLLMOperationGoogle,    // Future
  *   cohere: executeLLMOperationCohere,    // Future
  * }
  * ```
@@ -60,6 +65,7 @@ export type LLMProvider = 'anthropic' | 'mistral'
 const executors = {
   anthropic: executeLLMOperation,
   mistral: executeLLMOperationMistral,
+  google: executeLLMOperationGemini,
   // Future providers can be added here
 } as const
 
@@ -73,6 +79,7 @@ const executors = {
 const executorsWithRetry = {
   anthropic: executeLLMOperationWithRetry,
   mistral: executeLLMOperationMistralWithRetry,
+  google: executeLLMOperationGeminiWithRetry,
   // Future providers can be added here
 } as const
 
@@ -122,7 +129,7 @@ export async function executeLLMOperationWithRouter(
  *
  * @param params - Execution parameters (includes settings.provider)
  * @param supabase - Supabase client
- * @param documentRef - Document reference (string for file_id/URL, Buffer for inline, undefined for none)
+ * @param documentRef - Document reference (string for file_id/URL, GeminiCacheRef for Gemini, Buffer for inline, undefined for none)
  * @param maxRetries - Maximum number of retry attempts (default: 3)
  * @returns Execution result from provider-specific executor
  * @throws Error if provider is unknown/unsupported or max retries exceeded
@@ -132,9 +139,10 @@ export async function executeLLMOperationWithRouter(
  * Provider is determined from params.settings.provider, with 'anthropic' as default.
  *
  * Routing decision logic:
- * 1. If provider is 'mistral' → Mistral executor (documentRef is signed URL string)
- * 2. If provider is 'anthropic' AND documentRef is string → Anthropic Files API executor (NEW)
- * 3. If provider is 'anthropic' AND documentRef is Buffer/undefined → Anthropic legacy executor (EXISTING)
+ * 1. If provider is 'google' → Gemini executor (documentRef is GeminiCacheRef with fileUri + cacheName)
+ * 2. If provider is 'mistral' → Mistral executor (documentRef is signed URL string)
+ * 3. If provider is 'anthropic' AND documentRef is string → Anthropic Files API executor
+ * 4. If provider is 'anthropic' AND documentRef is Buffer/undefined → Anthropic legacy executor
  *
  * Retry behavior:
  * - Exponential backoff: 1s, 5s, 15s
@@ -144,12 +152,26 @@ export async function executeLLMOperationWithRouter(
 export async function executeLLMOperationWithRetryRouter(
   params: LLMExecutionParams,
   supabase: any,
-  documentRef?: string | any,
+  documentRef?: string | GeminiCacheRef | any,
   maxRetries: number = 3
 ): Promise<LLMExecutionResult> {
   const provider = (params.settings.provider || 'anthropic') as LLMProvider
 
   console.log(`[Router] Routing LLM execution to ${provider} executor with retry (max: ${maxRetries})`)
+
+  if (provider === 'google') {
+    // Google/Gemini path: documentRef is GeminiCacheRef object
+    if (!documentRef || typeof documentRef === 'string' || documentRef instanceof Buffer) {
+      throw new Error('Google provider requires GeminiCacheRef with fileUri and cacheName')
+    }
+    console.log('[Router] → Gemini executor with cached document')
+    return await executeLLMOperationGeminiWithRetry(
+      params,
+      supabase,
+      documentRef as GeminiCacheRef,
+      maxRetries
+    )
+  }
 
   if (provider === 'mistral') {
     // Mistral path: documentRef is signed URL (string)
@@ -186,7 +208,7 @@ export async function executeLLMOperationWithRetryRouter(
   }
 
   throw new Error(
-    `Unknown LLM provider: ${provider}. Supported providers: anthropic, mistral`
+    `Unknown LLM provider: ${provider}. Supported providers: anthropic, mistral, google`
   )
 }
 

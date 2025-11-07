@@ -41,6 +41,12 @@ import { Mistral } from 'npm:@mistralai/mistralai'
 import { uploadDocumentToMistral } from '../_shared/llm-executor-mistral.ts'
 import Anthropic from 'npm:@anthropic-ai/sdk'
 import { uploadDocumentToAnthropic } from '../_shared/llm-executor-anthropic.ts'
+import {
+  uploadDocumentToGemini,
+  createGeminiCache,
+  cleanupGeminiCache,
+  type GeminiCacheRef
+} from '../_shared/llm-executor-gemini.ts'
 import type { OperationSnapshot, DocumentSnapshot, ProcessorSettings } from '../_shared/types.ts'
 
 /**
@@ -115,6 +121,9 @@ interface RunSnapshot {
   document: DocumentSnapshot
   mistral_document_url?: string  // Signed URL for Mistral document reuse (valid 24 hours)
   anthropic_file_id?: string  // File ID for Anthropic Files API (indefinite storage)
+  gemini_file_uri?: string  // File URI for Gemini File API (valid 48 hours)
+  gemini_cache_name?: string  // Cache name for Gemini explicit caching (5-minute TTL)
+  gemini_file_mime_type?: string  // MIME type for Gemini file reference
 }
 
 /**
@@ -372,6 +381,81 @@ serve(async (req) => {
         }
       }
 
+      // 7c. If Google/Gemini, upload document and create cache BEFORE creating run (fail-fast)
+      let geminiFileUri: string | null = null
+      let geminiCacheName: string | null = null
+      let geminiFileMimeType: string | null = null
+
+      if (provider === 'google') {
+        console.log('Processor uses Google Gemini - uploading document and creating cache before run...')
+
+        try {
+          // Resolve Google API key (same pattern as Anthropic/Mistral)
+          let geminiApiKey: string
+          if (llmConfig.api_key_encrypted) {
+            const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+              p_ciphertext: llmConfig.api_key_encrypted,
+              p_org_id: llmConfig.organization_id
+            })
+
+            if (decryptError || !decryptedKey) {
+              throw new Error(`Failed to decrypt Google API key: ${decryptError?.message}`)
+            }
+            geminiApiKey = decryptedKey
+          } else {
+            // Fall back to global Google API key
+            const globalKey = Deno.env.get('GOOGLE_API_KEY')
+            if (!globalKey) {
+              throw new Error('No Google API key available (neither org-specific nor global)')
+            }
+            geminiApiKey = globalKey
+          }
+
+          // Download document
+          const documentBuffer = await downloadDocument(supabase, document.storage_path)
+
+          // Upload to Gemini File API (48-hour validity)
+          const geminiFileResult = await uploadDocumentToGemini(
+            geminiApiKey,
+            documentBuffer,
+            document.name,
+            document.mime_type || 'application/pdf'
+          )
+
+          geminiFileUri = geminiFileResult.fileUri
+          geminiFileMimeType = geminiFileResult.mimeType
+
+          console.log(`✅ Gemini document uploaded successfully (48h validity)`)
+          console.log(`File URI: ${geminiFileUri}`)
+
+          // Create cache with base system prompt (5-minute TTL)
+          const baseSystemPrompt = processor.configuration?.system_prompt ||
+            'You are a helpful AI assistant that analyzes documents and provides structured responses.'
+
+          geminiCacheName = await createGeminiCache(
+            geminiApiKey,
+            llmConfig.model,
+            geminiFileUri,
+            geminiFileMimeType,
+            baseSystemPrompt
+          )
+
+          console.log(`✅ Gemini cache created successfully (5min TTL)`)
+          console.log(`Cache name: ${geminiCacheName}`)
+          console.log(`Cache will be reused for all ${operations.length} operations`)
+        } catch (error: any) {
+          console.error(`❌ Failed to upload/cache document for Gemini: ${error.message}`)
+          // FAIL FAST: Return error BEFORE creating run
+          return new Response(
+            JSON.stringify({
+              error: 'Document upload/cache creation for Gemini failed',
+              details: error.message
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      }
+
       // 8. Create snapshot (frozen state)
       const snapshot: RunSnapshot = {
         processor: {
@@ -399,7 +483,10 @@ serve(async (req) => {
           storage_path: document.storage_path
         },
         mistral_document_url: mistralDocumentUrl,  // NULL for non-Mistral
-        anthropic_file_id: anthropicFileId  // NULL for legacy Anthropic or non-Anthropic
+        anthropic_file_id: anthropicFileId,  // NULL for legacy Anthropic or non-Anthropic
+        gemini_file_uri: geminiFileUri,  // NULL for non-Gemini
+        gemini_cache_name: geminiCacheName,  // NULL for non-Gemini
+        gemini_file_mime_type: geminiFileMimeType  // NULL for non-Gemini
       }
 
       console.log(`Snapshot created: ${operations.length} operations, document: ${document.name}`)
@@ -408,6 +495,9 @@ serve(async (req) => {
       }
       if (anthropicFileId) {
         console.log(`Anthropic file_id stored in snapshot for reuse`)
+      }
+      if (geminiFileUri && geminiCacheName) {
+        console.log(`Gemini file URI and cache name stored in snapshot for reuse`)
       }
 
       // 7. Create run record
@@ -661,12 +751,31 @@ serve(async (req) => {
       console.log(`Settings: temp=${settings.temperature}, max_tokens=${settings.max_tokens}, caching=${enableCaching}`)
 
       // Prepare document reference for executor
+      // - Google: GeminiCacheRef object with fileUri + cacheName
       // - Mistral: signed URL (string)
       // - Anthropic Files API: file_id (string)
       // - Anthropic Legacy: document buffer (Buffer)
-      let documentRef: string | any = null
+      let documentRef: string | GeminiCacheRef | any = null
 
-      if (provider === 'mistral') {
+      if (provider === 'google') {
+        // Gemini path: construct GeminiCacheRef from snapshot
+        const geminiFileUri = snapshot.gemini_file_uri || null
+        const geminiCacheName = snapshot.gemini_cache_name || null
+        const geminiFileMimeType = snapshot.gemini_file_mime_type || 'application/pdf'
+
+        if (geminiFileUri && geminiCacheName) {
+          console.log(`✅ Reusing Gemini file URI and cache from snapshot`)
+          console.log(`File URI: ${geminiFileUri.substring(0, 50)}...`)
+          console.log(`Cache: ${geminiCacheName}`)
+          documentRef = {
+            fileUri: geminiFileUri,
+            cacheName: geminiCacheName,
+            mimeType: geminiFileMimeType
+          } as GeminiCacheRef
+        } else {
+          throw new Error('Gemini file URI or cache name not found in snapshot')
+        }
+      } else if (provider === 'mistral') {
         // Existing Mistral path
         const mistralDocumentUrl = snapshot.mistral_document_url || null
         if (mistralDocumentUrl) {
@@ -831,6 +940,38 @@ serve(async (req) => {
             completed_at: new Date().toISOString()
           })
           .eq('id', backgroundBody.run_id)
+
+        // Cleanup Gemini cache if used
+        if (provider === 'google' && snapshot.gemini_cache_name) {
+          console.log('Cleaning up Gemini cache...')
+
+          try {
+            // Get API key for cleanup (same pattern as upload)
+            let geminiApiKey: string | undefined
+            if (llmConfig.api_key_encrypted) {
+              const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+                p_ciphertext: llmConfig.api_key_encrypted,
+                p_org_id: llmConfig.organization_id
+              })
+
+              if (!decryptError && decryptedKey) {
+                geminiApiKey = decryptedKey
+              }
+            } else {
+              // Fall back to global Google API key
+              geminiApiKey = Deno.env.get('GOOGLE_API_KEY')
+            }
+
+            if (geminiApiKey) {
+              await cleanupGeminiCache(geminiApiKey, snapshot.gemini_cache_name)
+            } else {
+              console.warn('No API key available for cache cleanup (non-critical)')
+            }
+          } catch (error: any) {
+            // Non-critical error - cache will auto-expire in 5 minutes
+            console.warn('Gemini cache cleanup failed (non-critical):', error.message)
+          }
+        }
       }
 
       // 7. Return success

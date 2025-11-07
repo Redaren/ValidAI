@@ -4,6 +4,8 @@
     "lib": ["deno.ns", "deno.unstable"]
   },
   "imports": {
-    "supabase": "https://esm.sh/@supabase/supabase-js@2"
+    "supabase": "https://esm.sh/@supabase/supabase-js@2",
+    "@google/generative-ai": "https://esm.sh/@google/generative-ai@0.21.0",
+    "zod-to-json-schema": "https://esm.sh/zod-to-json-schema@3.23.0"
   }
 }

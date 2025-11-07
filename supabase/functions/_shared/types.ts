@@ -50,7 +50,7 @@ export interface DocumentSnapshot {
 /**
  * Supported LLM providers
  */
-export type LLMProvider = 'anthropic' | 'mistral'
+export type LLMProvider = 'anthropic' | 'mistral' | 'google'
 
 /**
  * Processor configuration settings
