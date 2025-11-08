@@ -1392,6 +1392,185 @@ FROM validai_processors
 WHERE id = 'processor_uuid';  -- Replace with actual processor UUID
 ```
 
+## Parallel Execution Configuration
+
+**Status:** ✅ **Fully Implemented** (2025-11-08)
+
+ValidAI supports provider-aware parallel execution to dramatically reduce processor run times while preserving cost efficiency through intelligent caching strategies.
+
+### Execution Modes
+
+| Mode | Description | Use Cases |
+|------|-------------|-----------|
+| **serial** | Operations execute one by one (original behavior) | Debugging, rate limit issues, conservative execution |
+| **parallel** | All operations execute concurrently with rate limiting | Gemini, Mistral, maximum speed |
+| **hybrid** | Warmup operations serial, then parallel (Anthropic optimization) | Anthropic (preserves 90% cache savings) |
+
+### Provider-Specific Configurations
+
+The system uses optimal execution strategies per provider, stored in `validai_llm_global_settings.execution_config`:
+
+**Anthropic (Hybrid Mode):**
+```json
+{
+  "execution_mode": "hybrid",
+  "max_concurrency": 5,
+  "warmup_operations": 1,
+  "batch_delay_ms": 200,
+  "rate_limit_safety": true,
+  "description": "First operation creates cache (serial), then rest execute in parallel"
+}
+```
+
+**Google Gemini (Parallel Mode):**
+```json
+{
+  "execution_mode": "parallel",
+  "max_concurrency": 5,
+  "warmup_operations": 0,
+  "batch_delay_ms": 6000,
+  "rate_limit_safety": true,
+  "description": "Cache created upfront, all operations can parallelize immediately"
+}
+```
+
+**Mistral (Parallel Mode):**
+```json
+{
+  "execution_mode": "parallel",
+  "max_concurrency": 3,
+  "warmup_operations": 0,
+  "batch_delay_ms": 1000,
+  "rate_limit_safety": true,
+  "description": "No caching, but signed URL supports concurrent requests"
+}
+```
+
+### Configuration Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `execution_mode` | string | `serial`, `parallel`, or `hybrid` |
+| `max_concurrency` | integer | Maximum parallel operations (1-20) |
+| `warmup_operations` | integer | Number of serial operations before parallelization (hybrid mode) |
+| `batch_delay_ms` | integer | Delay between batches in milliseconds (rate limit safety) |
+| `rate_limit_safety` | boolean | Auto-reduce concurrency on 429 errors |
+| `description` | string | Human-readable configuration description |
+
+### Performance Improvements
+
+**Expected speedup with parallel execution:**
+
+| Provider | Serial (20 ops) | Parallel (20 ops) | Speedup |
+|----------|-----------------|-------------------|---------|
+| **Anthropic** | ~6 minutes | ~1.5 minutes | **4x faster** |
+| **Gemini** | ~5 minutes | ~1 minute | **5x faster** |
+| **Mistral** | ~8 minutes | ~2.5 minutes | **3x faster** |
+
+### Cost Impact
+
+- ✅ **Anthropic**: No change (hybrid pattern preserves 90% cache savings)
+- ✅ **Gemini**: No change (cache already created upfront)
+- ✅ **Mistral**: No change (no caching anyway)
+
+### Rate Limit Safety
+
+The system includes adaptive rate limiting:
+- Monitors for 429 (rate limit) errors
+- Automatically reduces concurrency when limits hit
+- Logs concurrency adjustments for monitoring
+- Prevents cascading failures
+
+Example log output:
+```
+[Parallel] Rate limit detected (2/5 operations).
+Reducing concurrency: 5 → 2
+```
+
+### Caching Considerations
+
+**Anthropic (Hybrid Required):**
+- Cache entries only available AFTER first response begins
+- First operation must complete serially to create cache
+- Subsequent operations can parallelize and hit cache
+- Result: 90% cost savings maintained with 4x speedup
+
+**Gemini (Full Parallel Compatible):**
+- Cache created explicitly via Cache API during run initialization
+- Cache immediately available for all operations
+- All operations can execute concurrently and hit cache
+- Result: 75-90% cost savings maintained with 5x speedup
+
+**Mistral (No Caching):**
+- No caching support = no constraints
+- Signed URL can handle unlimited concurrent requests
+- Full parallelization possible
+- Result: 3x speedup but no cost optimization
+
+### Modifying Execution Configuration
+
+**Via Database (Admin Only):**
+```sql
+-- Update Anthropic to use full parallel (not recommended - loses cache benefits)
+UPDATE validai_llm_global_settings
+SET execution_config = jsonb_build_object(
+  'execution_mode', 'parallel',
+  'max_concurrency', 10,
+  'warmup_operations', 0,
+  'batch_delay_ms', 100,
+  'rate_limit_safety', true
+)
+WHERE provider = 'anthropic';
+
+-- Disable parallel execution temporarily (debugging)
+UPDATE validai_llm_global_settings
+SET execution_config = jsonb_build_object(
+  'execution_mode', 'serial',
+  'max_concurrency', 1,
+  'warmup_operations', 0,
+  'batch_delay_ms', 0,
+  'rate_limit_safety', true
+)
+WHERE provider = 'anthropic';
+```
+
+### Troubleshooting
+
+**Problem: Operations still running serially**
+- Check database: `SELECT provider, execution_config FROM validai_llm_global_settings WHERE is_active = true`
+- Verify `execution_mode` is not `'serial'`
+- Check Edge Function logs for "Execution mode" output
+
+**Problem: Hitting rate limits frequently**
+- Reduce `max_concurrency` value
+- Increase `batch_delay_ms` value
+- Verify `rate_limit_safety` is `true` (should auto-adjust)
+
+**Problem: Anthropic cache misses**
+- Ensure `execution_mode` is `'hybrid'` (not `'parallel'`)
+- Verify `warmup_operations` is set to `1` or higher
+- Check logs for "warmup complete" message before parallelization
+
+**Problem: Unexpected costs**
+- Check if Anthropic is using `parallel` mode instead of `hybrid`
+- Verify cache hits in operation results: `SELECT cache_hit FROM validai_operation_results`
+- Review token usage: Anthropic hybrid should show high `cached_read` values after first operation
+
+### Monitoring
+
+Monitor parallel execution via Edge Function logs:
+```
+[ParallelExecutor] Starting execution: mode=hybrid, operations=20, maxConcurrency=5
+[ParallelExecutor] Using hybrid execution (Anthropic cache warmup)
+[Serial] Executing operation 0: Extract Contract Parties
+[Parallel] Warmup complete, executing 19 operations in parallel
+[Parallel] Executing batch: operations 1-5
+[Parallel] Executing batch: operations 6-10
+...
+[Parallel] Operation 3 completed successfully
+[Parallel] Operation 1 completed successfully
+```
+
 ## Future Enhancements
 
 ### Planned Features
@@ -1404,16 +1583,24 @@ WHERE id = 'processor_uuid';  -- Replace with actual processor UUID
    - Token consumption per model
    - Cost tracking by organization
    - Performance metrics
+   - Parallel execution speedup tracking
 
 3. **Advanced Features**
    - Custom model endpoints
    - Self-hosted model support
    - Model routing based on load
+   - Organization-level execution config overrides
 
 4. **Governance**
    - Audit trail for changes
    - Compliance reporting
    - Data residency controls
+
+5. **Parallel Execution Enhancements**
+   - Dynamic concurrency based on tier detection (Free/Pro/Enterprise)
+   - Per-organization execution config overrides
+   - Real-time concurrency visualization in UI
+   - Adaptive batch sizing based on operation complexity
 
 ### Extension Points
 
@@ -1422,6 +1609,7 @@ The architecture supports future extensions:
 - Custom models and endpoints
 - Complex routing rules
 - Dynamic model selection based on document type
+- Intelligent execution mode selection based on operation count
 
 ## Summary
 

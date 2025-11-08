@@ -49,7 +49,17 @@ import {
   cleanupGeminiFile,
   type GeminiCacheRef
 } from '../_shared/llm-executor-gemini.ts'
-import type { OperationSnapshot, DocumentSnapshot, ProcessorSettings } from '../_shared/types.ts'
+import {
+  executeOperationsParallel,
+  getDefaultExecutionConfig
+} from '../_shared/parallel-executor.ts'
+import type {
+  OperationSnapshot,
+  DocumentSnapshot,
+  ProcessorSettings,
+  ExecutionConfig,
+  LLMProvider
+} from '../_shared/types.ts'
 
 /**
  * CORS headers configuration
@@ -124,6 +134,7 @@ interface RunSnapshot {
   mistral_document_url?: string  // Signed URL for Mistral document reuse (valid 24 hours)
   anthropic_file_id?: string  // File ID for Anthropic Files API (indefinite storage)
   gemini_file_uri?: string  // File URI for Gemini File API (valid 48 hours)
+  gemini_file_name?: string  // File name for Gemini cleanup (valid 48 hours)
   gemini_cache_name?: string  // Cache name for Gemini explicit caching (5-minute TTL)
   gemini_file_mime_type?: string  // MIME type for Gemini file reference
 }
@@ -804,6 +815,33 @@ serve(async (req) => {
       console.log(`Using model: ${settings.selected_model_id}`)
       console.log(`Settings: temp=${settings.temperature}, max_tokens=${settings.max_tokens}, caching=${enableCaching}`)
 
+      // Fetch execution configuration for parallel execution
+      let executionConfig: ExecutionConfig
+      try {
+        const { data: llmGlobalSettings, error: settingsError } = await supabase
+          .from('validai_llm_global_settings')
+          .select('execution_config')
+          .eq('provider', provider)
+          .eq('is_active', true)
+          .limit(1)
+          .single()
+
+        if (settingsError || !llmGlobalSettings?.execution_config) {
+          console.warn(`No execution config found in database for provider ${provider}, using defaults`)
+          executionConfig = getDefaultExecutionConfig(provider as LLMProvider)
+        } else {
+          executionConfig = llmGlobalSettings.execution_config as ExecutionConfig
+        }
+
+        console.log(`Execution mode: ${executionConfig.execution_mode}`)
+        console.log(`Max concurrency: ${executionConfig.max_concurrency}`)
+        console.log(`Warmup operations: ${executionConfig.warmup_operations}`)
+        console.log(`Batch delay: ${executionConfig.batch_delay_ms}ms`)
+      } catch (error: any) {
+        console.warn(`Failed to fetch execution config: ${error.message}, using defaults`)
+        executionConfig = getDefaultExecutionConfig(provider as LLMProvider)
+      }
+
       // Prepare document reference for executor
       // - Google: GeminiCacheRef object with fileUri + cacheName
       // - Mistral: signed URL (string)
@@ -856,38 +894,44 @@ serve(async (req) => {
         }
       }
 
-      for (const [chunkIndex, operation] of chunk.entries()) {
-        const operationIndex = effectiveStartIndex + chunkIndex
+      // Execute operations using parallel executor (provider-aware)
+      const operationResults = await executeOperationsParallel(
+        chunk,
+        {
+          config: executionConfig,
+          provider: provider as LLMProvider,
+          startIndex: effectiveStartIndex,
+          maxOperations: CHUNK_SIZE,
+          isFirstBatch: backgroundBody.start_index === 0
+        },
+        {
+          document: snapshot.document,
+          systemPrompt: snapshot.processor.system_prompt,
+          settings,
+          apiKey
+        },
+        supabase,
+        documentRef
+      )
 
-        console.log(`\n--- Processing Operation ${operationIndex + 1}/${operations.length} ---`)
+      // Process results and save to database
+      console.log(`Processing ${operationResults.length} operation results...`)
+
+      for (const opResult of operationResults) {
+        const { operation, operationIndex, success, result, error } = opResult
+
+        console.log(`\n--- Saving Result for Operation ${operationIndex + 1}/${operations.length} ---`)
         console.log(`Name: ${operation.name}`)
-        console.log(`Type: ${operation.operation_type}`)
+        console.log(`Status: ${success ? 'completed' : 'failed'}`)
 
-        try {
-          const startedAt = new Date().toISOString()
+        const startedAt = new Date().toISOString()
 
-          // Execute LLM operation with retry using router (supports all providers)
-          // - Mistral: documentRef is signed URL (string)
-          // - Anthropic Files API: documentRef is file_id (string)
-          // - Anthropic Legacy: documentRef is Buffer
-          const result = await executeLLMOperationWithRetryRouter(
-            {
-              operation,
-              document: snapshot.document,
-              systemPrompt: snapshot.processor.system_prompt,
-              settings,
-              apiKey,
-              enableCache: enableCaching && operationIndex === 0 ? true : enableCaching, // First op creates cache (Anthropic only)
-            },
-            supabase,
-            documentRef  // Router determines execution path based on type
-          )
-
-          console.log(`✅ Operation completed successfully`)
+        if (success && result) {
+          // Operation succeeded
           console.log(`Response length: ${result.response.length} chars`)
           console.log(`Tokens: ${result.tokens.input} in, ${result.tokens.output} out`)
           if (result.cacheHit) {
-            console.log(`💰 Cache hit: ${result.tokens.cached_read} tokens (90% savings)`)
+            console.log(`💰 Cache hit: ${result.tokens.cached_read} tokens read from cache`)
           }
 
           // Single INSERT with all data (completed status)
@@ -910,26 +954,16 @@ serve(async (req) => {
               completed_at: new Date().toISOString()
             })
 
-          // Update progress counter immediately (atomic increment, crash-resistant)
-          // If function crashes after this, progress is persisted
+          // Update progress counter
           await supabase.rpc('increment_run_progress', {
             p_run_id: backgroundBody.run_id,
             p_status: 'completed'
           })
 
-          console.log(`Progress updated: ${operationIndex + 1}/${operations.length} operations completed`)
-
-        } catch (error: any) {
-          // Operation failed (after retries)
-          console.error(`❌ Operation failed: ${error.message}`)
-          console.error('Full error details:', {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-            retryCount: error.retryCount
-          })
-
-          const startedAt = new Date().toISOString()
+          console.log(`✅ Operation ${operationIndex + 1} recorded as completed`)
+        } else if (error) {
+          // Operation failed
+          console.error(`❌ Operation ${operationIndex + 1} failed: ${error.message}`)
 
           // Single INSERT with all data (failed status)
           await supabase
@@ -947,15 +981,13 @@ serve(async (req) => {
               completed_at: new Date().toISOString()
             })
 
-          // Update failure counter immediately (atomic increment, crash-resistant)
+          // Update failure counter
           await supabase.rpc('increment_run_progress', {
             p_run_id: backgroundBody.run_id,
             p_status: 'failed'
           })
 
-          console.log(`Failed operation recorded: ${operationIndex + 1}/${operations.length}`)
-
-          // Continue to next operation (don't stop run)
+          console.log(`❌ Operation ${operationIndex + 1} recorded as failed`)
         }
       }
 

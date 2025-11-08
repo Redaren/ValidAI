@@ -157,3 +157,66 @@ export interface LLMError extends Error {
   retryCount?: number
   isTransient: boolean
 }
+
+/**
+ * Execution mode for operations
+ * - serial: Execute operations one by one (current behavior)
+ * - parallel: Execute all operations concurrently with rate limiting
+ * - hybrid: Execute warmup operations serially, then parallelize rest (Anthropic optimization)
+ */
+export type ExecutionMode = 'serial' | 'parallel' | 'hybrid'
+
+/**
+ * Execution configuration for parallel operation processing
+ * Stored in validai_llm_global_settings.execution_config
+ */
+export interface ExecutionConfig {
+  /** Execution mode (serial, parallel, or hybrid) */
+  execution_mode: ExecutionMode
+
+  /** Maximum number of concurrent operations (1-20) */
+  max_concurrency: number
+
+  /** Number of operations to execute serially before parallelization (for hybrid mode) */
+  warmup_operations: number
+
+  /** Delay in milliseconds between parallel batches (for rate limit safety) */
+  batch_delay_ms: number
+
+  /** Whether to automatically reduce concurrency on rate limit errors */
+  rate_limit_safety: boolean
+
+  /** Optional description of configuration */
+  description?: string
+}
+
+/**
+ * Result of a single operation execution (for parallel processing)
+ */
+export interface OperationExecutionResult {
+  operation: OperationSnapshot
+  operationIndex: number
+  success: boolean
+  result?: LLMExecutionResult
+  error?: LLMError
+}
+
+/**
+ * Options for parallel execution
+ */
+export interface ParallelExecutionOptions {
+  /** Execution configuration from provider settings */
+  config: ExecutionConfig
+
+  /** Current provider */
+  provider: LLMProvider
+
+  /** Starting index in the operations array */
+  startIndex: number
+
+  /** Maximum number of operations to process in this batch */
+  maxOperations: number
+
+  /** Whether this is the first batch (for caching considerations) */
+  isFirstBatch: boolean
+}
