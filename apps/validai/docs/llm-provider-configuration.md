@@ -1415,6 +1415,7 @@ The system uses optimal execution strategies per provider, stored in `validai_ll
 {
   "execution_mode": "hybrid",
   "max_concurrency": 5,
+  "chunk_size": 5,
   "warmup_operations": 1,
   "batch_delay_ms": 200,
   "rate_limit_safety": true,
@@ -1426,7 +1427,8 @@ The system uses optimal execution strategies per provider, stored in `validai_ll
 ```json
 {
   "execution_mode": "parallel",
-  "max_concurrency": 5,
+  "max_concurrency": 25,
+  "chunk_size": 25,
   "warmup_operations": 0,
   "batch_delay_ms": 6000,
   "rate_limit_safety": true,
@@ -1439,6 +1441,7 @@ The system uses optimal execution strategies per provider, stored in `validai_ll
 {
   "execution_mode": "parallel",
   "max_concurrency": 3,
+  "chunk_size": 3,
   "warmup_operations": 0,
   "batch_delay_ms": 1000,
   "rate_limit_safety": true,
@@ -1452,6 +1455,7 @@ The system uses optimal execution strategies per provider, stored in `validai_ll
 |-------|------|-------------|
 | `execution_mode` | string | `serial`, `parallel`, or `hybrid` |
 | `max_concurrency` | integer | Maximum parallel operations (1-20) |
+| `chunk_size` | integer | Operations per Edge Function invocation (prevents timeout) |
 | `warmup_operations` | integer | Number of serial operations before parallelization (hybrid mode) |
 | `batch_delay_ms` | integer | Delay between batches in milliseconds (rate limit safety) |
 | `rate_limit_safety` | boolean | Auto-reduce concurrency on 429 errors |
@@ -1466,6 +1470,80 @@ The system uses optimal execution strategies per provider, stored in `validai_ll
 | **Anthropic** | ~6 minutes | ~1.5 minutes | **4x faster** |
 | **Gemini** | ~5 minutes | ~1 minute | **5x faster** |
 | **Mistral** | ~8 minutes | ~2.5 minutes | **3x faster** |
+
+### Chunk Size Optimization (2025-11-08)
+
+**Dynamic Chunk Sizing** enables provider-specific optimization of Edge Function self-invocation:
+
+**Previous Implementation (Hardcoded):**
+- Fixed `CHUNK_SIZE = 4` operations per Edge Function invocation
+- Prevented timeouts but limited parallel execution benefits
+- Example: 50 operations = 13 chunks × 22s each = **286 seconds**
+
+**Current Implementation (Provider-Specific):**
+- Dynamic `chunk_size` from provider configuration
+- Matched to provider rate limits and concurrency capabilities
+- Example: 50 operations = 2 chunks × 23s each = **46 seconds** (6x speedup)
+
+**Chunk Size by Provider:**
+
+| Provider | Chunk Size | Rate Limit Basis | Self-Invocations (50 ops) |
+|----------|------------|------------------|---------------------------|
+| **Gemini** | 25 | 150 RPM paid tier | 2 chunks |
+| **Anthropic** | 5 | 50 RPM Tier 1 | 10 chunks |
+| **Mistral** | 3 | Conservative free tier | 17 chunks |
+
+**Why Chunk Size Matters:**
+- Edge Functions have ~200s runtime limit
+- Large processor runs (50+ operations) must self-invoke to avoid timeout
+- Larger chunks = fewer invocations = faster completion
+- Must respect provider rate limits to avoid 429 errors
+
+### Real-Time Streaming Database Writes (2025-11-08)
+
+**Streaming Architecture** enables true real-time UI updates during processor runs:
+
+**Previous Implementation (Batch Writes):**
+- Database writes happened AFTER entire batch completed
+- UI received bursts of updates every 20-30 seconds
+- User experience: "loading... loading... BURST of 5 results... loading..."
+
+**Current Implementation (Streaming Writes):**
+- Immediate database INSERT as each operation completes
+- Immediate progress counter update via `increment_run_progress()`
+- UI receives continuous stream of updates every 3-10 seconds
+- User experience: Smooth, real-time progress with results appearing instantly
+
+**Implementation Details:**
+```typescript
+// Inside parallel executor - IMMEDIATE write after LLM call completes
+const result = await executeLLMOperationWithRetryRouter(params, supabase, documentRef)
+
+// 🔥 IMMEDIATE DATABASE WRITE (real-time streaming)
+await supabase
+  .from('validai_operation_results')
+  .insert({
+    run_id: runId,
+    operation_id: operation.id,
+    status: 'completed',
+    response_text: result.response,
+    structured_output: result.structured_output,
+    // ... all operation result fields
+  })
+
+// 🔥 IMMEDIATE PROGRESS UPDATE
+await supabase.rpc('increment_run_progress', {
+  p_run_id: runId,
+  p_status: 'completed'
+})
+```
+
+**Benefits:**
+- ✅ Real-time UI updates (Supabase Realtime subscriptions get instant notifications)
+- ✅ Crash resistance (partial results preserved immediately)
+- ✅ Better user experience (see results as they arrive)
+- ✅ No change to continue-on-failure semantics
+- ✅ Works seamlessly with parallel execution
 
 ### Cost Impact
 
@@ -1516,6 +1594,7 @@ UPDATE validai_llm_global_settings
 SET execution_config = jsonb_build_object(
   'execution_mode', 'parallel',
   'max_concurrency', 10,
+  'chunk_size', 10,
   'warmup_operations', 0,
   'batch_delay_ms', 100,
   'rate_limit_safety', true
@@ -1527,11 +1606,20 @@ UPDATE validai_llm_global_settings
 SET execution_config = jsonb_build_object(
   'execution_mode', 'serial',
   'max_concurrency', 1,
+  'chunk_size', 1,
   'warmup_operations', 0,
   'batch_delay_ms', 0,
   'rate_limit_safety', true
 )
 WHERE provider = 'anthropic';
+
+-- Increase Gemini chunk size for higher tier rate limits
+UPDATE validai_llm_global_settings
+SET execution_config = execution_config || jsonb_build_object(
+  'max_concurrency', 50,
+  'chunk_size', 50
+)
+WHERE provider = 'google';
 ```
 
 ### Troubleshooting

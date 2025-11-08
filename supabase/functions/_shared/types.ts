@@ -177,6 +177,9 @@ export interface ExecutionConfig {
   /** Maximum number of concurrent operations (1-20) */
   max_concurrency: number
 
+  /** Number of operations per Edge Function invocation (prevents timeout) */
+  chunk_size: number
+
   /** Number of operations to execute serially before parallelization (for hybrid mode) */
   warmup_operations: number
 

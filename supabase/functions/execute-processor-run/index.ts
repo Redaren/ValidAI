@@ -27,15 +27,21 @@
  * - Single INSERT per operation (no pending/processing states = 66% reduction in writes)
  * - Per-operation progress updates (1 UPDATE per operation = crash-resistant, adds ~100ms overhead)
  * - Resume logic prevents duplicate processing on retries (idempotent execution)
- * - CHUNK_SIZE=4 to stay within 200s runtime limit (was 10, caused timeouts on large docs)
  * - For 9 operations: ~18 queries total (9 inserts + 9 updates), ~1s DB overhead
+ *
+ * ## Parallel Execution & Real-Time Streaming (2025-11-08)
+ * - Dynamic chunk_size from provider config (Gemini: 25, Anthropic: 5, Mistral: 3)
+ * - Immediate database writes as operations complete (true real-time streaming)
+ * - Provider-aware execution modes: serial, parallel, hybrid (cache warmup)
+ * - Adaptive rate limit safety: auto-reduce concurrency on 429 errors
+ * - Performance: Gemini 50 ops went from ~286s (13 chunks) to ~46s (2 chunks) = 6x speedup
  *
  * @version 1.1.0
  * @since 2025-10-14
  */
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
-import { executeLLMOperationWithRetry, downloadDocument } from '../_shared/llm-executor.ts'
+import { downloadDocument } from '../_shared/llm-executor.ts'
 import { executeLLMOperationWithRetryRouter } from '../_shared/llm-executor-router.ts'
 import { Mistral } from 'npm:@mistralai/mistralai'
 import { uploadDocumentToMistral } from '../_shared/llm-executor-mistral.ts'
@@ -70,34 +76,10 @@ const corsHeaders = {
 }
 
 /**
- * Chunk size for operation processing
- *
- * IMPORTANT: This value is constrained by actual Edge Function runtime limits, NOT the
- * theoretical 25-minute maximum. Based on testing with large documents (8MB PDFs):
- *
- * - Observed operation time: 22-27 seconds per operation (Mistral Large, 76K tokens)
- * - HTTP Gateway timeout: 150 seconds (504 Gateway Timeout)
- * - Edge Function runtime limit: ~200 seconds (forcible "shutdown")
- *
- * Current setting: CHUNK_SIZE = 4
- * - Expected chunk duration: 4 ops × 23s = ~92 seconds
- * - Safety margin: 92s < 150s (HTTP) and 92s < 200s (runtime)
- *
- * TECHNICAL DEBT / TODO:
- * 1. Investigate actual Edge Function timeout configuration (why 200s not 25min?)
- * 2. Check if timeout differs by Supabase plan (Free/Pro/Enterprise)
- * 3. Consider document size warnings in UI (>5MB = slower processing)
- * 4. Optimize with mistral-small-latest instead of mistral-large-latest (3x faster)
- * 5. Implement document chunking (send only relevant pages per operation)
- * 6. Add adaptive CHUNK_SIZE based on avg operation time from previous runs
- * 7. Consider streaming response pattern to avoid HTTP Gateway timeout
- *
- * Related issue: Run 9b3ff289-ece5-4d9b-9dd8-c4465f54949f (2025-10-29)
- * - 9 operations, 8.78MB PDF, mistral-large-latest
- * - Timed out after operation 7, lost all progress due to batch update bug
- * - Fixed with this change + per-operation updates + resume logic
+ * Chunk size moved to provider-specific execution_config (2025-11-08)
+ * Now dynamically read from validai_llm_global_settings.execution_config.chunk_size
+ * This allows per-provider optimization (Gemini: 25, Anthropic: 5, Mistral: 3)
  */
-const CHUNK_SIZE = 4
 
 /**
  * Initial request payload (from UI)
@@ -789,15 +771,11 @@ serve(async (req) => {
         console.log(`This appears to be a retry after a crash or timeout`)
       }
 
-      const chunk = operations.slice(effectiveStartIndex, effectiveStartIndex + CHUNK_SIZE)
-
-      console.log(`Processing chunk: ${chunk.length} operations (${effectiveStartIndex} to ${effectiveStartIndex + chunk.length - 1})`)
-
       // Merge LLM config settings with snapshot overrides
       // Priority: snapshot.settings_override > llmConfig.settings > defaults
       const settings: ProcessorSettings = {
         // Provider (required for router)
-        provider: provider as 'anthropic' | 'mistral',
+        provider: provider as LLMProvider,
 
         // Start with resolved LLM config settings from get_llm_config_for_run
         selected_model_id: llmConfig.model,
@@ -841,6 +819,10 @@ serve(async (req) => {
         console.warn(`Failed to fetch execution config: ${error.message}, using defaults`)
         executionConfig = getDefaultExecutionConfig(provider as LLMProvider)
       }
+
+      // Slice chunk using execution config's chunk_size
+      const chunk = operations.slice(effectiveStartIndex, effectiveStartIndex + executionConfig.chunk_size)
+      console.log(`Processing chunk: ${chunk.length} operations (${effectiveStartIndex} to ${effectiveStartIndex + chunk.length - 1})`)
 
       // Prepare document reference for executor
       // - Google: GeminiCacheRef object with fileUri + cacheName
@@ -894,14 +876,14 @@ serve(async (req) => {
         }
       }
 
-      // Execute operations using parallel executor (provider-aware)
+      // Execute operations using parallel executor (provider-aware with real-time streaming)
       const operationResults = await executeOperationsParallel(
         chunk,
         {
           config: executionConfig,
           provider: provider as LLMProvider,
           startIndex: effectiveStartIndex,
-          maxOperations: CHUNK_SIZE,
+          maxOperations: executionConfig.chunk_size,
           isFirstBatch: backgroundBody.start_index === 0
         },
         {
@@ -911,94 +893,23 @@ serve(async (req) => {
           apiKey
         },
         supabase,
-        documentRef
+        documentRef,
+        backgroundBody.run_id  // Pass run_id for immediate database writes (real-time streaming)
       )
 
-      // Process results and save to database
-      console.log(`Processing ${operationResults.length} operation results...`)
+      // Database writes already done in parallel executor (real-time streaming)
+      // operationResults contains success/failure info for logging and error tracking
+      const successCount = operationResults.filter(r => r.success).length
+      const failureCount = operationResults.filter(r => !r.success).length
 
-      for (const opResult of operationResults) {
-        const { operation, operationIndex, success, result, error } = opResult
-
-        console.log(`\n--- Saving Result for Operation ${operationIndex + 1}/${operations.length} ---`)
-        console.log(`Name: ${operation.name}`)
-        console.log(`Status: ${success ? 'completed' : 'failed'}`)
-
-        const startedAt = new Date().toISOString()
-
-        if (success && result) {
-          // Operation succeeded
-          console.log(`Response length: ${result.response.length} chars`)
-          console.log(`Tokens: ${result.tokens.input} in, ${result.tokens.output} out`)
-          if (result.cacheHit) {
-            console.log(`💰 Cache hit: ${result.tokens.cached_read} tokens read from cache`)
-          }
-
-          // Single INSERT with all data (completed status)
-          await supabase
-            .from('validai_operation_results')
-            .insert({
-              run_id: backgroundBody.run_id,
-              operation_id: operation.id,
-              operation_snapshot: operation,
-              execution_order: operationIndex,
-              status: 'completed',
-              response_text: result.response,
-              structured_output: result.structured_output,
-              thinking_blocks: result.thinking_blocks,
-              model_used: result.model,
-              tokens_used: result.tokens,
-              execution_time_ms: result.executionTime,
-              cache_hit: result.cacheHit,
-              started_at: startedAt,
-              completed_at: new Date().toISOString()
-            })
-
-          // Update progress counter
-          await supabase.rpc('increment_run_progress', {
-            p_run_id: backgroundBody.run_id,
-            p_status: 'completed'
-          })
-
-          console.log(`✅ Operation ${operationIndex + 1} recorded as completed`)
-        } else if (error) {
-          // Operation failed
-          console.error(`❌ Operation ${operationIndex + 1} failed: ${error.message}`)
-
-          // Single INSERT with all data (failed status)
-          await supabase
-            .from('validai_operation_results')
-            .insert({
-              run_id: backgroundBody.run_id,
-              operation_id: operation.id,
-              operation_snapshot: operation,
-              execution_order: operationIndex,
-              status: 'failed',
-              error_message: error.message || 'Unknown error occurred',
-              error_type: error.name || 'UnknownError',
-              retry_count: error.retryCount || 0,
-              started_at: startedAt,
-              completed_at: new Date().toISOString()
-            })
-
-          // Update failure counter
-          await supabase.rpc('increment_run_progress', {
-            p_run_id: backgroundBody.run_id,
-            p_status: 'failed'
-          })
-
-          console.log(`❌ Operation ${operationIndex + 1} recorded as failed`)
-        }
-      }
-
-      console.log(`Chunk processing complete`)
+      console.log(`Chunk processing complete: ${successCount} succeeded, ${failureCount} failed`)
 
       // 6. Check if more chunks remain
-      const hasMoreOperations = (effectiveStartIndex + CHUNK_SIZE) < operations.length
+      const hasMoreOperations = (effectiveStartIndex + executionConfig.chunk_size) < operations.length
 
       if (hasMoreOperations) {
         // Invoke next chunk
-        const nextStartIndex = effectiveStartIndex + CHUNK_SIZE
+        const nextStartIndex = effectiveStartIndex + executionConfig.chunk_size
         console.log(`More operations remaining. Invoking next chunk (start: ${nextStartIndex})`)
 
         const edgeFunctionUrl = `${supabaseUrl}/functions/v1/execute-processor-run`

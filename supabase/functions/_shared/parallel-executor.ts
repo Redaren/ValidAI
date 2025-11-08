@@ -47,6 +47,7 @@ function sleep(ms: number): Promise<void> {
  * @param context - Execution context (document, settings, etc.)
  * @param supabase - Supabase client for database operations
  * @param documentRef - Provider-specific document reference (Buffer, URL, cache ref, or file_id)
+ * @param runId - Run ID for immediate database writes (real-time streaming)
  * @returns Array of operation execution results
  */
 export async function executeOperationsParallel(
@@ -59,7 +60,8 @@ export async function executeOperationsParallel(
     apiKey: string
   },
   supabase: any,
-  documentRef?: string | Buffer | { fileUri: string; fileName: string; cacheName: string }
+  documentRef: string | Buffer | { fileUri: string; fileName: string; cacheName: string } | undefined,
+  runId: string
 ): Promise<OperationExecutionResult[]> {
   const { config, provider, startIndex, isFirstBatch } = options
   const { execution_mode, max_concurrency, warmup_operations, batch_delay_ms, rate_limit_safety } = config
@@ -83,14 +85,14 @@ export async function executeOperationsParallel(
   if (execution_mode === 'serial') {
     // Serial execution (current behavior)
     console.log(`[ParallelExecutor] Using serial execution`)
-    return await executeSerial(operations, context, supabase, documentRef, startIndex)
+    return await executeSerial(operations, context, supabase, documentRef, startIndex, runId)
   } else if (execution_mode === 'hybrid' && provider === 'anthropic' && isFirstBatch) {
     // Hybrid mode for Anthropic: warmup operations serially, then parallelize
     console.log(`[ParallelExecutor] Using hybrid execution (Anthropic cache warmup)`)
 
     // Execute warmup operations serially
     const warmupOps = operations.slice(0, warmup_operations)
-    const warmupResults = await executeSerial(warmupOps, context, supabase, documentRef, startIndex)
+    const warmupResults = await executeSerial(warmupOps, context, supabase, documentRef, startIndex, runId)
     results.push(...warmupResults)
 
     // Execute remaining operations in parallel
@@ -105,7 +107,8 @@ export async function executeOperationsParallel(
         startIndex + warmup_operations,
         currentConcurrency,
         batch_delay_ms,
-        rate_limit_safety
+        rate_limit_safety,
+        runId
       )
       results.push(...parallelResults)
     }
@@ -122,13 +125,14 @@ export async function executeOperationsParallel(
       startIndex,
       currentConcurrency,
       batch_delay_ms,
-      rate_limit_safety
+      rate_limit_safety,
+      runId
     )
   }
 }
 
 /**
- * Execute operations serially (one by one)
+ * Execute operations serially (one by one) with immediate database writes
  */
 async function executeSerial(
   operations: OperationSnapshot[],
@@ -140,13 +144,15 @@ async function executeSerial(
   },
   supabase: any,
   documentRef: any,
-  startIndex: number
+  startIndex: number,
+  runId: string
 ): Promise<OperationExecutionResult[]> {
   const results: OperationExecutionResult[] = []
 
   for (let i = 0; i < operations.length; i++) {
     const operation = operations[i]
     const operationIndex = startIndex + i
+    const startedAt = new Date().toISOString()
 
     console.log(`[Serial] Executing operation ${operationIndex}: ${operation.name}`)
 
@@ -169,16 +175,64 @@ async function executeSerial(
         documentRef = result.fileId
       }
 
+      console.log(`[Serial] Operation ${operationIndex} completed successfully`)
+
+      // 🔥 IMMEDIATE DATABASE WRITE (real-time streaming)
+      await supabase
+        .from('validai_operation_results')
+        .insert({
+          run_id: runId,
+          operation_id: operation.id,
+          operation_snapshot: operation,
+          execution_order: operationIndex,
+          status: 'completed',
+          response_text: result.response,
+          structured_output: result.structured_output,
+          thinking_blocks: result.thinking_blocks,
+          model_used: result.model,
+          tokens_used: result.tokens,
+          execution_time_ms: result.executionTime,
+          cache_hit: result.cacheHit,
+          started_at: startedAt,
+          completed_at: new Date().toISOString()
+        })
+
+      // 🔥 IMMEDIATE PROGRESS UPDATE
+      await supabase.rpc('increment_run_progress', {
+        p_run_id: runId,
+        p_status: 'completed'
+      })
+
       results.push({
         operation,
         operationIndex,
         success: true,
         result,
       })
-
-      console.log(`[Serial] Operation ${operationIndex} completed successfully`)
     } catch (error) {
       console.error(`[Serial] Operation ${operationIndex} failed:`, error)
+
+      // 🔥 IMMEDIATE ERROR WRITE
+      await supabase
+        .from('validai_operation_results')
+        .insert({
+          run_id: runId,
+          operation_id: operation.id,
+          operation_snapshot: operation,
+          execution_order: operationIndex,
+          status: 'failed',
+          error_message: (error as LLMError).message || 'Unknown error occurred',
+          error_type: (error as LLMError).name || 'UnknownError',
+          retry_count: (error as LLMError).retryCount || 0,
+          started_at: startedAt,
+          completed_at: new Date().toISOString()
+        })
+
+      // 🔥 IMMEDIATE PROGRESS UPDATE
+      await supabase.rpc('increment_run_progress', {
+        p_run_id: runId,
+        p_status: 'failed'
+      })
 
       results.push({
         operation,
@@ -193,7 +247,7 @@ async function executeSerial(
 }
 
 /**
- * Execute operations in parallel batches with concurrency limiting
+ * Execute operations in parallel batches with concurrency limiting and immediate database writes
  */
 async function executeInBatches(
   operations: OperationSnapshot[],
@@ -208,7 +262,8 @@ async function executeInBatches(
   startIndex: number,
   maxConcurrency: number,
   batchDelayMs: number,
-  rateLimitSafety: boolean
+  rateLimitSafety: boolean,
+  runId: string
 ): Promise<OperationExecutionResult[]> {
   const results: OperationExecutionResult[] = []
   let currentConcurrency = maxConcurrency
@@ -223,6 +278,7 @@ async function executeInBatches(
     // Execute batch in parallel using Promise.allSettled (continue-on-failure)
     const batchPromises = batch.map(async (operation, batchIdx) => {
       const operationIndex = batchStartIndex + batchIdx
+      const startedAt = new Date().toISOString()
 
       try {
         const params: LLMExecutionParams = {
@@ -238,6 +294,32 @@ async function executeInBatches(
 
         console.log(`[Parallel] Operation ${operationIndex} completed successfully`)
 
+        // 🔥 IMMEDIATE DATABASE WRITE (real-time streaming)
+        await supabase
+          .from('validai_operation_results')
+          .insert({
+            run_id: runId,
+            operation_id: operation.id,
+            operation_snapshot: operation,
+            execution_order: operationIndex,
+            status: 'completed',
+            response_text: result.response,
+            structured_output: result.structured_output,
+            thinking_blocks: result.thinking_blocks,
+            model_used: result.model,
+            tokens_used: result.tokens,
+            execution_time_ms: result.executionTime,
+            cache_hit: result.cacheHit,
+            started_at: startedAt,
+            completed_at: new Date().toISOString()
+          })
+
+        // 🔥 IMMEDIATE PROGRESS UPDATE
+        await supabase.rpc('increment_run_progress', {
+          p_run_id: runId,
+          p_status: 'completed'
+        })
+
         return {
           operation,
           operationIndex,
@@ -246,6 +328,28 @@ async function executeInBatches(
         } as OperationExecutionResult
       } catch (error) {
         console.error(`[Parallel] Operation ${operationIndex} failed:`, error)
+
+        // 🔥 IMMEDIATE ERROR WRITE
+        await supabase
+          .from('validai_operation_results')
+          .insert({
+            run_id: runId,
+            operation_id: operation.id,
+            operation_snapshot: operation,
+            execution_order: operationIndex,
+            status: 'failed',
+            error_message: (error as LLMError).message || 'Unknown error occurred',
+            error_type: (error as LLMError).name || 'UnknownError',
+            retry_count: (error as LLMError).retryCount || 0,
+            started_at: startedAt,
+            completed_at: new Date().toISOString()
+          })
+
+        // 🔥 IMMEDIATE PROGRESS UPDATE
+        await supabase.rpc('increment_run_progress', {
+          p_run_id: runId,
+          p_status: 'failed'
+        })
 
         return {
           operation,
@@ -319,6 +423,7 @@ export function getDefaultExecutionConfig(provider: LLMProvider): ExecutionConfi
       return {
         execution_mode: 'hybrid',
         max_concurrency: 5,
+        chunk_size: 5,
         warmup_operations: 1,
         batch_delay_ms: 200,
         rate_limit_safety: true,
@@ -326,7 +431,8 @@ export function getDefaultExecutionConfig(provider: LLMProvider): ExecutionConfi
     case 'google':
       return {
         execution_mode: 'parallel',
-        max_concurrency: 5,
+        max_concurrency: 25,
+        chunk_size: 25,
         warmup_operations: 0,
         batch_delay_ms: 6000,
         rate_limit_safety: true,
@@ -335,6 +441,7 @@ export function getDefaultExecutionConfig(provider: LLMProvider): ExecutionConfi
       return {
         execution_mode: 'parallel',
         max_concurrency: 3,
+        chunk_size: 3,
         warmup_operations: 0,
         batch_delay_ms: 1000,
         rate_limit_safety: true,
@@ -344,6 +451,7 @@ export function getDefaultExecutionConfig(provider: LLMProvider): ExecutionConfi
       return {
         execution_mode: 'serial',
         max_concurrency: 1,
+        chunk_size: 1,
         warmup_operations: 0,
         batch_delay_ms: 0,
         rate_limit_safety: true,
