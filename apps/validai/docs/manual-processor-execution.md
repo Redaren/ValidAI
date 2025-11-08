@@ -3,7 +3,7 @@
 **Phase 1.8 Implementation**
 **Status:** ✅ Complete
 **Version:** 1.0.0
-**Last Updated:** 2025-10-14
+**Last Updated:** 2025-11-08
 
 ## Table of Contents
 
@@ -301,12 +301,31 @@ CREATE TABLE runs (
 ┌────────────────────────────────────────────────────────────────────┐
 │                    EXTERNAL SERVICES                               │
 ├────────────────────────────────────────────────────────────────────┤
+│                   LLM Provider APIs (Multi-Provider Support)       │
 │                                                                    │
 │  ┌──────────────────────────────────────────────────────────┐    │
 │  │  Anthropic Claude API                                    │    │
-│  │  - Process LLM operations                                │    │
-│  │  - Generate structured outputs                           │    │
-│  │  - Prompt caching for cost optimization                  │    │
+│  │  - Inline document processing (base64)                   │    │
+│  │  - Prompt caching (90% discount, inline cache_control)   │    │
+│  │  - Extended thinking mode (unlimited)                    │    │
+│  │  - Zod + Vercel AI SDK for structured output             │    │
+│  └──────────────────────────────────────────────────────────┘    │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────┐    │
+│  │  Mistral AI API                                          │    │
+│  │  - Document upload + signed URL (24h validity)           │    │
+│  │  - JSON mode (best-effort structured output)             │    │
+│  │  - No caching support                                    │    │
+│  │  - Native Mistral SDK                                    │    │
+│  └──────────────────────────────────────────────────────────┘    │
+│                                                                    │
+│  ┌──────────────────────────────────────────────────────────┐    │
+│  │  Google Gemini API (SDK v1.29.0)                         │    │
+│  │  - File API upload (48-hour storage)                     │    │
+│  │  - Explicit Cache API (75% discount, 5min TTL)           │    │
+│  │  - Native JSON Schema validation (best-in-class)         │    │
+│  │  - Thinking mode with budget control                     │    │
+│  │  - @google/genai SDK (GA - production ready)             │    │
 │  └──────────────────────────────────────────────────────────┘    │
 │                                                                    │
 └────────────────────────────────────────────────────────────────────┘
@@ -392,6 +411,14 @@ interface RunSnapshot {
     mime_type: string
     storage_path: string
   }
+
+  // Provider-specific document references (stored in snapshot for caching/reuse)
+  mistral_document_url?: string          // Mistral signed URL (24h validity)
+  anthropic_file_id?: string             // Anthropic Files API ID
+  gemini_file_uri?: string               // Gemini File API URI (48h validity)
+  gemini_file_name?: string              // Gemini file name (for cleanup)
+  gemini_cache_name?: string             // Gemini Cache API name (5min TTL)
+  gemini_file_mime_type?: string         // Document MIME type
 }
 ```
 
@@ -557,11 +584,18 @@ CREATE POLICY "operation_results_select" ON operation_results
 ```
 supabase/functions/
 ├── execute-processor-run/
-│   └── index.ts           # Main orchestration (566 lines)
+│   └── index.ts                  # Main orchestration (566 lines)
 └── _shared/
-    ├── types.ts           # Common type definitions
-    └── llm-executor.ts    # Reusable LLM execution logic
+    ├── types.ts                  # Common type definitions
+    ├── llm-executor-router.ts    # Provider routing (factory pattern) ✅
+    ├── llm-executor.ts           # Anthropic executor (legacy Vercel AI SDK)
+    ├── llm-executor-anthropic.ts # Anthropic executor (Files API) ✅
+    ├── llm-executor-mistral.ts   # Mistral executor (~438 lines) ✅
+    └── llm-executor-gemini.ts    # Gemini executor (~578 lines) ✅
 ```
+
+**Multi-Provider Support:**
+The architecture uses a factory pattern router (`llm-executor-router.ts`) that dispatches to provider-specific executors based on the selected model's provider. This allows seamless support for Anthropic, Mistral, and Google Gemini with their unique document handling and caching strategies.
 
 ### Main Handler
 
@@ -712,100 +746,222 @@ if (hasMoreOperations) {
 }
 ```
 
-### Shared LLM Executor
+### Multi-Provider LLM Execution
+
+The system uses a factory pattern router to dispatch to provider-specific executors based on the selected model's provider.
+
+#### Provider Routing Pattern
 
 ```typescript
-// _shared/llm-executor.ts
+// _shared/llm-executor-router.ts
 
-export async function executeLLMOperation(
+export async function executeLLMOperationWithRetryRouter(
   params: LLMExecutionParams,
-  supabase: any
+  supabase: any,
+  documentRef?: string | GeminiCacheRef | Buffer,
+  maxRetries: number = 3
 ): Promise<LLMExecutionResult> {
-  const { operation, document, systemPrompt, settings, apiKey, enableCache } = params
+  const provider = params.settings.provider || 'anthropic'
 
-  // 1. Download document from storage
-  const { data: fileData } = await supabase.storage
-    .from('documents')
-    .download(document.storage_path)
+  console.log(`[Router] Routing to ${provider} executor with retry (max: ${maxRetries})`)
 
-  const fileBuffer = await fileData.arrayBuffer()
-  const base64Data = Buffer.from(fileBuffer).toString('base64')
-
-  // 2. Build messages with separate file message (for caching)
-  const messages = [
-    {
-      role: 'user',
-      content: [
-        {
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: document.mime_type,
-            data: base64Data
-          },
-          cache_control: enableCache ? { type: 'ephemeral' } : undefined
-        }
-      ]
-    },
-    {
-      role: 'user',
-      content: operation.prompt
+  // Route to provider-specific executor
+  if (provider === 'google') {
+    // Gemini path: documentRef is GeminiCacheRef object
+    return await executeLLMOperationGeminiWithRetry(
+      params,
+      supabase,
+      documentRef as GeminiCacheRef,
+      maxRetries
+    )
+  } else if (provider === 'mistral') {
+    // Mistral path: documentRef is signed URL
+    return await executeLLMOperationMistralWithRetry(
+      params,
+      supabase,
+      documentRef as string,
+      maxRetries
+    )
+  } else if (provider === 'anthropic') {
+    // Anthropic path: documentRef is Buffer or file_id
+    if (typeof documentRef === 'string') {
+      // Files API path
+      return await executeLLMOperationAnthropicWithRetry(
+        params,
+        supabase,
+        documentRef,
+        maxRetries
+      )
+    } else {
+      // Legacy inline path
+      return await executeLLMOperationWithRetry(
+        params,
+        supabase,
+        documentRef as any,
+        maxRetries
+      )
     }
-  ]
-
-  // 3. Build output config based on operation type
-  const outputConfig = getOutputConfig(operation)
-
-  // 4. Execute via Vercel AI SDK
-  const { text, experimental_output, usage } = await generateText({
-    model: anthropic(settings.model),
-    system: systemPrompt || undefined,
-    messages,
-    temperature: settings.temperature,
-    maxTokens: settings.max_tokens,
-    experimental_output: outputConfig
-  })
-
-  // 5. Return comprehensive result
-  return {
-    response: text,
-    structured_output: experimental_output,
-    thinking_blocks: null, // Extracted if thinking enabled
-    model: settings.model,
-    tokens: {
-      input: usage.promptTokens,
-      output: usage.completionTokens,
-      cached_read: usage.cacheReadTokens || 0,
-      cached_write: usage.cacheCreationTokens || 0
-    },
-    executionTime: Date.now() - startTime,
-    cacheHit: (usage.cacheReadTokens || 0) > 0
   }
-}
 
+  throw new Error(`Unknown LLM provider: ${provider}`)
+}
+```
+
+#### Anthropic Executor Pattern
+
+**Document Handling:** Inline base64 encoding (legacy) or Files API upload
+**Caching:** Inline `cache_control` markers (90% discount, automatic on cache hit)
+**Structured Output:** Zod validation via Vercel AI SDK
+**Thinking Mode:** Extended thinking (unlimited tokens)
+
+```typescript
+// _shared/llm-executor.ts (Legacy) or llm-executor-anthropic.ts (Files API)
+
+// Inline approach (legacy):
+const messages = [
+  {
+    role: 'user',
+    content: [
+      {
+        type: 'document',
+        source: { type: 'base64', media_type: mime_type, data: base64Data },
+        cache_control: enableCache ? { type: 'ephemeral' } : undefined
+      }
+    ]
+  },
+  { role: 'user', content: operation.prompt }
+]
+
+// Files API approach (NEW):
+const file = await anthropic.files.upload({ file: blob })
+const message = {
+  role: 'user',
+  content: [
+    { type: 'document', source: { type: 'file', file_id: file.id } },
+    { type: 'text', text: operation.prompt }
+  ]
+}
+```
+
+#### Mistral Executor Pattern
+
+**Document Handling:** Upload to Mistral + signed URL (24h validity)
+**Caching:** Not supported
+**Structured Output:** JSON mode (best-effort, manual validation required)
+**Thinking Mode:** Not supported
+
+```typescript
+// _shared/llm-executor-mistral.ts
+
+// Upload document once per run
+const uploadResponse = await mistralClient.files.upload({
+  file: { name: fileName, buffer: documentBuffer },
+  purpose: 'chat'
+})
+
+// Get signed URL (valid 24 hours)
+const signedUrlResponse = await mistralClient.files.getSignedUrl(uploadResponse.id)
+const signedUrl = signedUrlResponse.url
+
+// Store in snapshot for reuse
+snapshot.mistral_document_url = signedUrl
+
+// All operations reference same signed URL
+const response = await mistralClient.chat.complete({
+  model: settings.model,
+  messages: [
+    { role: 'user', content: [{ type: 'url', url: signedUrl }, { type: 'text', text: prompt }] }
+  ],
+  responseFormat: { type: 'json_object' }
+})
+```
+
+#### Gemini Executor Pattern
+
+**Document Handling:** File API upload (48h validity) + Cache API creation (5min TTL)
+**Caching:** Explicit Cache API (75% discount on cache hits)
+**Structured Output:** Native JSON Schema validation (best-in-class reliability)
+**Thinking Mode:** Configurable thinking budget
+
+```typescript
+// _shared/llm-executor-gemini.ts (SDK v1.29.0)
+
+// 1. Upload document to File API (once per run)
+const ai = new GoogleGenAI({ apiKey })
+
+const file = await ai.files.upload({
+  file: blob,
+  config: { displayName: fileName, mimeType: mimeType }
+})
+
+// 2. Create cache with document + system prompt (once per run)
+const cache = await ai.caches.create({
+  model: modelName,
+  config: {
+    contents: [{
+      role: 'user',
+      parts: [
+        { text: 'Here is a document. Analyze it according to the instructions that follow.' },
+        { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
+      ]
+    }],
+    systemInstruction: systemPrompt,
+    ttl: '300s'  // 5 minutes
+  }
+})
+
+// 3. Store in snapshot for reuse
+snapshot.gemini_file_uri = file.uri
+snapshot.gemini_file_name = file.name  // For cleanup
+snapshot.gemini_cache_name = cache.name
+
+// 4. All operations reference same cache
+const response = await ai.models.generateContent({
+  model: modelName,
+  contents: operation.prompt,
+  config: {
+    responseMimeType: 'application/json',
+    responseSchema: jsonSchema,  // Native JSON Schema validation
+    cachedContent: cache.name    // 75% discount on cached tokens
+  }
+})
+
+// 5. Cleanup after run
+await ai.caches.delete({ name: cache.name })
+await ai.files.delete({ name: file.name })
+```
+
+#### Retry Logic (Universal)
+
+All provider executors include retry logic for transient errors:
+
+```typescript
 export async function executeLLMOperationWithRetry(
   params: LLMExecutionParams,
   supabase: any,
-  maxRetries: number = 3,
-  backoffMs: number[] = [1000, 5000, 15000]
+  documentRef: any,
+  maxRetries: number = 3
 ): Promise<LLMExecutionResult> {
+  const backoffMs = [1000, 5000, 15000]
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await executeLLMOperation(params, supabase)
+      return await executeLLMOperation(params, supabase, documentRef)
     } catch (error) {
       const isTransient =
-        error.status === 429 || // Rate limit
+        error.status === 429 ||        // Rate limit
         error.name === 'TimeoutError' ||
         error.code === 'ECONNRESET'
 
       const isLastAttempt = attempt === maxRetries - 1
 
       if (isTransient && !isLastAttempt) {
+        console.warn(`Retry ${attempt + 1}/${maxRetries} after ${backoffMs[attempt]}ms`)
         await sleep(backoffMs[attempt])
         continue
       }
 
-      // Permanent error or final attempt
+      // Permanent error or final attempt failed
       error.retryCount = attempt
       throw error
     }
@@ -815,32 +971,137 @@ export async function executeLLMOperationWithRetry(
 
 ### Prompt Caching Strategy
 
+The caching strategy varies by provider, offering different trade-offs between cost savings and implementation complexity.
+
+#### Provider-Specific Caching Mechanisms
+
+| Provider | Caching Mechanism | Cost Savings | TTL | Implementation |
+|----------|-------------------|--------------|-----|----------------|
+| **Anthropic** | Inline `cache_control` markers | 90% discount | 5 minutes | Automatic on cache hit |
+| **Mistral** | None | N/A | N/A | Not supported |
+| **Gemini** | Explicit Cache API | 75% discount | 5 minutes | Manual create/reference |
+
+#### Anthropic Caching (Inline)
+
 **First Operation (creates cache):**
 ```typescript
+// Operation 0 enables caching
 enableCache: operationIndex === 0 ? true : false
+
+// Document message with cache_control
+{
+  type: 'document',
+  source: { type: 'base64', media_type: mime_type, data: base64Data },
+  cache_control: { type: 'ephemeral' }  // Creates cache
+}
 ```
 
-- Document file message gets `cache_control: { type: 'ephemeral' }`
-- Anthropic caches the document embedding
-- Cost: +25% for first operation (one-time)
+**Cost:** Normal pricing + 25% cache write surcharge (one-time)
 
-**Subsequent Operations (hit cache):**
-- Same document in file message triggers cache hit
-- Cost: -90% for cached tokens
+**Subsequent Operations (cache hits):**
+- Same document in file message triggers automatic cache hit
+- Cost: 90% discount on cached tokens
 - Massive savings for multi-operation runs
 
-**Example Cost Comparison:**
+**Example Cost (100 operations):**
 ```
-Without caching (100 operations):
+Without caching:
   100 ops × $0.015 input tokens = $1.50
 
-With caching (100 operations):
-  Op 1:  $0.015 × 1.25 = $0.01875 (create cache)
+With caching:
+  Op 1:    $0.015 × 1.25 = $0.01875 (create cache)
   Op 2-100: $0.015 × 0.10 × 99 = $0.14850 (cache hits)
   Total: $0.16725
 
 Savings: 89% ($1.33 saved)
 ```
+
+#### Gemini Caching (Explicit Cache API)
+
+**Cache Creation (before operations start):**
+```typescript
+// Upload document and create cache in initial invocation
+const ai = new GoogleGenAI({ apiKey })
+
+const file = await ai.files.upload({ file: blob, config: { displayName, mimeType } })
+
+const cache = await ai.caches.create({
+  model: 'gemini-2.5-flash',
+  config: {
+    contents: [{ role: 'user', parts: [{ fileData: { fileUri: file.uri, mimeType } }] }],
+    systemInstruction: systemPrompt,
+    ttl: '300s'  // 5 minutes
+  }
+})
+
+// Store cache reference in snapshot
+snapshot.gemini_cache_name = cache.name
+```
+
+**Cost:** Normal pricing + cache write tokens
+
+**All Operations (cache references):**
+```typescript
+// All operations reference same cache
+const response = await ai.models.generateContent({
+  model: 'gemini-2.5-flash',
+  contents: operation.prompt,
+  config: {
+    cachedContent: cache.name  // 75% discount on cached tokens
+  }
+})
+```
+
+**Example Cost (100 operations):**
+```
+Input tokens (cached): $0.00375 / 1K (75% discount from $0.015)
+Input tokens (non-cached): $0.015 / 1K
+Output tokens: $0.06 / 1K
+
+Operation 1 (creates cache):
+  Input: 617 tokens × $0.015 = $0.009255
+  Cache write: 617 tokens × $0.00375 = $0.002314
+  Output: 155 tokens × $0.06 = $0.0093
+  Total: $0.020869
+
+Operation 2-100 (cache hits):
+  Input: 617 tokens × $0.00375 = $0.002314 (cached)
+  Output: 155 tokens × $0.06 = $0.0093
+  Total per op: $0.011614
+  Total for 99 ops: $1.149786
+
+Full run total: ~$1.17
+Without caching: ~$4.68
+Savings: 75%
+```
+
+#### Mistral (No Caching)
+
+Mistral does not support prompt caching. Document is uploaded once and referenced via signed URL, but the full document context is processed for every operation.
+
+**Cost Implication:**
+```
+100 operations without caching:
+  100 ops × $0.015 input tokens = ~$10.50
+
+Comparison:
+  Anthropic with caching: $0.17 (94% cheaper than Mistral)
+  Gemini with caching: $1.17 (89% cheaper than Mistral)
+  Mistral without caching: $10.50 (baseline)
+```
+
+**When Mistral is Still Cost-Effective:**
+- Single-operation processors (no caching benefit)
+- Small document batches (1-5 operations)
+- Mistral Small baseline pricing lower than competitors
+
+#### Cost Comparison Summary (100 operations)
+
+| Provider | Caching | Total Cost | Savings vs No Cache |
+|----------|---------|------------|---------------------|
+| **Anthropic** | 90% discount | ~$0.17 | 89% |
+| **Gemini** | 75% discount | ~$1.17 | 75% |
+| **Mistral** | No caching | ~$10.50 | 0% |
 
 ## UI Architecture
 
@@ -1590,12 +1851,18 @@ for (const run of runs) {
 **Database:**
 - Migration: `create_runs_and_operation_results.sql` (150 lines)
 - Migration: `fix_get_llm_config_for_run_null_user.sql` (120 lines)
+- Migration: `20251107000000_add_gemini_models.sql` - Gemini model setup ✅
+- Migration: `20251107000002_update_llm_config_google_api_key.sql` - Google API key support ✅
 - Types: `lib/database.types.ts` (auto-generated)
 
 **Edge Functions:**
 - Handler: `supabase/functions/execute-processor-run/index.ts` (566 lines)
 - Shared Types: `supabase/functions/_shared/types.ts` (150 lines)
-- Shared Executor: `supabase/functions/_shared/llm-executor.ts` (250 lines)
+- Provider Router: `supabase/functions/_shared/llm-executor-router.ts` (241 lines) ✅
+- Anthropic Executor (Legacy): `supabase/functions/_shared/llm-executor.ts` (250 lines)
+- Anthropic Executor (Files API): `supabase/functions/_shared/llm-executor-anthropic.ts` (~350 lines) ✅
+- Mistral Executor: `supabase/functions/_shared/llm-executor-mistral.ts` (438 lines) ✅
+- Gemini Executor: `supabase/functions/_shared/llm-executor-gemini.ts` (578 lines) ✅
 
 **UI Components:**
 - Dialog: `components/processors/run-processor-dialog.tsx` (220 lines)
