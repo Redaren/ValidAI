@@ -429,21 +429,57 @@ serve(async (req) => {
           console.log(`File URI: ${geminiFileUri}`)
           console.log(`File name: ${geminiFileName}`)
 
-          // Create cache with base system prompt (5-minute TTL) - NEW SDK
+          // Check file size before attempting cache creation (50 KB threshold)
+          const fileSizeKB = documentBuffer.byteLength / 1024
           const baseSystemPrompt = processor.configuration?.system_prompt ||
             'You are a helpful AI assistant that analyzes documents and provides structured responses.'
 
-          geminiCacheName = await createGeminiCache(
-            ai,  // NEW: Pass client instance
-            llmConfig.model,
-            geminiFileUri,
-            geminiFileMimeType,
-            baseSystemPrompt
-          )
+          if (fileSizeKB < 50) {
+            // File too small - skip cache creation
+            console.log(`[Gemini] File size: ${fileSizeKB.toFixed(1)} KB (below 50 KB threshold)`)
+            console.log(`[Gemini] Skipping cache creation - will use direct file references`)
+            console.log(`[Gemini] Operations will run without cache benefits (normal pricing applies)`)
+            geminiCacheName = null
+          } else {
+            // File large enough - attempt cache creation
+            console.log(`[Gemini] File size: ${fileSizeKB.toFixed(1)} KB - attempting cache creation`)
 
-          console.log(`✅ Gemini cache created successfully (5min TTL)`)
-          console.log(`Cache name: ${geminiCacheName}`)
-          console.log(`Cache will be reused for all ${operations.length} operations`)
+            try {
+              geminiCacheName = await createGeminiCache(
+                ai,  // NEW: Pass client instance
+                llmConfig.model,
+                geminiFileUri,
+                geminiFileMimeType,
+                baseSystemPrompt
+              )
+
+              console.log(`✅ Gemini cache created successfully (5min TTL)`)
+              console.log(`Cache name: ${geminiCacheName}`)
+              console.log(`Cache will be reused for all ${operations.length} operations (75% cost savings)`)
+
+            } catch (cacheError: any) {
+              // Check if error is about document being too small
+              const isTooSmallError =
+                cacheError.message?.includes('too small') ||
+                cacheError.message?.includes('min_total_token_count')
+
+              if (isTooSmallError) {
+                // Extract token counts from error message
+                const tokenMatch = cacheError.message?.match(/total_token_count=(\d+)/)
+                const minMatch = cacheError.message?.match(/min_total_token_count=(\d+)/)
+                const actualTokens = tokenMatch ? tokenMatch[1] : 'unknown'
+                const minTokens = minMatch ? minMatch[1] : '2048'
+
+                console.log(`[Gemini] Cache creation skipped: document has ${actualTokens} tokens (minimum: ${minTokens})`)
+                console.log(`[Gemini] Will use direct file references instead`)
+                geminiCacheName = null  // Continue without cache
+              } else {
+                // Real error - fail fast
+                console.error(`❌ Failed to create Gemini cache: ${cacheError.message}`)
+                throw cacheError
+              }
+            }
+          }
         } catch (error: any) {
           console.error(`❌ Failed to upload/cache document for Gemini: ${error.message}`)
           // FAIL FAST: Return error BEFORE creating run
@@ -838,19 +874,26 @@ serve(async (req) => {
         const geminiCacheName = snapshot.gemini_cache_name || null
         const geminiFileMimeType = snapshot.gemini_file_mime_type || 'application/pdf'
 
-        if (geminiFileUri && geminiCacheName) {
-          console.log(`✅ Reusing Gemini file URI and cache from snapshot`)
-          console.log(`File URI: ${geminiFileUri.substring(0, 50)}...`)
-          console.log(`File name: ${geminiFileName}`)
-          console.log(`Cache: ${geminiCacheName}`)
-          documentRef = {
-            fileUri: geminiFileUri,
-            fileName: geminiFileName || '',  // NEW: Include fileName for cleanup
-            cacheName: geminiCacheName
-          } as GeminiCacheRef
-        } else {
-          throw new Error('Gemini file URI or cache name not found in snapshot')
+        if (!geminiFileUri) {
+          throw new Error('Gemini file URI not found in snapshot')
         }
+
+        // Cache name is optional (may be null for small files)
+        if (geminiCacheName) {
+          console.log(`✅ Reusing Gemini file and cache from snapshot`)
+          console.log(`File URI: ${geminiFileUri.substring(0, 50)}...`)
+          console.log(`Cache: ${geminiCacheName}`)
+        } else {
+          console.log(`✅ Reusing Gemini file from snapshot (no cache - document too small)`)
+          console.log(`File URI: ${geminiFileUri.substring(0, 50)}...`)
+        }
+
+        documentRef = {
+          fileUri: geminiFileUri,
+          fileName: geminiFileName || '',  // NEW: Include fileName for cleanup
+          cacheName: geminiCacheName,  // May be undefined
+          mimeType: geminiFileMimeType
+        } as GeminiCacheRef
       } else if (provider === 'mistral') {
         // Existing Mistral path
         const mistralDocumentUrl = snapshot.mistral_document_url || null
@@ -965,21 +1008,25 @@ serve(async (req) => {
               // Initialize GoogleGenAI client (NEW SDK)
               const ai = new GoogleGenAI({ apiKey: geminiApiKey })
 
-              // Cleanup cache
+              // Cleanup cache (only if it was created)
               if (snapshot.gemini_cache_name) {
                 await cleanupGeminiCache(ai, snapshot.gemini_cache_name)
+                console.log('[Gemini] Cache cleanup completed')
+              } else {
+                console.log('[Gemini] No cache to cleanup (document was below size threshold)')
               }
 
               // Cleanup uploaded file (NEW)
               if (snapshot.gemini_file_name) {
                 await cleanupGeminiFile(ai, snapshot.gemini_file_name)
+                console.log('[Gemini] File cleanup completed')
               }
             } else {
-              console.warn('No API key available for Gemini cleanup (non-critical)')
+              console.log('[Gemini] No API key available for cleanup (files will auto-expire)')
             }
           } catch (error: any) {
             // Non-critical error - cache will auto-expire in 5 minutes, file in 48 hours
-            console.warn('Gemini cleanup failed (non-critical):', error.message)
+            console.log(`[Gemini] Cleanup failed (non-critical): ${error.message}`)
           }
         }
       }

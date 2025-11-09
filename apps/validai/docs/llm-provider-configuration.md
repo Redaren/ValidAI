@@ -716,25 +716,45 @@ const file = await ai.files.upload({
 // file.name → For cleanup after run
 ```
 
-**Cache Creation (5-minute TTL):**
+**Cache Creation (5-minute TTL, with size check):**
 ```typescript
-// Create cache with document + system prompt
-const cache = await ai.caches.create({
-  model: modelName,  // 'gemini-2.5-flash' or 'gemini-2.5-pro'
-  config: {
-    contents: [{
-      role: 'user',
-      parts: [
-        { text: 'Here is a document. Analyze it according to the instructions that follow.' },
-        { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
-      ]
-    }],
-    systemInstruction: systemPrompt,
-    ttl: '300s'  // 5 minutes
-  }
-})
+// Check file size before attempting cache creation (50 KB threshold)
+const fileSizeKB = documentBuffer.byteLength / 1024
 
-// cache.name → Used for all operations in run
+if (fileSizeKB < 50) {
+  // File too small - skip cache creation
+  console.log('[Gemini] File size below 50 KB threshold - skipping cache')
+  cacheName = null  // Will use direct file references
+} else {
+  // File large enough - attempt cache creation
+  try {
+    const cache = await ai.caches.create({
+      model: modelName,  // 'gemini-2.5-flash' or 'gemini-2.5-pro'
+      config: {
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: 'Here is a document. Analyze it according to the instructions that follow.' },
+            { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
+          ]
+        }],
+        systemInstruction: systemPrompt,
+        ttl: '300s'  // 5 minutes
+      }
+    })
+    cacheName = cache.name
+  } catch (error) {
+    // Graceful fallback if still too small (< 2,048 tokens)
+    if (error.message.includes('too small')) {
+      console.log('[Gemini] Document too small for caching, using direct file references')
+      cacheName = null
+    } else {
+      throw error  // Real error - fail fast
+    }
+  }
+}
+
+// cache.name → Used for all operations in run (may be null for small files)
 ```
 
 **Store in Run Snapshot:**
@@ -742,38 +762,50 @@ const cache = await ai.caches.create({
 // execute-processor-run: Store references in snapshot
 snapshot.gemini_file_uri = file.uri
 snapshot.gemini_file_name = file.name  // For cleanup
-snapshot.gemini_cache_name = cache.name
+snapshot.gemini_cache_name = cacheName  // May be null for small files
 snapshot.gemini_file_mime_type = file.mimeType
 
-// Background processing: Reuse cache for all operations
+// Background processing: Reuse cache for all operations (or direct file references if no cache)
 const documentRef: GeminiCacheRef = {
   fileUri: snapshot.gemini_file_uri,
   fileName: snapshot.gemini_file_name,
-  cacheName: snapshot.gemini_cache_name
+  cacheName: snapshot.gemini_cache_name,  // Optional - may be undefined
+  mimeType: snapshot.gemini_file_mime_type
 }
 
 for (const operation of operations) {
   const result = await executeLLMOperationGemini(
     params,
     supabase,
-    documentRef  // Cache hit for operations 2+
+    documentRef  // Cache hit for operations 2+, or direct file reference if no cache
   )
 }
 ```
 
 **Cleanup After Run:**
 ```typescript
-// Clean up both file and cache
+// Clean up both file and cache (if cache was created)
 const ai = new GoogleGenAI({ apiKey: geminiApiKey })
 
-await cleanupGeminiCache(ai, snapshot.gemini_cache_name)  // Delete cache
-await cleanupGeminiFile(ai, snapshot.gemini_file_name)    // Delete file
+// Only cleanup cache if it was created
+if (snapshot.gemini_cache_name) {
+  await cleanupGeminiCache(ai, snapshot.gemini_cache_name)
+} else {
+  console.log('[Gemini] No cache to cleanup (document was below size threshold)')
+}
+
+// Always cleanup uploaded file
+await cleanupGeminiFile(ai, snapshot.gemini_file_name)
 ```
 
 **Key Implementation Details:**
 - File upload is **fail-fast** (happens before creating run record)
-- Cache creation is **fail-fast** (happens before creating run record)
-- Both file and cache are **cleaned up** after run completion
+- Cache creation has **50 KB size check** + graceful fallback (added 2025-11-08)
+  - Files < 50 KB: Skip cache creation entirely
+  - Files >= 50 KB: Attempt cache creation with try-catch fallback
+  - If cache fails due to token size: Continue with direct file references
+- Small documents work without caching (normal pricing applies)
+- Both file and cache are **cleaned up** after run completion (cache only if created)
 - Files auto-delete after 48 hours even without cleanup
 - Caches auto-expire after 5 minutes (TTL)
 
@@ -1064,6 +1096,14 @@ The system automatically determines the provider from the selected model:
    - Impact: Cache expires after 5 minutes (Anthropic more flexible)
    - Mitigation: Sufficient for typical processor runs (< 10 minutes)
    - Note: Can be extended but requires parameter change
+
+6. **Minimum Cache Size Requirement**
+   - Impact: Documents must have 2,048+ tokens for caching (Gemini Flash) or 4,096+ tokens (Gemini Pro)
+   - Mitigation: Automatic file size check (50 KB threshold) + graceful fallback to direct file references
+   - Small documents (< 50 KB): Cache creation skipped, operations use direct file references (normal pricing)
+   - Borderline documents (>= 50 KB but < 2,048 tokens): Cache attempted, falls back gracefully if too small
+   - Note: All documents work regardless of size - small files just don't benefit from caching
+   - Implementation: Added 2025-11-08
 
 ### Testing Gemini Integration
 

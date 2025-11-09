@@ -2,8 +2,9 @@
 
 **Phase 1.8 Implementation**
 **Status:** ✅ Complete
-**Version:** 1.0.0
+**Version:** 1.1.1
 **Last Updated:** 2025-11-08
+**Latest Update:** Gemini cache size threshold (50 KB) with graceful fallback for small documents
 
 ## Table of Contents
 
@@ -485,7 +486,7 @@ interface RunSnapshot {
   anthropic_file_id?: string             // Anthropic Files API ID
   gemini_file_uri?: string               // Gemini File API URI (48h validity)
   gemini_file_name?: string              // Gemini file name (for cleanup)
-  gemini_cache_name?: string             // Gemini Cache API name (5min TTL)
+  gemini_cache_name?: string             // Gemini Cache API name (5min TTL) - null for small files (< 50 KB)
   gemini_file_mime_type?: string         // Document MIME type
 }
 ```
@@ -946,8 +947,8 @@ const response = await mistralClient.chat.complete({
 
 #### Gemini Executor Pattern
 
-**Document Handling:** File API upload (48h validity) + Cache API creation (5min TTL)
-**Caching:** Explicit Cache API (75% discount on cache hits)
+**Document Handling:** File API upload (48h validity) + Conditional cache creation (5min TTL)
+**Caching:** Explicit Cache API (75% discount on cache hits) - **with 50 KB file size threshold**
 **Structured Output:** Native JSON Schema validation (best-in-class reliability)
 **Thinking Mode:** Configurable thinking budget
 
@@ -962,40 +963,70 @@ const file = await ai.files.upload({
   config: { displayName: fileName, mimeType: mimeType }
 })
 
-// 2. Create cache with document + system prompt (once per run)
-const cache = await ai.caches.create({
-  model: modelName,
-  config: {
-    contents: [{
-      role: 'user',
-      parts: [
-        { text: 'Here is a document. Analyze it according to the instructions that follow.' },
-        { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
-      ]
-    }],
-    systemInstruction: systemPrompt,
-    ttl: '300s'  // 5 minutes
-  }
-})
+// 2. Conditionally create cache based on file size (added 2025-11-08)
+const fileSizeKB = documentBuffer.byteLength / 1024
+let cacheName = null
 
-// 3. Store in snapshot for reuse
+if (fileSizeKB < 50) {
+  // Skip cache for small files (< 50 KB)
+  console.log('[Gemini] File too small for caching - will use direct file references')
+} else {
+  // Attempt cache creation with try-catch fallback
+  try {
+    const cache = await ai.caches.create({
+      model: modelName,
+      config: {
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: 'Here is a document. Analyze it according to the instructions that follow.' },
+            { fileData: { fileUri: file.uri, mimeType: file.mimeType } }
+          ]
+        }],
+        systemInstruction: systemPrompt,
+        ttl: '300s'  // 5 minutes
+      }
+    })
+    cacheName = cache.name
+  } catch (error) {
+    if (error.message.includes('too small')) {
+      console.log('[Gemini] Document below 2,048 token minimum - using direct file references')
+    } else {
+      throw error
+    }
+  }
+}
+
+// 3. Store in snapshot for reuse (cache may be null for small files)
 snapshot.gemini_file_uri = file.uri
 snapshot.gemini_file_name = file.name  // For cleanup
-snapshot.gemini_cache_name = cache.name
+snapshot.gemini_cache_name = cacheName  // May be null
+snapshot.gemini_file_mime_type = file.mimeType
 
-// 4. All operations reference same cache
+// 4. Operations use cache if available, otherwise direct file references
 const response = await ai.models.generateContent({
   model: modelName,
-  contents: operation.prompt,
+  contents: cacheName
+    ? operation.prompt  // Cached mode: simple prompt
+    : [{  // Non-cached mode: include file reference
+        role: 'user',
+        parts: [
+          { text: 'Here is a document. Analyze it according to the instructions that follow.' },
+          { fileData: { fileUri: file.uri, mimeType: file.mimeType } },
+          { text: operation.prompt }
+        ]
+      }],
   config: {
     responseMimeType: 'application/json',
-    responseSchema: jsonSchema,  // Native JSON Schema validation
-    cachedContent: cache.name    // 75% discount on cached tokens
+    responseSchema: jsonSchema,
+    ...(cacheName && { cachedContent: cacheName })  // Only add if cache exists
   }
 })
 
-// 5. Cleanup after run
-await ai.caches.delete({ name: cache.name })
+// 5. Cleanup after run (cache only if created)
+if (cacheName) {
+  await ai.caches.delete({ name: cacheName })
+}
 await ai.files.delete({ name: file.name })
 ```
 
@@ -1142,6 +1173,12 @@ Full run total: ~$1.17
 Without caching: ~$4.68
 Savings: 75%
 ```
+
+**Note on Small Documents (added 2025-11-08):**
+- Documents < 50 KB or < 2,048 tokens cannot use caching
+- These documents use direct file references (normal pricing applies)
+- Cost for small documents: Same as "Without caching" scenario above
+- All documents work regardless of size - small files just don't benefit from cost savings
 
 #### Mistral (No Caching)
 
@@ -1977,6 +2014,8 @@ for (const run of runs) {
 | **Chunking** | Processing operations in batches to avoid timeouts |
 | **Self-invocation** | Edge Function calling itself for next chunk |
 | **Prompt Caching** | Anthropic/Gemini feature to reduce cost of repeated context |
+| **Cache Size Threshold** | Minimum file size (50 KB) or token count (2,048) required for Gemini caching |
+| **Direct File References** | Non-cached mode where file is sent with each operation (fallback for small documents) |
 | **RLS** | Row-Level Security (Postgres feature for authorization) |
 | **PostgREST** | Automatic REST API from Postgres schema |
 | **Real-time** | Supabase WebSocket service for live updates |
@@ -1986,7 +2025,7 @@ for (const run of runs) {
 
 ---
 
-**Document Version:** 1.1.0
+**Document Version:** 1.1.1
 **Last Updated:** 2025-11-08
 **Author:** Claude (Anthropic)
-**Status:** ✅ Complete (including parallel execution optimization)
+**Status:** ✅ Complete (including parallel execution optimization + Gemini cache size threshold)

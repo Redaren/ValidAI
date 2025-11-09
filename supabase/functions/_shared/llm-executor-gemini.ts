@@ -51,7 +51,8 @@ import type {
 export interface GeminiCacheRef {
   fileUri: string        // File API URI (48-hour validity)
   fileName: string       // File name for cleanup (NEW in SDK v1.29.0)
-  cacheName: string      // CachedContent name (5-minute TTL)
+  cacheName?: string     // CachedContent name (5-minute TTL) - optional for small files
+  mimeType: string       // Document MIME type - needed for direct file references
 }
 
 /**
@@ -337,7 +338,7 @@ export async function executeLLMOperationGemini(
   console.log(`Operation: ${operation.name} (${operation.operation_type})`)
   console.log(`Document: ${document.name} (${document.mime_type})`)
   console.log(`Model: ${settings.selected_model_id || 'gemini-2.5-flash'}`)
-  console.log(`Cache: ${cacheRef.cacheName}`)
+  console.log(`Cache mode: ${cacheRef.cacheName ? 'CACHED' : 'DIRECT FILE REFERENCE'}`)
   console.log(`File URI: ${cacheRef.fileUri}`)
 
   const ai = new GoogleGenAI({ apiKey })
@@ -361,8 +362,15 @@ export async function executeLLMOperationGemini(
     temperature: settings.temperature ?? 1.0,
     maxOutputTokens: settings.max_tokens ?? 8192,
     responseMimeType: 'application/json',
-    responseSchema: cleanedSchema,  // Use cleaned schema
-    cachedContent: cacheRef.cacheName  // NEW: Reference cached content
+    responseSchema: cleanedSchema  // Use cleaned schema
+  }
+
+  // Only add cachedContent if cache exists
+  if (cacheRef.cacheName) {
+    generationConfig.cachedContent = cacheRef.cacheName
+    console.log('[Gemini] Using cached content for operation')
+  } else {
+    console.log('[Gemini] Using direct file reference (no cache available)')
   }
 
   // Add top_p if supported and specified
@@ -387,13 +395,35 @@ export async function executeLLMOperationGemini(
   const startTime = Date.now()
 
   try {
-    console.log(`[Gemini] Executing ${operation.operation_type} operation with cached document`)
+    console.log(`[Gemini] Executing ${operation.operation_type} operation`)
 
-    // NEW: Unified API call with cached content
+    // Build contents based on cache availability
+    let contents: any
+    const systemInstruction = systemPrompt || 'You are a helpful AI assistant that analyzes documents and provides structured responses.'
+
+    if (cacheRef.cacheName) {
+      // CACHED MODE: Simple prompt (document already in cache)
+      contents = operation.prompt
+    } else {
+      // NON-CACHED MODE: Include file reference directly in contents
+      contents = [
+        {
+          role: 'user',
+          parts: [
+            { text: 'Here is a document. Analyze it according to the instructions that follow.' },
+            { fileData: { fileUri: cacheRef.fileUri, mimeType: cacheRef.mimeType } },
+            { text: operation.prompt }
+          ]
+        }
+      ]
+    }
+
+    // NEW: Unified API call (works for both cached and non-cached modes)
     const response = await ai.models.generateContent({
       model: modelToUse,
-      contents: operation.prompt,  // Simplified - just the prompt text
-      config: generationConfig
+      contents: contents,
+      config: generationConfig,
+      systemInstruction: systemInstruction
     })
 
     const executionTime = Date.now() - startTime
