@@ -4,18 +4,19 @@
  * @module components/processors/run-processor-dialog
  * @description
  * Dialog for drag-and-drop document upload and processor execution.
- * Uploads document to Supabase Storage, triggers the execute-processor-run Edge Function,
- * and navigates to the run detail page.
+ * Phase 1.9: Uses direct upload (base64) to Edge Function, bypassing Supabase Storage.
+ * This reduces latency by 3-7 seconds compared to Storage upload.
  *
  * **Features:**
  * - Drag-and-drop document upload
  * - Client-side file validation
- * - Upload progress indicator
+ * - Direct upload to Edge Function (no Storage)
  * - Automatic processor execution after upload
  * - Navigates to run detail page on success
  * - Error handling with inline display
  *
  * @since Phase 1.8
+ * @updated Phase 1.9 - Direct upload support
  */
 
 'use client'
@@ -24,6 +25,7 @@ import { useState } from 'react'
 import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import { useRouter } from '@/lib/i18n/navigation'
 import { Button } from '@playze/shared-ui'
+import { fileToBase64 } from '@/lib/utils/file'
 /**
  * TECHNICAL DEBT: Using direct @radix-ui/react-dialog import
  *
@@ -38,7 +40,6 @@ import { Button } from '@playze/shared-ui'
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { Play, X } from 'lucide-react'
-import { useUploadDocument } from '@/app/queries/documents'
 import { useCreateRun } from '@/app/queries/runs'
 import { toast } from 'sonner'
 import { DropZone } from '@/components/ui/dropzone'
@@ -105,21 +106,30 @@ interface RunProcessorDialogProps {
  * Displays a dialog for drag-and-drop document upload and processor execution.
  * On successful upload and run creation, navigates to the run detail page.
  *
- * **User Flow:**
+ * **User Flow (Phase 1.9 - Direct Upload):**
  * 1. User clicks "Run" button
  * 2. Dialog opens with drag-and-drop zone
  * 3. User drags and drops a file (or clicks to browse)
  * 4. File is validated client-side
- * 5. File is uploaded to Supabase Storage
- * 6. Document record is created in database
- * 7. Edge Function creates run and returns run_id
- * 8. Dialog closes and user is navigated to run detail page
+ * 5. File is converted to base64
+ * 6. Edge Function creates run with inline file (no Storage)
+ * 7. Dialog closes and user is navigated to run detail page
+ *
+ * **Performance Improvement:**
+ * - Eliminates 3-7 second Storage upload round trip
+ * - Document processed directly in Edge Function
  *
  * **Error Handling:**
  * - Shows inline error for invalid files (size, format)
- * - Shows toast error if upload fails
  * - Shows toast error if run creation fails
- * - Cleanup: Deletes uploaded file if database insert fails
+ *
+ * **Future Enhancement:**
+ * - TODO: Add optional Storage toggle for users who want to save documents for re-runs
+ * - Possible approaches:
+ *   1. UI toggle: "Save document for later re-runs"
+ *   2. Automatic: Save to Storage in background (non-blocking)
+ *   3. Smart: Only save if document used multiple times
+ * - For now: Keep it simple, optimize for speed
  *
  * @param processorId - UUID of the processor
  * @param trigger - Custom trigger element (optional)
@@ -142,10 +152,9 @@ export function RunProcessorDialog({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const router = useRouter()
 
-  const uploadDocument = useUploadDocument()
   const createRun = useCreateRun()
 
-  const isProcessing = uploadDocument.isPending || createRun.isPending
+  const isProcessing = createRun.isPending
 
   const handleFileSelect = async (file: File) => {
     setUploadError(null)
@@ -158,16 +167,23 @@ export function RunProcessorDialog({
     }
 
     try {
-      // 1. Upload file and create document record
-      const document = await uploadDocument.mutateAsync(file)
+      // Phase 1.9: Direct upload - convert file to base64 and send to Edge Function
+      logger.info('[Direct Upload] Converting file to base64', { filename: file.name })
+      const base64File = await fileToBase64(file)
 
-      // 2. Create processor run with uploaded document
+      // Create processor run with inline file (no Storage)
+      logger.info('[Direct Upload] Creating run with inline file', { processorId })
       const { run_id } = await createRun.mutateAsync({
         processor_id: processorId,
-        document_id: document.id,
+        file_upload: {
+          file: base64File,
+          filename: file.name,
+          mime_type: file.type,
+          size_bytes: file.size,
+        },
       })
 
-      // 3. Close dialog and navigate to run detail page with view parameter
+      // Close dialog and navigate to run detail page with view parameter
       setOpen(false)
       router.push(`/proc/${processorId}/runs/${run_id}?view=${defaultView}`)
 
@@ -176,7 +192,7 @@ export function RunProcessorDialog({
           'Processing in background. You can monitor progress on the run detail page.',
       })
     } catch (error) {
-      logger.error('Failed to upload document or create run:', extractErrorDetails(error))
+      logger.error('Failed to create run', extractErrorDetails(error))
       const errorMessage =
         error instanceof Error
           ? error.message
@@ -224,7 +240,7 @@ export function RunProcessorDialog({
           <DropZone
             onFileSelect={handleFileSelect}
             uploading={isProcessing}
-            uploadProgress={uploadDocument.isPending ? 50 : createRun.isPending ? 75 : 0}
+            uploadProgress={createRun.isPending ? 50 : 0}
             error={uploadError}
             disabled={isProcessing}
           />

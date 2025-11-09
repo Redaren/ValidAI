@@ -40,19 +40,34 @@ type OperationResult = Database['public']['Tables']['validai_operation_results']
  * 3. Triggers background execution
  * 4. Returns immediately with run_id (HTTP 202)
  *
+ * Phase 1.9: Supports both Storage-based and direct upload paths:
+ * - Storage path: Provide document_id (existing document in validai_documents)
+ * - Direct upload path: Provide file_upload (base64 file, no Storage)
+ *
  * @returns Mutation hook for creating runs
  *
- * @example
+ * @example Storage upload (legacy)
  * ```tsx
  * const createRun = useCreateRun()
+ * const { run_id } = await createRun.mutateAsync({
+ *   processor_id: 'uuid',
+ *   document_id: 'uuid'
+ * })
+ * ```
  *
- * const handleRun = async () => {
- *   const { run_id } = await createRun.mutateAsync({
- *     processor_id: 'uuid',
- *     document_id: 'uuid'
- *   })
- *   router.push(`/proc/${processor_id}/runs/${run_id}`)
- * }
+ * @example Direct upload (Phase 1.9)
+ * ```tsx
+ * const createRun = useCreateRun()
+ * const base64File = await fileToBase64(file)
+ * const { run_id } = await createRun.mutateAsync({
+ *   processor_id: 'uuid',
+ *   file_upload: {
+ *     file: base64File,
+ *     filename: file.name,
+ *     mime_type: file.type,
+ *     size_bytes: file.size
+ *   }
+ * })
  * ```
  */
 export function useCreateRun() {
@@ -60,15 +75,28 @@ export function useCreateRun() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({
-      processor_id,
-      document_id,
-    }: {
+    mutationFn: async (params: {
       processor_id: string
-      document_id: string
+      // Phase 1.9: Support both Storage and direct upload
+      document_id?: string
+      file_upload?: {
+        file: string           // base64 encoded
+        filename: string
+        mime_type: string
+        size_bytes: number
+      }
     }) => {
+      // Validate exactly one of document_id or file_upload
+      if (!params.document_id && !params.file_upload) {
+        throw new Error('Either document_id or file_upload is required')
+      }
+
+      if (params.document_id && params.file_upload) {
+        throw new Error('Cannot provide both document_id and file_upload')
+      }
+
       const { data, error } = await supabase.functions.invoke('execute-processor-run', {
-        body: { processor_id, document_id },
+        body: params,
       })
 
       if (error) {

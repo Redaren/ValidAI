@@ -83,10 +83,21 @@ const corsHeaders = {
 
 /**
  * Initial request payload (from UI)
+ * Supports either Storage-based upload (document_id) or direct upload (file_upload)
  */
 interface InitialRequest {
   processor_id: string
-  document_id: string
+
+  // EITHER document_id (existing Storage flow)
+  document_id?: string
+
+  // OR file_upload (new direct upload flow - Phase 1.9)
+  file_upload?: {
+    file: string           // base64 encoded file content
+    filename: string       // original filename
+    mime_type: string      // MIME type (e.g., 'application/pdf')
+    size_bytes: number     // file size in bytes
+  }
 }
 
 /**
@@ -165,11 +176,27 @@ serve(async (req) => {
       console.log('=== Initial Invocation: Creating Run ===')
       console.log(`Processor ID: ${initialBody.processor_id}`)
       console.log(`Document ID: ${initialBody.document_id}`)
+      console.log(`File Upload: ${initialBody.file_upload ? 'Direct upload' : 'N/A'}`)
 
-      // 1. Validate input
-      if (!initialBody.processor_id || !initialBody.document_id) {
+      // 1. Validate input - Phase 1.9: Support both Storage and direct upload
+      if (!initialBody.processor_id) {
         return new Response(
-          JSON.stringify({ error: 'Missing required fields: processor_id and document_id' }),
+          JSON.stringify({ error: 'Missing required field: processor_id' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Validate exactly one of document_id or file_upload
+      if (!initialBody.document_id && !initialBody.file_upload) {
+        return new Response(
+          JSON.stringify({ error: 'Either document_id or file_upload is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (initialBody.document_id && initialBody.file_upload) {
+        return new Response(
+          JSON.stringify({ error: 'Cannot provide both document_id and file_upload' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -209,18 +236,63 @@ serve(async (req) => {
         )
       }
 
-      // 4. Fetch document
-      const { data: document, error: docError } = await supabase
-        .from('validai_documents')
-        .select('*')
-        .eq('id', initialBody.document_id)
-        .single()
+      // 4. Resolve document - Phase 1.9: Support both Storage and direct upload
+      let documentMetadata: DocumentSnapshot
+      let documentId: string | null = null
+      let storageStatus: 'completed' | 'not_stored' = 'not_stored'
 
-      if (docError || !document) {
-        return new Response(
-          JSON.stringify({ error: `Document not found: ${docError?.message}` }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+      if (initialBody.document_id) {
+        // EXISTING PATH: Fetch document from Storage
+        console.log(`[Storage] Fetching document: ${initialBody.document_id}`)
+
+        const { data: document, error: docError } = await supabase
+          .from('validai_documents')
+          .select('*')
+          .eq('id', initialBody.document_id)
+          .single()
+
+        if (docError || !document) {
+          return new Response(
+            JSON.stringify({ error: `Document not found: ${docError?.message}` }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        documentMetadata = {
+          id: document.id,
+          name: document.name,
+          size_bytes: document.size_bytes,
+          mime_type: document.mime_type,
+          storage_path: document.storage_path
+        }
+        documentId = document.id
+        storageStatus = 'completed'
+        console.log(`[Storage] Document fetched successfully`)
+
+      } else if (initialBody.file_upload) {
+        // NEW PATH: Direct upload (no Storage) - Phase 1.9
+        console.log(`[Direct Upload] Processing file: ${initialBody.file_upload.filename}`)
+
+        // Validate file size (10MB limit for buffered uploads)
+        const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+        if (initialBody.file_upload.size_bytes > MAX_FILE_SIZE) {
+          return new Response(
+            JSON.stringify({ error: `File size exceeds 10MB limit (${(initialBody.file_upload.size_bytes / 1024 / 1024).toFixed(2)}MB)` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Create metadata (no storage_path, no id)
+        documentMetadata = {
+          id: null,
+          name: initialBody.file_upload.filename,
+          size_bytes: initialBody.file_upload.size_bytes,
+          mime_type: initialBody.file_upload.mime_type,
+          storage_path: null
+        }
+        documentId = null
+        storageStatus = 'not_stored'
+        console.log(`[Direct Upload] File metadata created (${(initialBody.file_upload.size_bytes / 1024).toFixed(2)}KB)`)
       }
 
       // 5. Get organization_id (from user or processor for service-role calls)
@@ -290,14 +362,26 @@ serve(async (req) => {
             mistralApiKey = globalKey
           }
 
-          // Download and upload document
-          const documentBuffer = await downloadDocument(supabase, document.storage_path)
+          // Get document buffer - Phase 1.9: Support both Storage and direct upload
+          let documentBuffer: Buffer
+          if (initialBody.document_id) {
+            // Storage path: download from Storage
+            documentBuffer = await downloadDocument(supabase, documentMetadata.storage_path!)
+          } else {
+            // Direct upload path: decode base64
+            documentBuffer = Buffer.from(initialBody.file_upload!.file, 'base64')
+            // Verify decoded size matches
+            if (documentBuffer.byteLength !== initialBody.file_upload!.size_bytes) {
+              throw new Error('File size mismatch after base64 decoding')
+            }
+          }
+
           const mistralClient = new Mistral({ apiKey: mistralApiKey })
 
           mistralDocumentUrl = await uploadDocumentToMistral(
             mistralClient,
             documentBuffer,
-            document.name
+            documentMetadata.name
           )
 
           console.log(`✅ Mistral document uploaded successfully`)
@@ -347,15 +431,27 @@ serve(async (req) => {
               anthropicApiKey = globalKey
             }
 
-            // Download and upload document
-            const documentBuffer = await downloadDocument(supabase, document.storage_path)
+            // Get document buffer - Phase 1.9: Support both Storage and direct upload
+            let documentBuffer: Buffer
+            if (initialBody.document_id) {
+              // Storage path: download from Storage
+              documentBuffer = await downloadDocument(supabase, documentMetadata.storage_path!)
+            } else {
+              // Direct upload path: decode base64
+              documentBuffer = Buffer.from(initialBody.file_upload!.file, 'base64')
+              // Verify decoded size matches
+              if (documentBuffer.byteLength !== initialBody.file_upload!.size_bytes) {
+                throw new Error('File size mismatch after base64 decoding')
+              }
+            }
+
             const anthropicClient = new Anthropic({ apiKey: anthropicApiKey })
 
             anthropicFileId = await uploadDocumentToAnthropic(
               anthropicClient,
               documentBuffer,
-              document.name,
-              document.mime_type
+              documentMetadata.name,
+              documentMetadata.mime_type
             )
 
             console.log(`✅ Anthropic document uploaded successfully`)
@@ -410,15 +506,26 @@ serve(async (req) => {
           // Initialize GoogleGenAI client (NEW SDK)
           const ai = new GoogleGenAI({ apiKey: geminiApiKey })
 
-          // Download document
-          const documentBuffer = await downloadDocument(supabase, document.storage_path)
+          // Get document buffer - Phase 1.9: Support both Storage and direct upload
+          let documentBuffer: Buffer
+          if (initialBody.document_id) {
+            // Storage path: download from Storage
+            documentBuffer = await downloadDocument(supabase, documentMetadata.storage_path!)
+          } else {
+            // Direct upload path: decode base64
+            documentBuffer = Buffer.from(initialBody.file_upload!.file, 'base64')
+            // Verify decoded size matches
+            if (documentBuffer.byteLength !== initialBody.file_upload!.size_bytes) {
+              throw new Error('File size mismatch after base64 decoding')
+            }
+          }
 
           // Upload to Gemini File API (48-hour validity) - NEW SDK
           const geminiFileResult = await uploadDocumentToGemini(
             ai,  // NEW: Pass client instance
             documentBuffer,
-            document.name,
-            document.mime_type || 'application/pdf'
+            documentMetadata.name,
+            documentMetadata.mime_type || 'application/pdf'
           )
 
           geminiFileUri = geminiFileResult.uri  // NEW: Changed from fileUri
@@ -512,13 +619,7 @@ serve(async (req) => {
           configuration: op.configuration,
           output_schema: op.output_schema
         })),
-        document: {
-          id: document.id,
-          name: document.name,
-          size_bytes: document.size_bytes,
-          mime_type: document.mime_type,
-          storage_path: document.storage_path
-        },
+        document: documentMetadata,  // Phase 1.9: Uses unified metadata (Storage or direct upload)
         mistral_document_url: mistralDocumentUrl,  // NULL for non-Mistral
         anthropic_file_id: anthropicFileId,  // NULL for legacy Anthropic or non-Anthropic
         gemini_file_uri: geminiFileUri,  // NULL for non-Gemini
@@ -527,7 +628,7 @@ serve(async (req) => {
         gemini_file_mime_type: geminiFileMimeType  // NULL for non-Gemini
       }
 
-      console.log(`Snapshot created: ${operations.length} operations, document: ${document.name}`)
+      console.log(`Snapshot created: ${operations.length} operations, document: ${documentMetadata.name}`)
       if (mistralDocumentUrl) {
         console.log(`Mistral signed URL stored in snapshot for reuse`)
       }
@@ -538,18 +639,19 @@ serve(async (req) => {
         console.log(`Gemini file URI, name, and cache name stored in snapshot for reuse`)
       }
 
-      // 7. Create run record
+      // 7. Create run record - Phase 1.9: Support nullable document_id and storage_status
       const { data: run, error: runError } = await supabase
         .from('validai_runs')
         .insert({
           processor_id: processor.id,
-          document_id: document.id,
+          document_id: documentId,  // Phase 1.9: Can be NULL for direct uploads
           organization_id: organization_id,
           snapshot: snapshot,
           status: 'pending',
           triggered_by: user?.id || null,
           trigger_type: 'manual',
           total_operations: operations.length,
+          storage_status: storageStatus,  // Phase 1.9: 'completed' or 'not_stored'
           started_at: new Date().toISOString()
         })
         .select()
