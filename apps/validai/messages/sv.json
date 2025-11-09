@@ -96,7 +96,7 @@
     }
   },
   "processors": {
-    "title": "Dokumentmallar",
+    "title": "Analysmallar",
     "description": "Skapa och hantera AI-drivna dokumentanalysmallar",
     "breadcrumb": "Mallar",
     "loading": "Laddar mall...",
