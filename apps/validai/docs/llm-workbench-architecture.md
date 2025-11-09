@@ -1,32 +1,41 @@
 # LLM Workbench Architecture
 
-The LLM Workbench is a testing environment for operations that integrates with LLM providers through the Vercel AI SDK, featuring message composition controls, structured output generation, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Currently configured for Anthropic's Claude models with the foundation for multi-provider support.
+The LLM Workbench is a multi-provider testing environment for LLM operations, featuring message composition controls, structured output generation, prompt caching, real-time execution tracking, and comprehensive LLM configuration management. Supports Anthropic Claude (via Vercel AI SDK), Google Gemini (native SDK), and Mistral AI with provider-specific optimizations.
 
-**Implementation:** Phase 2.1.2 (Thinking + Structured Output Workaround)
-**Documentation Date:** 2025-10-13
-**Based on:** Vercel AI SDK v5 (https://ai-sdk.dev) with Anthropic provider
+**Implementation:** Phase 2.2.0 (Multi-Provider Support with Gemini)
+**Documentation Date:** 2025-11-09
+**Supported Providers:**
+- **Anthropic Claude**: Via Vercel AI SDK v5 with prompt caching and extended thinking
+- **Google Gemini**: Via Google GenAI SDK v1.29.0 with explicit caching and thinking mode
+- **Mistral AI**: With document upload and JSON mode support
 
 ## Overview
 
 The Workbench provides a sandboxed environment where users can:
-- Select operation types to control output structure (Generic text or Structured validation)
-- Compose messages with explicit control over what gets sent (system prompt, file, cache markers)
-- Test operations with real LLM responses in two distinct modes (stateful/stateless)
-- Generate structured outputs with automatic schema validation (True/False, future: Extraction, Rating, etc.)
-- Leverage prompt caching for cost optimization (90% savings)
-- Enable extended thinking for complex reasoning tasks
-- Use citations for document grounding
-- Track execution progress in real-time
-- View comprehensive per-message metadata with structured output visualization
-- Monitor context window usage (Claude Sonnet 4.5 context awareness)
+- **Select LLM providers**: Choose between Anthropic Claude, Google Gemini, and Mistral AI
+- **Select operation types**: Control output structure (Generic text or Structured validation)
+- **Compose messages**: Explicit control over what gets sent (system prompt, file, cache markers)
+- **Test operations**: Real LLM responses in two distinct modes (stateful/stateless)
+- **Generate structured outputs**: Automatic schema validation for all operation types
+- **Leverage prompt caching**: Provider-specific caching for cost optimization
+  - Anthropic: 90% savings (automatic prefix caching)
+  - Gemini: 75% savings (explicit caching with 50 KB threshold)
+  - Mistral: No caching support
+- **Enable extended thinking**: Complex reasoning for Anthropic and Gemini
+- **Use citations**: Document grounding (Anthropic)
+- **Track execution**: Real-time progress monitoring
+- **View metadata**: Comprehensive per-message metadata with structured output visualization
+- **Text-only queries**: All providers support queries without file upload
 
 **Key Characteristics:**
+- **Multi-Provider Support**: Seamless switching between Anthropic, Gemini, and Mistral
+- **Provider-Specific Optimizations**: Each provider uses native features (caching, thinking, structured output)
 - **Message Composition**: Settings act as toggles to construct each message
-- **User-Controlled Caching**: Explicit "Create cache" toggle instead of mode-based automation
-- **Context Awareness**: Tracks 200K token usage for Claude Sonnet 4.5 (stateful mode)
+- **User-Controlled Caching**: Explicit "Create cache" toggle for supported providers
+- **Dual Execution Paths**: File-based (with caching) and text-only (direct API) modes
 - **Ephemeral**: State is not persisted across sessions
 - **Performance-Optimized**: Database audit logging disabled by default (optional via environment flag)
-- **Cost-optimized**: Prompt caching reduces token costs by up to 90%
+- **Cost-optimized**: Provider-specific caching reduces token costs significantly
 - **Auditable**: Execution audit trail available when enabled (adds ~500ms latency)
 
 ## Message Composition System
@@ -138,6 +147,132 @@ Message 2 (after create cache auto-reset):
 - Create cache: OFF
 
 Result: Cache hit, no conversation history sent
+```
+
+## Multi-Provider Architecture
+
+The Workbench supports three LLM providers with provider-specific optimizations and features. Each provider is integrated using its native SDK to maximize capabilities and performance.
+
+### Supported Providers
+
+| Provider | SDK | Integration | Caching | Thinking | Structured Output | File Upload |
+|----------|-----|-------------|---------|----------|-------------------|-------------|
+| **Anthropic Claude** | Vercel AI SDK v5 | `@ai-sdk/anthropic` | ✅ Automatic (90% savings) | ✅ Extended thinking | ✅ Native (`generateObject`) | ✅ Via content blocks |
+| **Google Gemini** | Google GenAI SDK v1.29.0 | `@google/genai` | ✅ Explicit (75% savings, 50KB min) | ✅ Thinking mode | ✅ Native (JSON Schema) | ✅ File API (48hr validity) |
+| **Mistral AI** | Direct API | HTTP requests | ❌ Not supported | ❌ Not supported | ✅ JSON mode | ✅ Document upload |
+
+### Provider Selection
+
+**Configuration:** Models are configured in `llm_global_settings` with provider-specific settings:
+```sql
+INSERT INTO llm_global_settings (provider, model_name, display_name, is_active)
+VALUES
+  ('anthropic', 'claude-3-5-sonnet-20241022', 'Claude 3.5 Sonnet', true),
+  ('google', 'gemini-2.0-flash-thinking-exp-01-21', 'Gemini 2.0 Flash Thinking', true),
+  ('mistral', 'mistral-large-latest', 'Mistral Large', true);
+```
+
+**Runtime Selection:** Users select models via the model selector UI. The Edge Function resolves the provider from the model configuration and routes to the appropriate integration.
+
+### Execution Paths
+
+#### Text-Only Queries (All Providers)
+All providers support text-only queries without file upload:
+- **Anthropic**: Uses `generateText()` or `generateObject()` with text messages
+- **Gemini**: Direct API call with `generateContent()` and JSON Schema
+- **Mistral**: HTTP POST with JSON payload
+
+#### File-Based Queries
+When files are uploaded, providers use different approaches:
+- **Anthropic**: Inline content blocks with automatic caching
+- **Gemini**:
+  - Upload to Gemini File API (48-hour validity)
+  - Optional explicit cache creation (50 KB threshold)
+  - Uses shared executor or direct API based on file size
+- **Mistral**: Direct document upload in request
+
+### Provider-Specific Features
+
+#### Anthropic Claude
+- **Caching**: Automatic prefix caching with `cache_control` markers (5-min TTL, 90% savings)
+- **Thinking**: Extended thinking via `providerOptions.anthropic.thinking` (budget tokens)
+- **Structured Output**: Native via `generateObject()` with Zod schemas
+- **Citations**: Document grounding with citation blocks
+- **Context Window**: 200K tokens for Claude Sonnet 4.5
+
+#### Google Gemini
+- **Caching**: Explicit cache creation with `createGeminiCache()` (5-min TTL, 75% savings)
+  - Requires 50 KB minimum document size
+  - Graceful fallback for smaller documents
+  - Cache write happens during cache creation (not per-operation)
+- **Thinking**: Native thinking mode via `thinkingConfig`
+  - Budget tokens configurable
+  - Thoughts included in response when enabled
+  - Summary extraction from thought parts
+- **Structured Output**: Native via `responseSchema` (JSON Schema format)
+  - Automatic Zod-to-JSON-Schema conversion
+  - All 7 operation types supported
+- **File Upload**: Gemini File API with 48-hour validity
+  - MIME type detection
+  - Automatic cleanup after expiration
+- **Dual-Path Architecture**:
+  - **With File**: Uses shared executor, supports caching
+  - **Without File**: Direct API call, no caching overhead
+
+#### Mistral AI
+- **Structured Output**: JSON mode via `response_format`
+- **File Upload**: Direct document upload in request
+- **OCR Support**: Automatic text extraction from images/PDFs
+- **No Caching**: Cost optimization not available
+- **No Thinking**: Standard response only
+
+### Token Metrics by Provider
+
+**Anthropic:**
+```json
+{
+  "usage": {
+    "promptTokens": 1042,
+    "completionTokens": 245,
+    "totalTokens": 1287
+  },
+  "providerMetadata": {
+    "anthropic": {
+      "cacheReadInputTokens": 950,
+      "cacheCreationInputTokens": 1000
+    }
+  }
+}
+```
+
+**Gemini:**
+```json
+{
+  "usage": {
+    "inputTokens": 1042,
+    "outputTokens": 245
+  },
+  "providerMetadata": {
+    "google": {
+      "usage": {
+        "cachedContentTokenCount": 950,
+        "thoughtsTokenCount": 128,
+        "totalTokenCount": 1287
+      }
+    }
+  }
+}
+```
+
+**Mistral:**
+```json
+{
+  "usage": {
+    "prompt_tokens": 1042,
+    "completion_tokens": 245,
+    "total_tokens": 1287
+  }
+}
 ```
 
 ## Operation Types & Structured Outputs
@@ -478,8 +613,12 @@ ALTER PUBLICATION supabase_realtime ADD TABLE workbench_executions;
 #### `execute-workbench-test`
 
 **Location:** `supabase/functions/execute-workbench-test/index.ts`
+**Version:** 2.2.0
 
-**LLM Integration:** Uses Vercel AI SDK with `@ai-sdk/anthropic` provider for unified LLM interface
+**LLM Integration:** Multi-provider support with:
+- **Anthropic Claude**: Vercel AI SDK with `@ai-sdk/anthropic` provider
+- **Google Gemini**: Native Google GenAI SDK v1.29.0
+- **Mistral AI**: Direct HTTP API requests
 
 **Performance Optimization:**
 The Edge Function includes an optional audit logging system controlled by `ENABLE_WORKBENCH_AUDIT_LOG` environment variable (default: `false`).
@@ -502,6 +641,132 @@ const { data: llmConfig } = await supabase.rpc('get_llm_config_for_run', {
   p_user_id: user.id
 })
 // Returns: model, api_key_encrypted, organization_id, settings in one roundtrip
+```
+
+**Provider Branching Logic:**
+
+The Edge Function determines the provider from the model configuration and routes to the appropriate integration:
+
+```typescript
+// Determine provider from model name
+const provider = llmConfig.model.startsWith('claude') ? 'anthropic' :
+                 llmConfig.model.startsWith('gemini') ? 'google' :
+                 llmConfig.model.startsWith('mistral') ? 'mistral' : null
+
+if (!provider) {
+  throw new Error(`Unknown provider for model: ${llmConfig.model}`)
+}
+
+// API Key Resolution (provider-specific)
+let apiKey: string
+
+if (provider === 'anthropic') {
+  // Decrypt organization key or use environment variable
+  if (llmConfig.api_key_encrypted) {
+    const { data: decryptedKey } = await supabase.rpc('decrypt_api_key', {
+      p_ciphertext: llmConfig.api_key_encrypted,
+      p_org_id: llmConfig.organization_id
+    })
+    apiKey = decryptedKey
+  } else {
+    apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  }
+} else if (provider === 'google') {
+  // Google API key resolution
+  if (llmConfig.api_key_encrypted) {
+    const { data: decryptedKey } = await supabase.rpc('decrypt_api_key', {
+      p_ciphertext: llmConfig.api_key_encrypted,
+      p_org_id: llmConfig.organization_id
+    })
+    apiKey = decryptedKey
+  } else {
+    apiKey = Deno.env.get('GOOGLE_API_KEY')
+  }
+} else if (provider === 'mistral') {
+  // Mistral API key resolution
+  if (llmConfig.api_key_encrypted) {
+    const { data: decryptedKey } = await supabase.rpc('decrypt_api_key', {
+      p_ciphertext: llmConfig.api_key_encrypted,
+      p_org_id: llmConfig.organization_id
+    })
+    apiKey = decryptedKey
+  } else {
+    apiKey = Deno.env.get('MISTRAL_API_KEY')
+  }
+}
+
+// Execute based on provider
+let response: any
+
+if (provider === 'anthropic') {
+  // Anthropic execution via Vercel AI SDK
+  const anthropicProvider = createAnthropic({ apiKey })
+  response = await generateText({
+    model: anthropicProvider(modelToUse),
+    messages,
+    system,
+    maxTokens: body.settings.max_tokens || 4096,
+    providerOptions: {
+      anthropic: {
+        thinking: body.settings.thinking,
+        cacheControl: body.settings.create_cache
+      }
+    }
+  })
+} else if (provider === 'google') {
+  // Gemini execution - dual path based on file upload
+  const ai = new GoogleGenAI(apiKey)
+
+  if (body.send_file && body.file_content) {
+    // Path A: File-based with caching
+    const geminiFile = await uploadDocumentToGemini(ai, fileBuffer, fileName, mimeType)
+
+    let geminiCacheName: string | null = null
+    if (fileSizeKB >= 50 && body.settings.create_cache) {
+      geminiCacheName = await createGeminiCache(ai, modelToUse, geminiFile.uri, ...)
+    }
+
+    response = await executeLLMOperationGemini(params, supabase, geminiCacheRef)
+  } else {
+    // Path B: Text-only direct API
+    const operationSchema = getOperationTypeSchema(body.operation_type)
+    const jsonSchema = zodToJsonSchema(operationSchema, { $refStrategy: 'none' })
+
+    response = await ai.models.generateContent({
+      model: modelToUse,
+      contents: body.new_prompt,
+      config: {
+        temperature: body.settings.temperature ?? 1.0,
+        maxOutputTokens: body.settings.max_tokens || 4096,
+        responseMimeType: 'application/json',
+        responseSchema: cleanedSchema,
+        ...(body.settings.thinking && {
+          thinkingConfig: {
+            thinkingBudget: body.settings.thinking.budget_tokens,
+            includeThoughts: true
+          }
+        })
+      },
+      systemInstruction: systemInstruction
+    })
+  }
+} else if (provider === 'mistral') {
+  // Mistral execution via direct API
+  response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: modelToUse,
+      messages: messages,
+      response_format: { type: 'json_object' },
+      temperature: body.settings.temperature,
+      max_tokens: body.settings.max_tokens
+    })
+  })
+}
 ```
 
 **System Prompt Handling (User-Controlled):**
@@ -951,16 +1216,18 @@ All override toggles turn OFF, reverting to LLM defaults.
 - Export conversation as JSON
 - Clear conversation button
 
-## LLM Provider Integration (Vercel AI SDK)
+## Multi-Provider Integration
 
-The workbench uses the Vercel AI SDK to integrate with LLM providers, currently configured for Anthropic's Claude models. This provides a unified interface that simplifies adding support for additional providers (OpenAI, Mistral, Google, etc.) in the future.
+The workbench integrates with three LLM providers using provider-specific SDKs and APIs. Each provider is integrated natively to maximize performance and feature utilization.
 
-### Provider Configuration
+### Anthropic Claude (Vercel AI SDK)
 
-**Current Implementation:**
+**SDK:** Vercel AI SDK v5 with `@ai-sdk/anthropic` provider
+
+**Integration:**
 ```typescript
 import { createAnthropic } from '@ai-sdk/anthropic'
-import { generateText } from 'ai'
+import { generateText, generateObject } from 'ai'
 
 // Initialize provider with custom API key
 const anthropicProvider = createAnthropic({ apiKey })
@@ -980,7 +1247,7 @@ const response = await generateText({
 })
 ```
 
-### 1. Prompt Caching
+#### 1. Prompt Caching
 
 **Purpose:** 90% cost reduction for repeated content
 
@@ -1056,7 +1323,7 @@ This follows proper separation of concerns - backend provides raw data, frontend
 }
 ```
 
-### 4. Context Window Tracking (Claude Sonnet 4.5)
+#### 4. Context Window Tracking (Claude Sonnet 4.5)
 
 **Purpose:** Visibility into 200K context window usage
 
@@ -1081,6 +1348,303 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - Helps users understand when approaching the 200K limit
 - Prevents context overflow in long conversations
 - Shows what Claude internally tracks
+
+### Google Gemini (Native SDK)
+
+**SDK:** Google GenAI SDK v1.29.0 (`@google/genai`)
+
+**Architecture:** Dual-path execution based on whether a file is uploaded
+
+**Integration:**
+```typescript
+import { GoogleGenAI } from 'npm:@google/genai@1.29.0'
+import {
+  uploadDocumentToGemini,
+  createGeminiCache,
+  executeLLMOperationGemini
+} from '../_shared/llm-executor-gemini.ts'
+
+// Initialize Gemini client
+const ai = new GoogleGenAI(apiKey)
+```
+
+#### Dual-Path Architecture
+
+Gemini uses two different execution paths depending on whether a file is uploaded:
+
+**Path A: File-Based Execution (With Caching)**
+
+Used when `send_file = true` and `file_content` exists:
+
+```typescript
+// 1. Upload document to Gemini File API (48-hour validity)
+const geminiFile = await uploadDocumentToGemini(
+  ai,
+  fileBuffer,
+  fileName,
+  mimeType
+)
+
+// 2. Create explicit cache (if document ≥ 50 KB and create_cache = true)
+let geminiCacheName: string | null = null
+const fileSizeKB = fileBuffer.length / 1024
+
+if (fileSizeKB >= 50 && workbenchBody.settings.create_cache) {
+  try {
+    geminiCacheName = await createGeminiCache(
+      ai,
+      modelToUse,
+      geminiFile.uri,
+      geminiFile.mimeType,
+      systemPromptForCache
+    )
+    console.log(`✅ Gemini cache created: ${geminiCacheName}`)
+  } catch (error: any) {
+    // Graceful fallback for documents below threshold
+    if (error.message?.includes('INVALID_ARGUMENT')) {
+      console.log('⚠️ Document too small for caching, proceeding without cache')
+      geminiCacheName = null
+    } else {
+      throw error
+    }
+  }
+}
+
+// 3. Execute via shared executor
+const geminiResult = await executeLLMOperationGemini(
+  {
+    model: modelToUse,
+    prompt: workbenchBody.new_prompt,
+    operation_type: workbenchBody.operation_type,
+    document: {
+      content: fileBuffer,
+      filename: fileName,
+      mimeType: mimeType
+    },
+    systemPrompt: systemPromptForCache,
+    thinking: workbenchBody.settings.thinking,
+    temperature: workbenchBody.settings.temperature,
+    max_tokens: workbenchBody.settings.max_tokens
+  },
+  supabase,
+  {
+    fileUri: geminiFile.uri,
+    fileName: geminiFile.name,
+    cacheName: geminiCacheName || undefined,
+    mimeType: geminiFile.mimeType
+  }
+)
+```
+
+**Path B: Text-Only Execution (Direct API)**
+
+Used when `send_file = false` or no file content:
+
+```typescript
+// 1. Build Zod schema for operation type
+const operationSchema = getOperationTypeSchema(workbenchBody.operation_type)
+
+// 2. Convert to JSON Schema
+const jsonSchema = zodToJsonSchema(operationSchema, {
+  name: `${workbenchBody.operation_type}Schema`,
+  $refStrategy: 'none'
+})
+
+// 3. Clean schema (remove Gemini-incompatible fields)
+const cleanedSchema = { ...jsonSchema }
+delete cleanedSchema.$schema
+delete cleanedSchema.definitions
+delete cleanedSchema.$ref
+
+// 4. Build generation config
+const generationConfig: any = {
+  temperature: workbenchBody.settings.temperature ?? 1.0,
+  maxOutputTokens: workbenchBody.settings.max_tokens || 4096,
+  responseMimeType: 'application/json',
+  responseSchema: cleanedSchema
+}
+
+// 5. Add thinking configuration if enabled
+if (workbenchBody.settings.thinking?.budget_tokens) {
+  generationConfig.thinkingConfig = {
+    thinkingBudget: workbenchBody.settings.thinking.budget_tokens,
+    includeThoughts: workbenchBody.settings.thinking.type === 'enabled'
+  }
+}
+
+// 6. Execute direct API call
+const geminiResponse = await ai.models.generateContent({
+  model: modelToUse,
+  contents: workbenchBody.new_prompt,
+  config: generationConfig,
+  systemInstruction: systemInstruction
+})
+
+// 7. Parse structured output
+const rawText = geminiResponse.text
+const structuredOutput = JSON.parse(rawText)
+
+// 8. Extract thinking summary if enabled
+let thinkingSummary: string | undefined
+if (workbenchBody.settings.thinking && geminiResponse.candidates?.[0]?.content?.parts) {
+  const thoughtParts = geminiResponse.candidates[0].content.parts
+    .filter((part: any) => part.thought)
+    .map((part: any) => part.text)
+  if (thoughtParts.length > 0) {
+    thinkingSummary = thoughtParts.join('\n')
+  }
+}
+```
+
+#### Explicit Caching
+
+**Requirements:**
+- Minimum document size: **50 KB** (enforced by Gemini API)
+- Cache TTL: 5 minutes (same as Anthropic)
+- Cost reduction: **75%** for cached reads
+
+**Cache Creation:**
+```typescript
+// Cache includes system prompt + document
+const cache = await ai.caches.create({
+  model: modelToUse,
+  contents: [{
+    role: 'user',
+    parts: [{
+      fileData: {
+        fileUri: fileUri,
+        mimeType: mimeType
+      }
+    }]
+  }],
+  systemInstruction: { parts: [{ text: systemPrompt }] },
+  ttlSeconds: 300  // 5 minutes
+})
+```
+
+**Graceful Fallback:**
+- If document < 50 KB and cache creation fails with `INVALID_ARGUMENT`
+- Logs warning and proceeds without cache
+- Execution continues normally (no user-facing error)
+
+#### Thinking Mode
+
+**Configuration:**
+```typescript
+thinkingConfig: {
+  thinkingBudget: 10000,  // Budget tokens for reasoning
+  includeThoughts: true    // Include thoughts in response
+}
+```
+
+**Thought Extraction:**
+```typescript
+// Extract thinking summary from response parts
+const thoughtParts = geminiResponse.candidates[0].content.parts
+  .filter((part: any) => part.thought)
+  .map((part: any) => part.text)
+
+const thinkingSummary = thoughtParts.join('\n')
+```
+
+#### Structured Output
+
+**All Operation Types Supported:**
+
+```typescript
+// Helper function returns Zod schemas for all 7 operation types
+const getOperationTypeSchema = (operationType: string): z.ZodSchema => {
+  switch (operationType) {
+    case 'generic':
+      return z.object({
+        response: z.string().describe('The AI response text')
+      })
+
+    case 'validation':
+      return z.object({
+        result: z.boolean().describe('The validation result (true/false)'),
+        comment: z.string().describe('Reasoning and explanation for the decision')
+      })
+
+    case 'extraction':
+      return z.object({
+        extracted_data: z.record(z.string(), z.any())
+          .describe('Key-value pairs of extracted information'),
+        confidence: z.number().min(0).max(1)
+          .describe('Confidence score for the extraction')
+      })
+
+    // ... rating, classification, analysis, traffic_light
+  }
+}
+
+// Convert Zod to JSON Schema
+const jsonSchema = zodToJsonSchema(operationSchema, {
+  name: `${operationType}Schema`,
+  $refStrategy: 'none'  // Inline all references
+})
+```
+
+#### Token Metrics
+
+**Extraction from Response:**
+```typescript
+const usage = geminiResponse.usageMetadata
+
+// Map to workbench format
+response = {
+  text: rawText,
+  experimental_output: structuredOutput,
+  usage: {
+    inputTokens: usage.promptTokenCount || 0,
+    outputTokens: usage.candidatesTokenCount || 0
+  },
+  providerMetadata: {
+    google: {
+      usage: {
+        cachedContentTokenCount: usage.cachedContentTokenCount || 0,
+        thoughtsTokenCount: usage.thoughtsTokenCount || 0,
+        totalTokenCount: usage.totalTokenCount || 0
+      }
+    }
+  },
+  ...(thinkingSummary && { reasoning: thinkingSummary })
+}
+```
+
+**Cache Metrics:**
+- `cachedContentTokenCount`: Tokens read from cache (75% cost reduction)
+- Cache write happens during cache creation (not tracked per-operation)
+- `thoughtsTokenCount`: Tokens used for reasoning (when thinking mode enabled)
+
+### Mistral AI (Direct API)
+
+**Integration:** HTTP POST requests to Mistral API
+
+**Features:**
+- JSON mode for structured output via `response_format`
+- Direct document upload in request payload
+- OCR support for PDFs and images
+- No caching support
+- No thinking mode
+
+**Basic Implementation:**
+```typescript
+const response = await fetch('https://api.mistral.ai/v1/chat/completions', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    model: modelToUse,
+    messages: messages,
+    response_format: { type: 'json_object' },
+    temperature: settings.temperature,
+    max_tokens: settings.max_tokens
+  })
+})
+```
 
 ## Mode Comparison
 
@@ -1144,13 +1708,28 @@ Context: 4,288/200,000 (2.1%) • 195,712 remaining
 - Conditional `workbench_executions` writes
 - Near-instant response delivery
 
-### ✅ Phase F: Thinking + Structured Output (Current)
+### ✅ Phase F: Thinking + Structured Output
 - Hybrid execution approach for thinking mode with structured outputs
 - Workaround for Vercel AI SDK issue #7220 (thinking conflicts with forced tool_choice)
 - Uses `generateText()` with manual tools when both features enabled
 - AI SDK v5 compatibility (`inputSchema` + `jsonSchema` helper)
 - Frontend handling of `response.reasoning` array format
 - No breaking changes to existing functionality
+
+### ✅ Phase 2.2.0: Multi-Provider Support with Gemini (Current)
+- **Google Gemini Integration**: Native SDK v1.29.0 with full feature support
+- **Dual-Path Architecture**: File-based (with caching) vs text-only (direct API) execution
+- **Explicit Caching**: 50 KB threshold with graceful fallback for smaller documents
+- **Thinking Mode**: Budget tokens, thought extraction, reasoning summary
+- **Structured Output**: All 7 operation types via JSON Schema conversion
+- **Text-Only Queries**: All providers support queries without file upload
+- **Provider Branching**: Automatic routing based on model configuration
+- **API Key Management**: Provider-specific key resolution (organization or environment)
+- **Token Metrics**: Provider-specific metadata extraction and normalization
+- **Gemini File API**: 48-hour file validity with automatic cleanup
+- **Zod to JSON Schema**: Automatic schema conversion for Gemini structured output
+- **Cache Size Threshold**: Intelligent 50 KB check with INVALID_ARGUMENT handling
+- **Mistral Support**: Direct HTTP API integration with JSON mode
 
 ## Bug Fixes
 
@@ -1491,11 +2070,12 @@ CREATE INDEX idx_workbench_executions_status ON workbench_executions(status);
 
 ---
 
-**Last Updated:** 2025-10-14
-**Phase:** 2.1.3 Complete (Separate File Message for Cache Hits)
-**Architecture:** Unified LLM provider interface via Vercel AI SDK with separate file message architecture for cache optimization
-**Next Phase:** 2.2 - Additional Operation Types (Extraction, Rating, Classification, Analysis)
-**Edge Function Version:** 34 (Separate file messages, cache hit optimization across conversation turns)
+**Last Updated:** 2025-11-09
+**Phase:** 2.2.0 Complete (Multi-Provider Support with Gemini)
+**Architecture:** Multi-provider integration (Anthropic via Vercel AI SDK, Gemini via native SDK, Mistral via direct API) with provider-specific optimizations
+**Current Providers:** Anthropic Claude (90% cache savings), Google Gemini (75% cache savings, dual-path), Mistral AI (JSON mode)
+**Next Phase:** 2.3 - Additional Operation Types (Extraction, Rating, Classification, Analysis, Traffic Light)
+**Edge Function Version:** 2.2.0 (Multi-provider with dual-path Gemini, text-only query support, provider-specific caching)
 
 ## Benefits of Vercel AI SDK Architecture
 
