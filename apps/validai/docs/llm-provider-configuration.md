@@ -1,14 +1,16 @@
 # LLM Provider Configuration Architecture
 
-> **Last Updated:** 2025-11-08
+> **Last Updated:** 2025-11-09
 
 ## Overview
 
 ValidAI implements a flexible 3-tier configuration hierarchy for managing Large Language Model (LLM) providers and their settings. This architecture allows for progressive customization from system-wide defaults down to processor-specific optimizations.
 
+> **Note on Phase 1.9 Direct Upload:** The document upload method (Storage vs direct upload to Edge Function) is independent of LLM provider configuration. Phase 1.9 added the ability to bypass Supabase Storage for faster uploads (3-7s improvement), but this does not affect how documents are processed by LLM providers. See [Manual Processor Execution Architecture](./manual-processor-execution.md#h-phase-19-direct-upload-optional-storage) for details on direct upload.
+
 ## Implementation Status
 
-**Current Implementation (as of 2025-11-08):**
+**Current Implementation (as of 2025-11-09):**
 
 ### ✅ Fully Implemented
 - **Database Schema:** All tables, columns, and functions are in place and working

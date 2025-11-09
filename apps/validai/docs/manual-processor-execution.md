@@ -1,10 +1,10 @@
 # Manual Processor Execution Architecture
 
-**Phase 1.8 Implementation**
+**Phase 1.8 + 1.9 Implementation**
 **Status:** ✅ Complete
-**Version:** 1.1.1
-**Last Updated:** 2025-11-08
-**Latest Update:** Gemini cache size threshold (50 KB) with graceful fallback for small documents
+**Version:** 1.2.0
+**Last Updated:** 2025-11-09
+**Latest Update:** Phase 1.9 - Direct upload bypasses Storage (3-7s performance improvement)
 
 ## Table of Contents
 
@@ -36,6 +36,7 @@ Manual Processor Execution enables users to run a processor end-to-end on a docu
 ### Key Features
 
 - ✅ One-click processor execution from UI
+- ✅ Direct document upload (bypasses Storage for 3-7s speedup) - **Phase 1.9**
 - ✅ Document selection and validation
 - ✅ Chunked background processing (avoids timeouts)
 - ✅ Real-time progress updates via WebSockets
@@ -114,10 +115,11 @@ if (hasMoreOperations) {
 CREATE TABLE runs (
   id uuid PRIMARY KEY,
   processor_id uuid REFERENCES processors(id) ON DELETE SET NULL,
-  document_id uuid REFERENCES documents(id) ON DELETE SET NULL,
+  document_id uuid REFERENCES documents(id) ON DELETE SET NULL, -- Phase 1.9: Nullable (direct uploads bypass Storage)
   organization_id uuid NOT NULL,
   snapshot jsonb NOT NULL, -- { processor, operations[], document }
   status text NOT NULL,
+  storage_status text NOT NULL DEFAULT 'not_stored', -- Phase 1.9: 'not_stored' | 'completed'
   total_operations integer,
   completed_operations integer,
   failed_operations integer,
@@ -228,29 +230,175 @@ Three execution modes stored in `validai_llm_global_settings.execution_config`:
 - ❌ Always serial - Unnecessarily slow for Gemini/Mistral
 - ✅ Provider-aware execution - Best of both worlds
 
+### H. Phase 1.9: Direct Upload (Optional Storage)
+
+**Decision:** Support both Storage upload and direct base64 upload to Edge Function
+
+**Added:** 2025-11-09
+
+**Rationale:**
+- **Storage upload overhead** - Traditional flow: UI → Storage (3-7s) → Edge Function → LLM
+- **Direct upload optimization** - New flow: UI → Edge Function (inline base64) → LLM
+- **Performance improvement** - Eliminates 3-7 second Storage round trip
+- **Flexibility** - Users can choose speed (direct) vs persistence (Storage)
+- **Backward compatibility** - Existing Storage-based runs continue to work
+
+**Implementation:**
+
+The Edge Function now accepts **two mutually exclusive parameters**:
+
+1. **Storage Path (Traditional):**
+```typescript
+{
+  processor_id: "uuid",
+  document_id: "uuid"  // References document in Storage
+}
+```
+
+2. **Direct Upload (New - Phase 1.9):**
+```typescript
+{
+  processor_id: "uuid",
+  file_upload: {
+    file: "base64_encoded_data",  // Document content as base64
+    filename: "contract.pdf",
+    mime_type: "application/pdf",
+    size_bytes: 52348
+  }
+}
+```
+
+**Database Tracking:**
+
+The `storage_status` column tracks which upload method was used:
+- `'not_stored'`: Direct upload (document NOT saved to Storage)
+- `'completed'`: Storage upload (document saved to Storage)
+
+**User Flow (Phase 1.9 - Direct Upload):**
+
+```
+1. User clicks "Run" button in processor detail page
+2. RunProcessorDialog opens with drag-and-drop zone
+3. User drags and drops file OR clicks to browse
+4. Client validates file (size, MIME type)
+5. fileToBase64() converts File to base64 string
+6. useCreateRun() sends to Edge Function with file_upload parameter
+7. Edge Function creates run with inline document (no Storage)
+8. Dialog closes, user navigates to run detail page
+9. Processing continues in background
+```
+
+**Performance Comparison:**
+
+| Upload Method | Latency | Persistence | Re-usability |
+|--------------|---------|-------------|--------------|
+| **Storage (Traditional)** | 3-7 seconds | ✅ Persistent | ✅ Can re-run |
+| **Direct (Phase 1.9)** | < 100ms | ❌ Not saved | ❌ Must re-upload |
+
+**Edge Function Request Interface:**
+
+```typescript
+// Traditional Storage upload
+interface StorageRunRequest {
+  processor_id: string
+  document_id: string  // UUID of document in Storage
+}
+
+// Phase 1.9: Direct upload
+interface DirectRunRequest {
+  processor_id: string
+  file_upload: {
+    file: string        // Base64-encoded document
+    filename: string    // Original filename
+    mime_type: string   // MIME type (application/pdf, etc.)
+    size_bytes: number  // File size in bytes
+  }
+}
+```
+
+**Document Snapshot Structure:**
+
+For direct uploads, the snapshot stores document metadata but no Storage reference:
+
+```typescript
+{
+  document: {
+    id: null,                    // No Storage ID
+    name: "contract.pdf",
+    size_bytes: 52348,
+    mime_type: "application/pdf",
+    storage_path: null           // No Storage path
+  }
+}
+```
+
+**Background Processing Limitation:**
+
+**Important:** Direct uploads cannot be retried in background mode after Edge Function restart. The document content is only available during the initial invocation.
+
+```typescript
+// Background invocation: Check if storage_path is available
+if (!snapshot.document.storage_path) {
+  throw new Error(
+    `Document not available for background processing. ` +
+    `This run used direct upload (bypassing Storage) and cannot be retried in background mode. ` +
+    `The document must be re-uploaded to process this run.`
+  )
+}
+```
+
+**Future Enhancements:**
+
+- **Optional Storage toggle** - UI checkbox: "Save document for later re-runs"
+- **Smart caching** - Automatically save documents used multiple times
+- **Streaming uploads** - Support for files > 10 MB without blocking UI
+
+**Alternatives Considered:**
+- ❌ Always use Storage - Slower, adds latency
+- ❌ Always use direct upload - No document persistence, can't re-run
+- ✅ Dual-path support - Best of both worlds (speed + flexibility)
+
 ## System Architecture
 
 ### High-Level Flow
 
+**Phase 1.9: Two Upload Paths**
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         USER INTERFACE                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  1. User clicks "Run Processor"                                │
-│  2. Selects document from dropdown                             │
-│  3. Clicks "Start Run"                                         │
-│                                                                 │
-└────────────────────┬────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                         USER INTERFACE                               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  1. User clicks "Run Processor"                                     │
+│  2. Phase 1.9: Drag-and-drop file upload (OR select from Storage)  │
+│  3. Clicks "Start Run"                                              │
+│                                                                      │
+└────────────────────┬────────────────────────────────────────────────┘
                      │
-                     ▼
+                     ├─────── Storage Path (Traditional) ──────┐
+                     │                                          │
+                     │       - Document pre-uploaded to Storage│
+                     │       - 3-7s upload overhead (already paid)
+                     │       - Persistent, can re-run          │
+                     │                                          │
+                     └─────── Direct Upload (Phase 1.9) ───────┤
+                             │                                  │
+                             - File converted to base64        │
+                             - < 100ms overhead (inline)       │
+                             - Not saved to Storage            │
+                             │                                  │
+                             ▼                                  ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │              EDGE FUNCTION (Initial Invocation)                 │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  1. Fetch processor + operations + document                    │
-│  2. Create frozen snapshot (JSONB)                             │
-│  3. Insert run record (status: pending)                        │
+│  Phase 1.9: Dual-Path Document Resolution                      │
+│    - IF document_id: Fetch from Storage (traditional)         │
+│    - IF file_upload: Use inline base64 (new)                  │
+│                                                                 │
+│  1. Fetch processor + operations + resolve document            │
+│  2. Create frozen snapshot (JSONB) with document metadata      │
+│  3. Insert run record (status: pending, storage_status set)    │
 │  4. Self-invoke for background processing                      │
 │  5. Return HTTP 202 with run_id                                │
 │                                                                 │
@@ -415,7 +563,7 @@ CREATE TABLE runs (
 
   -- References (nullable - allow deletion)
   processor_id uuid REFERENCES processors(id) ON DELETE SET NULL,
-  document_id uuid REFERENCES documents(id) ON DELETE SET NULL,
+  document_id uuid REFERENCES documents(id) ON DELETE SET NULL, -- Phase 1.9: Nullable
   organization_id uuid REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
 
   -- Frozen state (immutable snapshot)
@@ -423,6 +571,7 @@ CREATE TABLE runs (
 
   -- Execution metadata
   status text NOT NULL DEFAULT 'pending', -- pending|processing|completed|failed|cancelled
+  storage_status text NOT NULL DEFAULT 'not_stored', -- Phase 1.9: not_stored|completed
   triggered_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   trigger_type text NOT NULL DEFAULT 'manual', -- manual|webhook|scheduled|external
 
@@ -448,6 +597,10 @@ CREATE INDEX idx_runs_started ON runs(started_at DESC) WHERE deleted_at IS NULL;
 
 -- Enable Realtime
 ALTER PUBLICATION supabase_realtime ADD TABLE runs;
+
+-- Phase 1.9: Comment on storage_status column
+COMMENT ON COLUMN runs.storage_status IS
+  'Tracks whether document was stored in Supabase Storage. Values: not_stored (direct upload), completed (Storage upload)';
 ```
 
 **Snapshot Structure:**
@@ -474,11 +627,11 @@ interface RunSnapshot {
     output_schema: Record<string, any> | null
   }>
   document: {
-    id: string
+    id: string | null              // Phase 1.9: Nullable for direct uploads
     name: string
     size_bytes: number
     mime_type: string
-    storage_path: string
+    storage_path: string | null    // Phase 1.9: Nullable for direct uploads
   }
 
   // Provider-specific document references (stored in snapshot for caching/reuse)
@@ -1958,8 +2111,10 @@ for (const run of runs) {
 - Migration: `fix_get_llm_config_for_run_null_user.sql` (120 lines)
 - Migration: `20251107000000_add_gemini_models.sql` - Gemini model setup ✅
 - Migration: `20251107000002_update_llm_config_google_api_key.sql` - Google API key support ✅
-- Migration: `20251108000000_add_execution_config_to_llm_settings.sql` - Parallel execution config ✅ **NEW**
+- Migration: `20251108000000_add_execution_config_to_llm_settings.sql` - Parallel execution config ✅
+- Migration: `20251109000000_optional_document_storage.sql` - Phase 1.9 direct upload ✅ **NEW**
 - Types: `lib/database.types.ts` (auto-generated)
+- Types: `supabase/functions/_shared/types.ts` - Updated with nullable DocumentSnapshot ✅
 
 **Edge Functions:**
 - Handler: `supabase/functions/execute-processor-run/index.ts` (~990 lines, updated with parallel execution) ✅ **UPDATED**
@@ -1972,7 +2127,9 @@ for (const run of runs) {
 - Gemini Executor: `supabase/functions/_shared/llm-executor-gemini.ts` (578 lines) ✅
 
 **UI Components:**
-- Dialog: `components/processors/run-processor-dialog.tsx` (220 lines)
+- Dialog: `components/processors/run-processor-dialog.tsx` (252 lines) ✅ **UPDATED Phase 1.9**
+- DropZone: `components/ui/dropzone.tsx` - Drag-and-drop file upload ✅ **NEW Phase 1.9**
+- Utility: `lib/utils/file.ts` - fileToBase64() converter ✅ **NEW Phase 1.9**
 - Header: `components/runs/run-detail-header.tsx` (195 lines)
 - Table: `components/runs/operation-results-table.tsx` (367 lines)
 - List: `components/runs/runs-table.tsx` (256 lines)
@@ -1994,7 +2151,7 @@ for (const run of runs) {
 - Processor Detail: `app/proc/[id]/processor-detail-client.tsx` (2 menu items added)
 - Operation Sheet: `components/processors/operation-sheet.tsx` (TypeScript fix)
 
-**Total:** ~3,176 lines of production code
+**Total:** ~3,300 lines of production code (including Phase 1.9 additions)
 
 ### References
 
@@ -2022,10 +2179,14 @@ for (const run of runs) {
 | **Parallel Execution** | Running multiple operations concurrently (provider-aware) |
 | **Hybrid Execution** | Serial warmup followed by parallel execution (Anthropic) |
 | **Execution Config** | Settings controlling parallel execution behavior |
+| **Direct Upload** | Phase 1.9 - Upload file directly to Edge Function (bypasses Storage) |
+| **Storage Status** | Phase 1.9 - Tracks whether document was saved to Storage ('not_stored' or 'completed') |
+| **Dual-Path Upload** | Phase 1.9 - Support for both Storage and direct upload methods |
+| **Base64 Encoding** | Phase 1.9 - Convert File to base64 string for inline Edge Function upload |
 
 ---
 
-**Document Version:** 1.1.1
-**Last Updated:** 2025-11-08
+**Document Version:** 1.2.0
+**Last Updated:** 2025-11-09
 **Author:** Claude (Anthropic)
-**Status:** ✅ Complete (including parallel execution optimization + Gemini cache size threshold)
+**Status:** ✅ Complete (including Phase 1.9 direct upload + parallel execution + Gemini cache threshold)
