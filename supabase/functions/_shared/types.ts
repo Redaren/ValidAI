@@ -38,13 +38,14 @@ export interface OperationSnapshot {
 /**
  * Snapshot of a document from run.snapshot.document
  * Used to fetch file content during execution
+ * Phase 1.9: id and storage_path are nullable for direct uploads (bypassing Storage)
  */
 export interface DocumentSnapshot {
-  id: string
+  id: string | null          // Nullable for direct uploads without Storage
   name: string
   size_bytes: number
   mime_type: string
-  storage_path: string
+  storage_path: string | null  // Nullable for direct uploads without Storage
 }
 
 /**

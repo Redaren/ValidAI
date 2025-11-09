@@ -1015,6 +1015,16 @@ serve(async (req) => {
         } else {
           // LEGACY: Anthropic inline files path
           console.log(`Using Anthropic legacy mode - downloading document for inline passing`)
+
+          // Phase 1.9: Check if storage_path is available (null for direct uploads)
+          if (!snapshot.document.storage_path) {
+            throw new Error(
+              `Document not available for background processing. ` +
+              `This run used direct upload (bypassing Storage) and cannot be retried in background mode. ` +
+              `The document must be re-uploaded to process this run.`
+            )
+          }
+
           console.log(`\n--- Downloading document: ${snapshot.document.name} ---`)
           const documentBuffer = await downloadDocument(supabase, snapshot.document.storage_path)
           console.log(`Document cached in memory: ${documentBuffer.length} bytes`)
