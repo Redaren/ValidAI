@@ -15,6 +15,7 @@ interface DropZoneProps {
   onFileSelect: (file: File) => void | Promise<void>
   uploading?: boolean
   uploadProgress?: number
+  uploadMessage?: string
   error?: string | null
   disabled?: boolean
   className?: string
@@ -34,6 +35,7 @@ export function DropZone({
   onFileSelect,
   uploading = false,
   uploadProgress = 0,
+  uploadMessage,
   error = null,
   disabled = false,
   className,
@@ -131,7 +133,9 @@ export function DropZone({
           <div className="w-full space-y-3">
             <div className="flex flex-col items-center gap-2">
               <Upload className="h-8 w-8 animate-pulse text-primary" />
-              <p className="text-sm font-medium">Uploading...</p>
+              <p className="text-sm font-medium transition-opacity duration-300">
+                {uploadMessage || "Uploading..."}
+              </p>
             </div>
             <Progress value={uploadProgress} className="h-2" />
             <p className="text-center text-xs text-muted-foreground">

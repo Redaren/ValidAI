@@ -147,9 +147,14 @@ export function RunProcessorDialog({
   defaultView = 'compliance',
 }: RunProcessorDialogProps) {
   const t = useTranslations('common')
+  const tUpload = useTranslations('upload')
 
   const [open, setOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<{
+    progress: number
+    messageKey: string
+  }>({ progress: 0, messageKey: '' })
   const router = useRouter()
 
   const createRun = useCreateRun()
@@ -159,19 +164,23 @@ export function RunProcessorDialog({
   const handleFileSelect = async (file: File) => {
     setUploadError(null)
 
-    // Validate file
+    // Step 1: Validating file (10%)
+    setUploadStatus({ progress: 10, messageKey: 'validating' })
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
       setUploadError(validation.error!)
+      setUploadStatus({ progress: 0, messageKey: '' })
       return
     }
 
     try {
-      // Phase 1.9: Direct upload - convert file to base64 and send to Edge Function
+      // Step 2: Converting file (20%)
+      setUploadStatus({ progress: 20, messageKey: 'converting' })
       logger.info('[Direct Upload] Converting file to base64', { filename: file.name })
       const base64File = await fileToBase64(file)
 
-      // Create processor run with inline file (no Storage)
+      // Step 3: Creating processor run (40%)
+      setUploadStatus({ progress: 40, messageKey: 'creating' })
       logger.info('[Direct Upload] Creating run with inline file', { processorId })
       const { run_id } = await createRun.mutateAsync({
         processor_id: processorId,
@@ -182,6 +191,9 @@ export function RunProcessorDialog({
           size_bytes: file.size,
         },
       })
+
+      // Step 4: Preparing run view (90%)
+      setUploadStatus({ progress: 90, messageKey: 'preparing' })
 
       // Close dialog and navigate to run detail page with view parameter
       setOpen(false)
@@ -200,6 +212,7 @@ export function RunProcessorDialog({
             ? String(error.message)
             : 'Unknown error occurred'
       setUploadError(errorMessage)
+      setUploadStatus({ progress: 0, messageKey: '' })
       toast.error('Failed to start processor run', {
         description: errorMessage,
       })
@@ -210,6 +223,7 @@ export function RunProcessorDialog({
     // Reset state when dialog closes
     if (!newOpen) {
       setUploadError(null)
+      setUploadStatus({ progress: 0, messageKey: '' })
     }
     setOpen(newOpen)
   }
@@ -240,7 +254,12 @@ export function RunProcessorDialog({
           <DropZone
             onFileSelect={handleFileSelect}
             uploading={isProcessing}
-            uploadProgress={createRun.isPending ? 50 : 0}
+            uploadProgress={uploadStatus.progress}
+            uploadMessage={
+              uploadStatus.messageKey
+                ? tUpload(uploadStatus.messageKey as 'validating' | 'converting' | 'creating' | 'uploading' | 'preparing' | 'complete')
+                : undefined
+            }
             error={uploadError}
             disabled={isProcessing}
           />
