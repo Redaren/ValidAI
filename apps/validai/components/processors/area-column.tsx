@@ -183,7 +183,7 @@ export function AreaColumn({
           isOver ? "ring-2 ring-primary" : ""
         } ${isAreaDragging ? "z-50" : ""}`}
       >
-        <CardHeader className="border-b py-3">
+        <CardHeader className="border-b py-3 bg-area-header">
           <CardTitle className="flex items-center justify-between text-base">
             {/* Drag handle - outside of CollapsibleTrigger */}
             <button
