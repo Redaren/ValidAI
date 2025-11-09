@@ -193,9 +193,13 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
   const validationMetrics = calculateValidationMetrics(operationResults)
 
   const validationChartConfig = {
-    validations: {
-      label: t('validations'),
-      color: validationMetrics.passRate >= 70 ? 'hsl(142, 76%, 36%)' : 'hsl(0, 84%, 60%)',
+    passed: {
+      label: t('passed'),
+      color: 'hsl(142, 76%, 36%)',
+    },
+    failed: {
+      label: t('failed'),
+      color: 'hsl(0, 84%, 60%)',
     },
   } satisfies ChartConfig
 
@@ -210,7 +214,12 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
           className="mx-auto aspect-square w-full max-w-[180px]"
         >
           <RadialBarChart
-            data={[{ validations: validationMetrics.passRate }]}
+            data={[
+              {
+                passed: validationMetrics.trueCount,
+                failed: validationMetrics.falseCount,
+              },
+            ]}
             startAngle={180}
             endAngle={0}
             innerRadius={80}
@@ -243,9 +252,17 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
               />
             </PolarRadiusAxis>
             <RadialBar
-              dataKey="validations"
-              fill="var(--color-validations)"
-              cornerRadius={10}
+              dataKey="passed"
+              stackId="a"
+              cornerRadius={5}
+              fill="var(--color-passed)"
+              className="stroke-transparent stroke-2"
+            />
+            <RadialBar
+              dataKey="failed"
+              stackId="a"
+              cornerRadius={5}
+              fill="var(--color-failed)"
               className="stroke-transparent stroke-2"
             />
           </RadialBarChart>

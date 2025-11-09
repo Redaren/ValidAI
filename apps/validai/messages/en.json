@@ -185,6 +185,8 @@
       "green": "Green",
       "yellow": "Yellow",
       "red": "Red",
+      "passed": "Passed",
+      "failed": "Failed",
       "passedOf": "passed of",
       "of": "of",
       "tests": "# Tests etc",

@@ -185,6 +185,8 @@
       "green": "Grön",
       "yellow": "Gul",
       "red": "Röd",
+      "passed": "Godkända",
+      "failed": "Underkända",
       "passedOf": "godkända av",
       "of": "av",
       "tests": "# Tester etc",
