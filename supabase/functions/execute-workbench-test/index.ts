@@ -4,25 +4,31 @@
  * @module execute-workbench-test
  * @description
  * Production-ready Edge Function for executing LLM test calls from the ValidAI workbench interface.
- * Built with Vercel AI SDK and Anthropic provider for robust, scalable AI interactions.
+ * Supports multiple LLM providers: Anthropic (Claude), Google (Gemini), and Mistral.
+ *
+ * ## Supported Providers
+ * - **Anthropic**: Claude models with Vercel AI SDK, prompt caching, extended thinking
+ * - **Google Gemini**: Native structured output, explicit caching (50 KB threshold), thinking mode
+ * - **Mistral**: Document upload, JSON mode, OCR support
  *
  * ## Features
- * - **Multi-turn Conversations**: Maintains conversation context in stateful mode
- * - **Prompt Caching with Separate File Messages**: Reduces costs by 90% for repeated content
- *   by sending files as separate user messages positioned before conversation history,
- *   ensuring cache prefix remains identical across turns for consistent cache hits
- * - **PDF Support**: Handles PDF document uploads with proper buffer reconstruction
- * - **Extended Thinking**: Supports Claude's reasoning mode with configurable token budgets
- * - **Citations**: Extracts and returns citation blocks from AI responses
+ * - **Multi-provider Support**: Seamless switching between Anthropic, Gemini, and Mistral
+ * - **Multi-turn Conversations**: Maintains conversation context in stateful mode (Anthropic)
+ * - **Prompt Caching**:
+ *   - Anthropic: Separate file messages with 90% cost reduction
+ *   - Gemini: Explicit cache creation with 75% cost reduction (50 KB minimum)
+ * - **PDF Support**: Handles PDF document uploads across all providers
+ * - **Extended Thinking**: Supports reasoning mode with configurable token budgets
+ * - **Structured Output**: All operation types (validation, extraction, rating, etc.)
  * - **Advanced Settings**: Fine-grained control over model parameters
  * - **Real-time Updates**: Publishes execution status via Supabase Realtime
  *
  * ## Architecture
- * - Uses Vercel AI SDK for unified LLM interface (future multi-provider support)
- * - Handles both organization-specific and global API keys with encryption
- * - Separate file message architecture: Files sent as standalone user messages BEFORE
- *   conversation history to maintain cache prefix consistency across conversation turns
- * - User-controlled caching: Users keep "Send file" toggle ON for cache hits
+ * - Multi-provider execution paths with shared utilities
+ * - Organization-specific and global API keys with encryption
+ * - Anthropic: Separate file message architecture for cache consistency
+ * - Gemini: File API upload + explicit cache creation
+ * - Mistral: Document upload via Files API
  *
  * ## Known Issues & Workarounds
  * - **Thinking + Structured Output Bug**: Vercel AI SDK issue #7220 - When using generateObject()
@@ -36,7 +42,7 @@
  * - API errors returned as assistant messages for better UX
  * - Comprehensive error logging and status tracking
  *
- * @version 2.1.3
+ * @version 2.2.0
  * @since 2025-10-14
  */
 
@@ -47,6 +53,14 @@ import { generateText, Output } from 'npm:ai'
 import { z } from 'npm:zod'
 import { Mistral } from 'npm:@mistralai/mistralai'
 import { uploadDocumentToMistral } from '../_shared/llm-executor-mistral.ts'
+import { GoogleGenAI } from 'npm:@google/genai@1.29.0'
+import {
+  uploadDocumentToGemini,
+  createGeminiCache,
+  executeLLMOperationGemini,
+  type GeminiCacheRef,
+  type GeminiExecutionParams
+} from '../_shared/llm-executor-gemini.ts'
 
 /**
  * CORS headers configuration for cross-origin requests
@@ -595,6 +609,29 @@ serve(async (req) => {
         }
       }
       console.log('Mistral API key resolved successfully')
+    } else if (provider === 'google') {
+      console.log('Resolving Google API key...')
+      if (llmConfig.api_key_encrypted) {
+        // Organization has custom Google API key - decrypt it
+        const { data: decryptedKey, error: decryptError } = await supabase.rpc('decrypt_api_key', {
+          p_ciphertext: llmConfig.api_key_encrypted,
+          p_org_id: llmConfig.organization_id
+        })
+
+        if (decryptError || !decryptedKey) {
+          throw new Error(`Failed to decrypt organization Google API key: ${decryptError?.message || 'Unknown error'}`)
+        }
+
+        apiKey = decryptedKey
+      } else {
+        // No organization key - use global Google API key from environment
+        apiKey = Deno.env.get('GOOGLE_API_KEY')
+
+        if (!apiKey) {
+          throw new Error('No Google API key available. Please configure GOOGLE_API_KEY environment variable or set organization API key.')
+        }
+      }
+      console.log('Google API key resolved successfully')
     } else {
       console.log('Resolving Anthropic API key...')
       if (llmConfig.api_key_encrypted) {
@@ -1010,6 +1047,165 @@ serve(async (req) => {
     }
 
     /**
+     * Get Zod schema for operation type (for direct Gemini API calls)
+     * Returns raw Zod schema without Vercel AI SDK wrapper
+     *
+     * @param operationType - The type of operation (validation, rating, classification, etc.)
+     * @returns Zod schema for the operation type
+     */
+    const getOperationTypeSchema = (operationType: string): z.ZodSchema => {
+      switch (operationType) {
+        case 'generic':
+          return z.object({
+            response: z.string().describe('The AI response text')
+          })
+
+        case 'validation':
+          return z.object({
+            result: z.boolean().describe('The validation result (true/false)'),
+            comment: z.string().describe('Reasoning and explanation for the decision')
+          })
+
+        case 'rating':
+          return z.object({
+            value: z.number().describe('Numerical rating value'),
+            comment: z.string().describe('Rationale and explanation for rating')
+          })
+
+        case 'classification':
+          return z.object({
+            classification: z.string().describe('Assigned category or classification'),
+            comment: z.string().describe('Reasoning for classification decision')
+          })
+
+        case 'extraction':
+          return z.object({
+            items: z.array(z.string()).describe('Array of extracted items'),
+            comment: z.string().describe('Context and explanation of extraction')
+          })
+
+        case 'analysis':
+          return z.object({
+            conclusion: z.string().describe('Main analytical conclusion'),
+            comment: z.string().describe('Supporting analysis and detailed explanation')
+          })
+
+        case 'traffic_light':
+          return z.object({
+            traffic_light: z.enum(['red', 'yellow', 'green']).describe('Traffic light status indicator (red=high risk, yellow=medium risk, green=low risk)'),
+            comment: z.string().describe('Explanation for the traffic light status')
+          })
+
+        default:
+          return z.object({
+            response: z.string()
+          })
+      }
+    }
+
+    /**
+     * Get JSON Schema for operation type (for Gemini API)
+     * Manual JSON Schema definitions to avoid zodToJsonSchema compatibility issues
+     */
+    const getOperationJsonSchema = (operationType: string) => {
+      switch (operationType) {
+        case 'generic':
+          return {
+            type: 'object',
+            properties: {
+              response: { type: 'string', description: 'The AI response text' }
+            },
+            required: ['response'],
+            additionalProperties: false
+          }
+
+        case 'validation':
+          return {
+            type: 'object',
+            properties: {
+              result: { type: 'boolean', description: 'The validation result (true/false)' },
+              comment: { type: 'string', description: 'Reasoning and explanation for the decision' }
+            },
+            required: ['result', 'comment'],
+            additionalProperties: false
+          }
+
+        case 'rating':
+          return {
+            type: 'object',
+            properties: {
+              value: { type: 'number', description: 'Numerical rating value' },
+              comment: { type: 'string', description: 'Rationale and explanation for rating' }
+            },
+            required: ['value', 'comment'],
+            additionalProperties: false
+          }
+
+        case 'classification':
+          return {
+            type: 'object',
+            properties: {
+              classification: { type: 'string', description: 'Assigned category or classification' },
+              comment: { type: 'string', description: 'Reasoning for classification decision' }
+            },
+            required: ['classification', 'comment'],
+            additionalProperties: false
+          }
+
+        case 'extraction':
+          return {
+            type: 'object',
+            properties: {
+              items: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Array of extracted items'
+              },
+              comment: { type: 'string', description: 'Context and explanation of extraction' }
+            },
+            required: ['items', 'comment'],
+            additionalProperties: false
+          }
+
+        case 'analysis':
+          return {
+            type: 'object',
+            properties: {
+              conclusion: { type: 'string', description: 'Main analytical conclusion' },
+              comment: { type: 'string', description: 'Supporting analysis and detailed explanation' }
+            },
+            required: ['conclusion', 'comment'],
+            additionalProperties: false
+          }
+
+        case 'traffic_light':
+          return {
+            type: 'object',
+            properties: {
+              traffic_light: {
+                type: 'string',
+                enum: ['red', 'yellow', 'green'],
+                description: 'Traffic light status indicator (red=high risk, yellow=medium risk, green=low risk)'
+              },
+              comment: { type: 'string', description: 'Explanation for the traffic light status' }
+            },
+            required: ['traffic_light', 'comment'],
+            additionalProperties: false
+          }
+
+        default:
+          return {
+            type: 'object',
+            properties: {
+              response: { type: 'string', description: 'The AI response' }
+            },
+            required: ['response'],
+            additionalProperties: false
+          }
+      }
+    }
+
+    /**
      * Get structured output configuration based on operation type
      * Uses Vercel AI SDK's experimental_output pattern for proper structured data generation
      *
@@ -1221,6 +1417,348 @@ serve(async (req) => {
           }
         }
 
+      } else if (provider === 'google') {
+        // ===== GOOGLE GEMINI EXECUTION PATH =====
+        console.log('=== Executing with Google Gemini ===')
+
+        const ai = new GoogleGenAI({ apiKey })
+
+        // DUAL PATH: WITH FILE (document analysis) OR WITHOUT FILE (text-only query)
+        if (workbenchBody.send_file && workbenchBody.file_content) {
+          // ===== PATH A: WITH FILE - Document analysis with optional caching =====
+          console.log('=== Gemini Path: Document Analysis (with file) ===')
+          console.log('Uploading document to Gemini File API...')
+
+          // Decode base64 file content
+          const fileBuffer = Buffer.from(workbenchBody.file_content, 'base64')
+          console.log(`File size: ${fileBuffer.length} bytes (${(fileBuffer.length / 1024).toFixed(2)} KB)`)
+
+          // Determine MIME type
+          const mimeType = workbenchBody.file_type || 'application/pdf'
+          const fileName = `workbench-${Date.now()}.${mimeType === 'application/pdf' ? 'pdf' : 'txt'}`
+
+          // Upload to Gemini File API
+          const geminiFile = await uploadDocumentToGemini(
+            ai,
+            fileBuffer,
+            fileName,
+            mimeType
+          )
+
+          console.log(`✅ Gemini file uploaded: ${geminiFile.name}`)
+
+          // Create cache with size threshold check (50 KB minimum)
+          let geminiCacheName: string | null = null
+          const fileSizeKB = fileBuffer.length / 1024
+
+          if (fileSizeKB >= 50 && workbenchBody.settings.create_cache) {
+            try {
+              console.log(`File size (${fileSizeKB.toFixed(2)} KB) exceeds 50 KB threshold - creating cache...`)
+
+              // Use system prompt if available, otherwise use default
+              const systemPromptForCache = workbenchBody.send_system_prompt && workbenchBody.system_prompt
+                ? workbenchBody.system_prompt
+                : 'You are a helpful AI assistant.'
+
+              geminiCacheName = await createGeminiCache(
+                ai,
+                modelToUse,
+                geminiFile.uri,
+                geminiFile.mimeType,
+                systemPromptForCache
+              )
+
+              console.log(`✅ Gemini cache created: ${geminiCacheName}`)
+            } catch (error: any) {
+              // Graceful fallback for too-small errors
+              if (error.message?.includes('too small') || error.message?.includes('minimum')) {
+                console.log(`[Gemini] Document too small for caching - using direct file reference (error: ${error.message})`)
+              } else {
+                // Other cache creation errors - log but continue with direct file reference
+                console.warn(`[Gemini] Cache creation failed - using direct file reference (error: ${error.message})`)
+              }
+            }
+          } else if (fileSizeKB < 50) {
+            console.log(`File size (${fileSizeKB.toFixed(2)} KB) below 50 KB threshold - skipping cache creation, using direct file reference`)
+          } else {
+            console.log('Cache not requested - using direct file reference')
+          }
+
+          // Store cache reference for execution
+          const geminiCacheRef: GeminiCacheRef = {
+            fileUri: geminiFile.uri,
+            fileName: geminiFile.name,
+            cacheName: geminiCacheName || undefined,
+            mimeType: geminiFile.mimeType
+          }
+
+          console.log('✅ Gemini document ready for execution')
+
+          // Build Gemini execution params
+          const geminiParams: GeminiExecutionParams = {
+            operation: {
+              id: workbenchBody.processor_id,
+              name: 'Workbench Test',
+              description: null,
+              operation_type: workbenchBody.operation_type,
+              prompt: workbenchBody.new_prompt,
+              position: 0,
+              area: 'workbench',
+              configuration: null,
+              output_schema: null
+            },
+            document: {
+              id: null,
+              name: 'workbench-file',
+              size_bytes: fileBuffer.length,
+              mime_type: mimeType,
+              storage_path: null
+            },
+            systemPrompt: workbenchBody.send_system_prompt && workbenchBody.system_prompt
+              ? workbenchBody.system_prompt
+              : undefined,
+            settings: {
+              provider: 'google',
+              selected_model_id: modelToUse,
+              temperature: workbenchBody.settings.temperature,
+              max_tokens: workbenchBody.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+              top_p: workbenchBody.settings.top_p,
+              top_k: workbenchBody.settings.top_k,
+              thinking_budget: workbenchBody.settings.thinking?.budget_tokens,
+              include_thoughts: workbenchBody.settings.thinking?.type === 'enabled'
+            },
+            apiKey,
+            enableCache: workbenchBody.settings.create_cache || false
+          }
+
+          console.log('Calling Gemini API via shared executor...')
+          const geminiResult = await executeLLMOperationGemini(
+            geminiParams,
+            supabase,
+            geminiCacheRef
+          )
+
+          const executionTime = Date.now() - startTime
+          console.log(`✅ Gemini call completed in ${executionTime}ms`)
+
+          // Map Gemini result to workbench response format
+          response = {
+            text: geminiResult.response,
+            experimental_output: geminiResult.structured_output,
+            usage: {
+              inputTokens: geminiResult.tokens.input,
+              outputTokens: geminiResult.tokens.output
+            },
+            providerMetadata: {
+              google: {
+                usage: {
+                  cachedContentTokenCount: geminiResult.tokens.cached_read || 0,
+                  totalTokenCount: geminiResult.tokens.input + geminiResult.tokens.output
+                }
+              }
+            }
+          }
+
+          console.log('✅ Gemini response mapped to workbench format')
+
+        } else {
+          // ===== PATH B: WITHOUT FILE - Text-only query (direct API call) =====
+          console.log('=== Gemini Path: Text-Only Query (no file) ===')
+
+          // Build Zod schema for validation and JSON Schema for API
+          const operationSchema = getOperationTypeSchema(workbenchBody.operation_type)
+          console.log('[DEBUG] Operation type:', workbenchBody.operation_type)
+          console.log('[DEBUG] Zod schema type:', operationSchema._def?.typeName)
+
+          // Test parse to see expected structure
+          try {
+            const testParse = operationSchema.safeParse({})
+            console.log('[DEBUG] Expected schema structure from Zod:', testParse.error?.issues || 'Valid empty object')
+          } catch (e) {
+            console.log('[DEBUG] Could not test parse schema')
+          }
+
+          // Get JSON Schema for Gemini API (manual definition - no library conversion)
+          const jsonSchema = getOperationJsonSchema(workbenchBody.operation_type)
+          console.log('[DEBUG] JSON Schema for Gemini:', JSON.stringify(jsonSchema, null, 2))
+
+          // Build generation config
+          const generationConfig: any = {
+            temperature: workbenchBody.settings.temperature ?? 1.0,
+            maxOutputTokens: workbenchBody.settings.max_tokens || llmConfig.settings.default_max_tokens || 4096,
+            responseMimeType: 'application/json',
+            responseJsonSchema: jsonSchema,  // ✅ Manual JSON Schema (no library conversion)
+            systemInstruction: workbenchBody.send_system_prompt && workbenchBody.system_prompt
+              ? workbenchBody.system_prompt
+              : 'You are a helpful AI assistant.'
+          }
+
+          console.log('[DEBUG] System prompt being used:', generationConfig.systemInstruction.substring(0, 200))
+
+          // Add top_p if specified
+          if (workbenchBody.settings.top_p !== undefined) {
+            generationConfig.topP = workbenchBody.settings.top_p
+          }
+
+          // Add top_k if specified
+          if (workbenchBody.settings.top_k !== undefined) {
+            generationConfig.topK = workbenchBody.settings.top_k
+          }
+
+          // Add thinking configuration if enabled
+          if (workbenchBody.settings.thinking?.budget_tokens) {
+            generationConfig.thinkingConfig = {
+              thinkingBudget: workbenchBody.settings.thinking.budget_tokens,
+              includeThoughts: workbenchBody.settings.thinking.type === 'enabled'
+            }
+            console.log(`Thinking mode enabled with budget: ${workbenchBody.settings.thinking.budget_tokens} tokens`)
+          }
+
+          // Note: We rely on responseJsonSchema parameter to enforce structure.
+          // Adding schema details to system prompt confuses Gemini and causes field name translation.
+
+          console.log('[DEBUG] ===== GEMINI API CALL DEBUG =====')
+          console.log('[DEBUG] Model:', modelToUse)
+          console.log('[DEBUG] Operation type:', workbenchBody.operation_type)
+          console.log('[DEBUG] Prompt length:', workbenchBody.new_prompt.length)
+          console.log('[DEBUG] Prompt preview:', workbenchBody.new_prompt.substring(0, 100))
+          console.log('[DEBUG] Complete generationConfig:', JSON.stringify({
+            ...generationConfig,
+            systemInstruction: generationConfig.systemInstruction?.substring(0, 50) + '...',
+            responseJsonSchema: generationConfig.responseJsonSchema ? 'PRESENT' : 'MISSING'
+          }, null, 2))
+          console.log('[DEBUG] Config keys:', Object.keys(generationConfig))
+          console.log('[DEBUG] responseJsonSchema is:', typeof generationConfig.responseJsonSchema)
+
+          // Execute direct API call (text-only)
+          console.log('[DEBUG] Calling ai.models.generateContent...')
+          const geminiResponse = await ai.models.generateContent({
+            model: modelToUse,
+            contents: workbenchBody.new_prompt,
+            config: generationConfig
+          })
+          console.log('[DEBUG] ===== API CALL COMPLETED =====')
+          console.log('[DEBUG] Response object keys:', Object.keys(geminiResponse))
+          console.log('[DEBUG] Response has .text?:', typeof geminiResponse.text)
+          console.log('[DEBUG] Response has .candidates?:', Array.isArray(geminiResponse.candidates))
+
+          const executionTime = Date.now() - startTime
+          console.log(`✅ Gemini call completed in ${executionTime}ms`)
+
+          // Extract response text and structured output
+          const rawText = geminiResponse.text
+          console.log('[Gemini Schema Debug] Raw Gemini response text:', rawText)
+          let structuredOutput: any = null
+
+          try {
+            structuredOutput = JSON.parse(rawText)
+            console.log('[Gemini Schema Debug] Parsed structured output:', JSON.stringify(structuredOutput, null, 2))
+
+            // Validate against Zod schema and auto-correct common Gemini mistakes
+            const validated = operationSchema.safeParse(structuredOutput)
+
+            if (!validated.success) {
+              console.error('[Gemini Schema Debug] ⚠️ Zod validation failed!')
+              console.error('[Gemini Schema Debug] Validation errors:', JSON.stringify(validated.error.errors, null, 2))
+              console.error('[Gemini Schema Debug] Received output:', JSON.stringify(structuredOutput, null, 2))
+
+              // Attempt auto-correction for common Gemini mistakes
+              if (workbenchBody.operation_type === 'validation') {
+                // Check if response is plain string/boolean
+                if (typeof structuredOutput === 'string' || typeof structuredOutput === 'boolean') {
+                  const boolValue = structuredOutput === 'true' || structuredOutput === true ||
+                                   (typeof structuredOutput === 'string' &&
+                                    (structuredOutput.toUpperCase() === 'JA' || structuredOutput.toUpperCase() === 'YES'))
+                  structuredOutput = {
+                    result: boolValue,
+                    comment: `Auto-corrected from raw response: ${structuredOutput}`
+                  }
+                  console.log('[Gemini Schema Debug] ✓ Auto-corrected plain value to object')
+                }
+                // Check if wrong field names were used (e.g., "answer" instead of "result")
+                else if (structuredOutput.answer !== undefined && structuredOutput.result === undefined) {
+                  const boolValue = structuredOutput.answer === 'true' || structuredOutput.answer === true ||
+                                   (typeof structuredOutput.answer === 'string' &&
+                                    (structuredOutput.answer.toUpperCase() === 'JA' || structuredOutput.answer.toUpperCase() === 'YES'))
+                  structuredOutput = {
+                    result: boolValue,
+                    comment: structuredOutput.comment || `Auto-corrected from answer field: ${structuredOutput.answer}`
+                  }
+                  console.log('[Gemini Schema Debug] ✓ Auto-corrected wrong field name (answer → result)')
+                }
+                // Check if missing comment field
+                else if (structuredOutput.result !== undefined && !structuredOutput.comment) {
+                  structuredOutput.comment = `Response: ${structuredOutput.result}`
+                  console.log('[Gemini Schema Debug] ✓ Auto-added missing comment field')
+                }
+              }
+
+              // Validate again after auto-correction
+              const revalidated = operationSchema.safeParse(structuredOutput)
+              if (!revalidated.success) {
+                console.error('[Gemini Schema Debug] ❌ Auto-correction failed, schema still invalid')
+                throw new Error(`Gemini returned invalid schema after auto-correction: ${JSON.stringify(validated.error.errors)}`)
+              } else {
+                console.log('[Gemini Schema Debug] ✅ Auto-correction successful, schema now valid')
+              }
+            } else {
+              console.log('[Gemini Schema Debug] ✅ Zod validation passed')
+            }
+
+            console.log('✅ Structured output parsed successfully')
+          } catch (e) {
+            console.error('[Gemini Schema Debug] Failed to parse JSON response:', e)
+            console.error('[Gemini Schema Debug] Raw text was:', rawText)
+            console.warn('⚠️ Failed to parse Gemini JSON response:', e)
+            structuredOutput = { raw: rawText, error: 'Failed to parse JSON' }
+          }
+
+          // Extract thinking summary if enabled
+          let thinkingSummary: string | undefined
+          if (workbenchBody.settings.thinking && geminiResponse.candidates?.[0]?.content?.parts) {
+            const thoughtParts = geminiResponse.candidates[0].content.parts
+              .filter((part: any) => part.thought)
+              .map((part: any) => part.text)
+
+            if (thoughtParts.length > 0) {
+              thinkingSummary = thoughtParts.join('\n')
+              console.log(`Thinking summary extracted: ${thinkingSummary.length} characters`)
+            }
+          }
+
+          // Extract token metrics
+          const usage = geminiResponse.usageMetadata || {}
+          const inputTokens = usage.promptTokenCount || 0
+          const outputTokens = usage.candidatesTokenCount || 0
+          const thoughtsTokens = usage.thoughtsTokenCount || 0
+
+          console.log(`Token usage: ${inputTokens} input, ${outputTokens} output, ${thoughtsTokens} thinking`)
+
+          // Map to workbench response format
+          response = {
+            text: rawText,
+            experimental_output: structuredOutput,
+            usage: {
+              inputTokens: inputTokens,
+              outputTokens: outputTokens
+            },
+            providerMetadata: {
+              google: {
+                usage: {
+                  cachedContentTokenCount: 0,  // No cache for text-only
+                  thoughtsTokenCount: thoughtsTokens,
+                  totalTokenCount: inputTokens + outputTokens
+                }
+              }
+            },
+            ...(thinkingSummary && {
+              reasoning: thinkingSummary  // Include thinking summary if present
+            })
+          }
+
+          console.log('✅ Gemini text-only response mapped to workbench format')
+        }
+
       } else {
         // ===== ANTHROPIC EXECUTION PATH (existing logic) =====
         // VERCEL AI SDK PROPER PATTERN FOR STRUCTURED OUTPUT
@@ -1299,8 +1837,9 @@ serve(async (req) => {
       // Provider-specific metadata handling
       const anthropicMetadata = response.providerMetadata?.anthropic || {}
       const mistralMetadata = response.providerMetadata?.mistral || {}
+      const googleMetadata = response.providerMetadata?.google || {}
 
-      // Cache tokens (Anthropic only - Mistral doesn't support caching)
+      // Cache tokens (Anthropic and Google support caching, Mistral doesn't)
       let cacheWriteTokens = 0
       let cacheReadTokens = 0
 
@@ -1316,6 +1855,19 @@ serve(async (req) => {
                                  anthropicMetadata.cacheCreationInputTokens || 0
         cacheReadTokens = anthropicMetadata.usage?.cache_read_input_tokens ||
                                 anthropicMetadata.cacheReadInputTokens || 0
+      } else if (provider === 'google') {
+        if (Object.keys(googleMetadata).length > 0) {
+          console.log('✅ Google metadata found:', JSON.stringify(googleMetadata))
+        } else {
+          console.log('⚠️ No Google metadata in response')
+        }
+
+        // Google Gemini: Cache write happens during cache creation (not per-operation)
+        // Only track cache reads (cachedContentTokenCount)
+        cacheWriteTokens = 0  // Write cost is separate, during cache creation
+        cacheReadTokens = googleMetadata.usage?.cachedContentTokenCount || 0
+
+        console.log(`Google cache metrics: cacheReadTokens=${cacheReadTokens}`)
       } else {
         console.log('Mistral provider - no cache support')
       }

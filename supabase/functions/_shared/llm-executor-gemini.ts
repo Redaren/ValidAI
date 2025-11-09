@@ -33,7 +33,6 @@
 
 import { Buffer } from 'node:buffer'
 import { GoogleGenAI } from 'npm:@google/genai@1.29.0'
-import { zodToJsonSchema } from 'npm:zod-to-json-schema@3.23.0'
 import { z } from 'npm:zod'
 import type {
   LLMExecutionParams,
@@ -128,6 +127,116 @@ function getOperationTypeSchema(operationType: OperationType): z.ZodSchema {
       return z.object({
         response: z.string()
       })
+  }
+}
+
+/**
+ * Get JSON Schema for operation type (for Gemini API)
+ *
+ * @param operationType - Type of operation
+ * @returns JSON Schema object compatible with Gemini's responseJsonSchema parameter
+ *
+ * @description
+ * Returns manual JSON Schema definitions instead of using zodToJsonSchema() to avoid
+ * version compatibility issues between zod and zod-to-json-schema libraries.
+ * This matches the pattern used by Mistral/Anthropic executors (manual schema definitions).
+ */
+function getOperationJsonSchema(operationType: OperationType) {
+  switch (operationType) {
+    case 'generic':
+      return {
+        type: 'object',
+        properties: {
+          response: { type: 'string', description: 'The AI response text' }
+        },
+        required: ['response'],
+        additionalProperties: false
+      }
+
+    case 'validation':
+      return {
+        type: 'object',
+        properties: {
+          result: { type: 'boolean', description: 'The validation result (true/false)' },
+          comment: { type: 'string', description: 'Reasoning and explanation for the decision' }
+        },
+        required: ['result', 'comment'],
+        additionalProperties: false
+      }
+
+    case 'rating':
+      return {
+        type: 'object',
+        properties: {
+          value: { type: 'number', description: 'Numerical rating value' },
+          comment: { type: 'string', description: 'Rationale and explanation for rating' }
+        },
+        required: ['value', 'comment'],
+        additionalProperties: false
+      }
+
+    case 'classification':
+      return {
+        type: 'object',
+        properties: {
+          classification: { type: 'string', description: 'Assigned category or classification' },
+          comment: { type: 'string', description: 'Reasoning for classification decision' }
+        },
+        required: ['classification', 'comment'],
+        additionalProperties: false
+      }
+
+    case 'extraction':
+      return {
+        type: 'object',
+        properties: {
+          items: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Array of extracted items'
+          },
+          comment: { type: 'string', description: 'Context and explanation of extraction' }
+        },
+        required: ['items', 'comment'],
+        additionalProperties: false
+      }
+
+    case 'analysis':
+      return {
+        type: 'object',
+        properties: {
+          conclusion: { type: 'string', description: 'Main analytical conclusion' },
+          comment: { type: 'string', description: 'Supporting analysis and detailed explanation' }
+        },
+        required: ['conclusion', 'comment'],
+        additionalProperties: false
+      }
+
+    case 'traffic_light':
+      return {
+        type: 'object',
+        properties: {
+          traffic_light: {
+            type: 'string',
+            enum: ['red', 'yellow', 'green'],
+            description: 'Traffic light status indicator (red=high risk, yellow=medium risk, green=low risk)'
+          },
+          comment: { type: 'string', description: 'Explanation for the traffic light status' }
+        },
+        required: ['traffic_light', 'comment'],
+        additionalProperties: false
+      }
+
+    default:
+      // Fallback to generic
+      return {
+        type: 'object',
+        properties: {
+          response: { type: 'string', description: 'The AI response' }
+        },
+        required: ['response'],
+        additionalProperties: false
+      }
   }
 }
 
@@ -344,34 +453,38 @@ export async function executeLLMOperationGemini(
   const ai = new GoogleGenAI({ apiKey })
   const modelToUse = settings.selected_model_id || 'gemini-2.5-flash'
 
-  // Get operation schema and convert to JSON Schema
+  // Get operation schema for validation (Zod) and API (JSON Schema)
   const operationSchema = getOperationTypeSchema(operation.operation_type)
-  const jsonSchema = zodToJsonSchema(operationSchema, {
-    name: `${operation.operation_type}Schema`,
-    $refStrategy: 'none'  // Inline all references for Gemini compatibility
-  })
+  console.log('[DEBUG] Operation type:', operation.operation_type)
+  console.log('[DEBUG] Zod schema type:', operationSchema._def?.typeName)
 
-  // Clean the schema - remove fields Google doesn't accept
-  const cleanedSchema = { ...jsonSchema }
-  delete cleanedSchema.$schema
-  delete cleanedSchema.definitions
-  delete cleanedSchema.$ref
+  // Get JSON Schema for Gemini API (manual definition - no library conversion)
+  const jsonSchema = getOperationJsonSchema(operation.operation_type)
+  console.log('[DEBUG] JSON Schema for Gemini:', JSON.stringify(jsonSchema, null, 2))
 
   // Build generation config
   const generationConfig: any = {
     temperature: settings.temperature ?? 1.0,
     maxOutputTokens: settings.max_tokens ?? 8192,
     responseMimeType: 'application/json',
-    responseSchema: cleanedSchema  // Use cleaned schema
+    responseJsonSchema: jsonSchema  // ✅ Manual JSON Schema (no library conversion)
+    // ✅ systemInstruction added conditionally below (cache vs non-cache)
   }
 
-  // Only add cachedContent if cache exists
+  // Add cache or systemInstruction (mutually exclusive per Gemini API)
   if (cacheRef.cacheName) {
+    // CACHED MODE: systemInstruction already baked into cache during cache creation
     generationConfig.cachedContent = cacheRef.cacheName
-    console.log('[Gemini] Using cached content for operation')
+    console.log('[Gemini] Using cached content (systemInstruction in cache)')
   } else {
-    console.log('[Gemini] Using direct file reference (no cache available)')
+    // NON-CACHED MODE: systemInstruction must be in generationConfig
+    generationConfig.systemInstruction = systemPrompt || 'You are a helpful AI assistant that analyzes documents and provides structured responses.'
+    console.log('[Gemini] Using direct file reference (systemInstruction in config)')
   }
+
+  console.log('[DEBUG] System prompt preview:', (systemPrompt || 'default').substring(0, 100))
+  console.log('[DEBUG] Generation config keys:', Object.keys(generationConfig))
+  console.log('[DEBUG] responseJsonSchema type:', typeof generationConfig.responseJsonSchema)
 
   // Add top_p if supported and specified
   if (settings.top_p !== undefined && settings.supports_top_p) {
@@ -399,7 +512,9 @@ export async function executeLLMOperationGemini(
 
     // Build contents based on cache availability
     let contents: any
-    const systemInstruction = systemPrompt || 'You are a helpful AI assistant that analyzes documents and provides structured responses.'
+
+    // Note: We rely on responseJsonSchema parameter to enforce structure.
+    // Adding schema details to system prompt confuses Gemini and causes field name translation.
 
     if (cacheRef.cacheName) {
       // CACHED MODE: Simple prompt (document already in cache)
@@ -419,28 +534,80 @@ export async function executeLLMOperationGemini(
     }
 
     // NEW: Unified API call (works for both cached and non-cached modes)
+    console.log('[DEBUG] ===== CALLING GEMINI API =====')
+    console.log('[DEBUG] Model:', modelToUse)
+    console.log('[DEBUG] Cache mode:', cacheRef.cacheName ? 'CACHED' : 'DIRECT')
+    console.log('[DEBUG] Prompt length:', typeof contents === 'string' ? contents.length : 'array')
     const response = await ai.models.generateContent({
       model: modelToUse,
       contents: contents,
-      config: generationConfig,
-      systemInstruction: systemInstruction
+      config: generationConfig
     })
+    console.log('[DEBUG] ===== API CALL COMPLETED =====')
+    console.log('[DEBUG] Response keys:', Object.keys(response))
+    console.log('[DEBUG] Response has .text?:', typeof response.text)
 
     const executionTime = Date.now() - startTime
 
     // NEW: Direct .text property
     const rawText = response.text
-    console.log(`[Gemini] Response received (${rawText.length} chars in ${executionTime}ms)`)
+    console.log(`[DEBUG] Response received (${rawText.length} chars in ${executionTime}ms)`)
+    console.log('[DEBUG] Raw Gemini response text:', rawText)
 
     // Parse JSON (guaranteed valid by Gemini's structured output)
-    const structuredOutput = JSON.parse(rawText)
+    let structuredOutput = JSON.parse(rawText)
+    console.log('[Gemini Schema Debug] Parsed structured output:', JSON.stringify(structuredOutput, null, 2))
 
     // Validate with Zod (additional safety check)
     const validated = operationSchema.safeParse(structuredOutput)
 
     if (!validated.success) {
-      console.warn('[Gemini] Zod validation failed (unexpected - should be caught by JSON Schema):', validated.error)
-      console.warn('[Gemini] Using raw structured output anyway')
+      console.error('[Gemini Schema Debug] ⚠️ Zod validation failed!')
+      console.error('[Gemini Schema Debug] Validation errors:', JSON.stringify(validated.error.errors, null, 2))
+      console.error('[Gemini Schema Debug] Received output:', JSON.stringify(structuredOutput, null, 2))
+
+      // Attempt auto-correction for common Gemini mistakes
+      if (operation.operation_type === 'validation') {
+        // Check if response is plain string/boolean
+        if (typeof structuredOutput === 'string' || typeof structuredOutput === 'boolean') {
+          const boolValue = structuredOutput === 'true' || structuredOutput === true ||
+                           (typeof structuredOutput === 'string' &&
+                            (structuredOutput.toUpperCase() === 'JA' || structuredOutput.toUpperCase() === 'YES'))
+          structuredOutput = {
+            result: boolValue,
+            comment: `Auto-corrected from raw response: ${structuredOutput}`
+          }
+          console.log('[Gemini Schema Debug] ✓ Auto-corrected plain value to object')
+        }
+        // Check if wrong field names were used (e.g., "answer" instead of "result")
+        else if (structuredOutput.answer !== undefined && structuredOutput.result === undefined) {
+          const boolValue = structuredOutput.answer === 'true' || structuredOutput.answer === true ||
+                           (typeof structuredOutput === 'string' &&
+                            (structuredOutput.answer.toUpperCase() === 'JA' || structuredOutput.answer.toUpperCase() === 'YES'))
+          structuredOutput = {
+            result: boolValue,
+            comment: structuredOutput.comment || `Auto-corrected from answer field: ${structuredOutput.answer}`
+          }
+          console.log('[Gemini Schema Debug] ✓ Auto-corrected wrong field name (answer → result)')
+        }
+        // Check if missing comment field
+        else if (structuredOutput.result !== undefined && !structuredOutput.comment) {
+          structuredOutput.comment = `Response: ${structuredOutput.result}`
+          console.log('[Gemini Schema Debug] ✓ Auto-added missing comment field')
+        }
+      }
+
+      // Validate again after auto-correction
+      const revalidated = operationSchema.safeParse(structuredOutput)
+      if (!revalidated.success) {
+        console.error('[Gemini Schema Debug] ❌ Auto-correction failed, schema still invalid')
+        console.warn('[Gemini] Zod validation failed (unexpected - should be caught by JSON Schema):', validated.error)
+        console.warn('[Gemini] Using raw structured output anyway')
+      } else {
+        console.log('[Gemini Schema Debug] ✅ Auto-correction successful, schema now valid')
+      }
+    } else {
+      console.log('[Gemini Schema Debug] ✅ Zod validation passed')
     }
 
     // Extract thinking summary if includeThoughts is enabled
