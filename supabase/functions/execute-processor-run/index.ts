@@ -41,6 +41,7 @@
  */
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
+import { decodeBase64 } from 'https://deno.land/std@0.224.0/encoding/base64.ts'
 import { downloadDocument } from '../_shared/llm-executor.ts'
 import { executeLLMOperationWithRetryRouter } from '../_shared/llm-executor-router.ts'
 import { Mistral } from 'npm:@mistralai/mistralai'
@@ -363,13 +364,13 @@ serve(async (req) => {
           }
 
           // Get document buffer - Phase 1.9: Support both Storage and direct upload
-          let documentBuffer: Buffer
+          let documentBuffer: Uint8Array
           if (initialBody.document_id) {
             // Storage path: download from Storage
             documentBuffer = await downloadDocument(supabase, documentMetadata.storage_path!)
           } else {
             // Direct upload path: decode base64
-            documentBuffer = Buffer.from(initialBody.file_upload!.file, 'base64')
+            documentBuffer = decodeBase64(initialBody.file_upload!.file)
             // Verify decoded size matches
             if (documentBuffer.byteLength !== initialBody.file_upload!.size_bytes) {
               throw new Error('File size mismatch after base64 decoding')
@@ -507,13 +508,13 @@ serve(async (req) => {
           const ai = new GoogleGenAI({ apiKey: geminiApiKey })
 
           // Get document buffer - Phase 1.9: Support both Storage and direct upload
-          let documentBuffer: Buffer
+          let documentBuffer: Uint8Array
           if (initialBody.document_id) {
             // Storage path: download from Storage
             documentBuffer = await downloadDocument(supabase, documentMetadata.storage_path!)
           } else {
             // Direct upload path: decode base64
-            documentBuffer = Buffer.from(initialBody.file_upload!.file, 'base64')
+            documentBuffer = decodeBase64(initialBody.file_upload!.file)
             // Verify decoded size matches
             if (documentBuffer.byteLength !== initialBody.file_upload!.size_bytes) {
               throw new Error('File size mismatch after base64 decoding')
