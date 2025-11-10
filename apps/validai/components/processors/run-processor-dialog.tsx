@@ -45,6 +45,7 @@ import { toast } from 'sonner'
 import { DropZone } from '@/components/ui/dropzone'
 import { validateDocumentFile } from '@/lib/constants/documents'
 import { useTranslations } from 'next-intl'
+import { createAsymptoticProgress } from '@/lib/utils/progress'
 
 // Dialog component wrappers (mirroring @playze/shared-ui structure)
 const Dialog = DialogPrimitive.Root
@@ -173,14 +174,29 @@ export function RunProcessorDialog({
       return
     }
 
+    // Initialize progress simulator (will be started after conversion)
+    let progressSimulator: ReturnType<typeof createAsymptoticProgress> | null = null
+
     try {
       // Step 2: Converting file (20%)
       setUploadStatus({ progress: 20, messageKey: 'converting' })
       logger.info('[Direct Upload] Converting file to base64', { filename: file.name })
       const base64File = await fileToBase64(file)
 
-      // Step 3: Creating processor run (40%)
+      // Step 3: Creating processor run (40% → 85% asymptotic)
+      // Start smooth animation from 40% toward 85% over ~2.5s
       setUploadStatus({ progress: 40, messageKey: 'creating' })
+
+      progressSimulator = createAsymptoticProgress({
+        start: 40,
+        target: 85,
+        duration: 2500, // Average: Anthropic 750ms, Mistral 1.5s, Gemini 4s
+        onUpdate: (progress) => {
+          setUploadStatus({ progress, messageKey: 'creating' })
+        },
+      })
+      progressSimulator.start()
+
       logger.info('[Direct Upload] Creating run with inline file', { processorId })
       const { run_id } = await createRun.mutateAsync({
         processor_id: processorId,
@@ -191,6 +207,9 @@ export function RunProcessorDialog({
           size_bytes: file.size,
         },
       })
+
+      // Stop asymptotic animation
+      progressSimulator.complete()
 
       // Step 4: Preparing run view (90%)
       setUploadStatus({ progress: 90, messageKey: 'preparing' })
@@ -204,6 +223,11 @@ export function RunProcessorDialog({
           'Processing in background. You can monitor progress on the run detail page.',
       })
     } catch (error) {
+      // Ensure progress simulation is stopped on error
+      if (progressSimulator) {
+        progressSimulator.complete()
+      }
+
       logger.error('Failed to create run', extractErrorDetails(error))
       const errorMessage =
         error instanceof Error

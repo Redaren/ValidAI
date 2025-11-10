@@ -325,9 +325,9 @@
   "upload": {
     "validating": "Validerar fil...",
     "converting": "Konverterar fil...",
-    "creating": "Skapar processorkörning...",
+    "creating": "Bearbetar med AI-leverantör...",
     "uploading": "Laddar upp till AI-leverantör...",
-    "preparing": "Förbereder körningsvy...",
+    "preparing": "Förbereder dina resultat...",
     "complete": "Uppladdning slutförd"
   }
 }

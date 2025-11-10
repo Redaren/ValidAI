@@ -325,9 +325,9 @@
   "upload": {
     "validating": "Validating file...",
     "converting": "Converting file...",
-    "creating": "Creating processor run...",
+    "creating": "Processing with AI provider...",
     "uploading": "Uploading to AI provider...",
-    "preparing": "Preparing run view...",
+    "preparing": "Preparing your results...",
     "complete": "Upload complete"
   }
 }
