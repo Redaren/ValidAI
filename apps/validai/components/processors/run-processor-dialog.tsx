@@ -162,6 +162,17 @@ export function RunProcessorDialog({
 
   const isProcessing = createRun.isPending
 
+  /**
+   * Create a randomized delay for progress checkpoints
+   * Adds brief pauses between steps to create distinct "checkpoint" feeling
+   * @param min - Minimum delay in milliseconds
+   * @param max - Maximum delay in milliseconds
+   */
+  const randomDelay = (min: number, max: number): Promise<void> => {
+    const delay = Math.floor(Math.random() * (max - min + 1)) + min
+    return new Promise((resolve) => setTimeout(resolve, delay))
+  }
+
   const handleFileSelect = async (file: File) => {
     setUploadError(null)
 
@@ -174,6 +185,9 @@ export function RunProcessorDialog({
       return
     }
 
+    // Pause briefly to show validation completed (150-250ms)
+    await randomDelay(150, 250)
+
     // Initialize progress simulator (will be started after conversion)
     let progressSimulator: ReturnType<typeof createAsymptoticProgress> | null = null
 
@@ -182,6 +196,9 @@ export function RunProcessorDialog({
       setUploadStatus({ progress: 20, messageKey: 'converting' })
       logger.info('[Direct Upload] Converting file to base64', { filename: file.name })
       const base64File = await fileToBase64(file)
+
+      // Pause briefly to show conversion completed (150-250ms)
+      await randomDelay(150, 250)
 
       // Step 3: Creating processor run (40% → 85% asymptotic)
       // Start smooth animation from 40% toward 85% over ~6s
@@ -211,8 +228,14 @@ export function RunProcessorDialog({
       // Stop asymptotic animation
       progressSimulator.complete()
 
+      // Pause longer before final step to create anticipation (200-400ms)
+      await randomDelay(200, 400)
+
       // Step 4: Preparing run view (90%)
       setUploadStatus({ progress: 90, messageKey: 'preparing' })
+
+      // Brief pause before navigation (100-200ms)
+      await randomDelay(100, 200)
 
       // Close dialog and navigate to run detail page with view parameter
       setOpen(false)
