@@ -184,13 +184,13 @@ export function RunProcessorDialog({
       const base64File = await fileToBase64(file)
 
       // Step 3: Creating processor run (40% → 85% asymptotic)
-      // Start smooth animation from 40% toward 85% over ~2.5s
+      // Start smooth animation from 40% toward 85% over ~6s
       setUploadStatus({ progress: 40, messageKey: 'creating' })
 
       progressSimulator = createAsymptoticProgress({
         start: 40,
         target: 85,
-        duration: 2500, // Average: Anthropic 750ms, Mistral 1.5s, Gemini 4s
+        duration: 6000, // Matches slowest case: Gemini with cache up to 6s
         onUpdate: (progress) => {
           setUploadStatus({ progress, messageKey: 'creating' })
         },
