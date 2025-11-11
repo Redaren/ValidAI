@@ -156,6 +156,7 @@ export function RunProcessorDialog({
     progress: number
     messageKey: string
   }>({ progress: 0, messageKey: '' })
+  const [showProgress, setShowProgress] = useState(false)
   const router = useRouter()
 
   const createRun = useCreateRun()
@@ -175,6 +176,7 @@ export function RunProcessorDialog({
 
   const handleFileSelect = async (file: File) => {
     setUploadError(null)
+    setShowProgress(true)
 
     // Step 1: Validating file (10%)
     setUploadStatus({ progress: 10, messageKey: 'validating' })
@@ -182,6 +184,7 @@ export function RunProcessorDialog({
     if (!validation.valid) {
       setUploadError(validation.error!)
       setUploadStatus({ progress: 0, messageKey: '' })
+      setShowProgress(false)
       return
     }
 
@@ -260,6 +263,7 @@ export function RunProcessorDialog({
             : 'Unknown error occurred'
       setUploadError(errorMessage)
       setUploadStatus({ progress: 0, messageKey: '' })
+      setShowProgress(false)
       toast.error('Failed to start processor run', {
         description: errorMessage,
       })
@@ -269,8 +273,12 @@ export function RunProcessorDialog({
   const handleOpenChange = (newOpen: boolean) => {
     // Reset state when dialog closes
     if (!newOpen) {
-      setUploadError(null)
-      setUploadStatus({ progress: 0, messageKey: '' })
+      // Delay reset until after dialog animation completes (200ms + buffer)
+      setTimeout(() => {
+        setUploadError(null)
+        setUploadStatus({ progress: 0, messageKey: '' })
+        setShowProgress(false)
+      }, 300)
     }
     setOpen(newOpen)
   }
@@ -300,7 +308,7 @@ export function RunProcessorDialog({
         <div className="py-4">
           <DropZone
             onFileSelect={handleFileSelect}
-            uploading={isProcessing}
+            uploading={showProgress}
             uploadProgress={uploadStatus.progress}
             uploadMessage={
               uploadStatus.messageKey

@@ -158,20 +158,20 @@ export function ProgressChart({
 
   return (
     <Card className="flex flex-col">
-      <CardHeader className="items-center pb-2">
+      <CardHeader className="items-center pb-1">
         <CardTitle className="text-sm font-medium">{cardTitle}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 items-center pb-4">
+      <CardContent className="flex flex-1 items-center pb-1">
         <ChartContainer
           config={progressChartConfig}
-          className="mx-auto aspect-square w-full max-w-[180px]"
+          className="mx-auto aspect-square w-full max-w-[140px]"
         >
           <RadialBarChart
             data={[{ progress: hasResults ? progressPercent : 0 }]}
             startAngle={180}
             endAngle={0}
-            innerRadius={80}
-            outerRadius={130}
+            innerRadius={60}
+            outerRadius={100}
           >
             <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
               <Label
@@ -251,13 +251,13 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
 
   return (
     <Card className="flex flex-col">
-      <CardHeader className="items-center pb-2">
+      <CardHeader className="items-center pb-1">
         <CardTitle className="text-sm font-medium">{t('validations')}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 items-center pb-4">
+      <CardContent className="flex flex-1 items-center pb-1">
         <ChartContainer
           config={validationChartConfig}
-          className="mx-auto aspect-square w-full max-w-[180px]"
+          className="mx-auto aspect-square w-full max-w-[140px]"
         >
           <RadialBarChart
             data={[
@@ -268,8 +268,8 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
             ]}
             startAngle={180}
             endAngle={0}
-            innerRadius={80}
-            outerRadius={130}
+            innerRadius={60}
+            outerRadius={100}
           >
             <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
               <Label
@@ -347,13 +347,13 @@ export function TrafficLightChart({ operationResults }: TrafficLightChartProps) 
 
   return (
     <Card className="flex flex-col">
-      <CardHeader className="items-center pb-2">
+      <CardHeader className="items-center pb-1">
         <CardTitle className="text-sm font-medium">{t('trafficLights')}</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-1 items-center pb-4">
+      <CardContent className="flex flex-1 items-center pb-1">
         <ChartContainer
           config={trafficLightChartConfig}
-          className="mx-auto aspect-square w-full max-w-[180px]"
+          className="mx-auto aspect-square w-full max-w-[140px]"
         >
           <RadialBarChart
             data={[
@@ -365,8 +365,8 @@ export function TrafficLightChart({ operationResults }: TrafficLightChartProps) 
             ]}
             startAngle={180}
             endAngle={0}
-            innerRadius={80}
-            outerRadius={130}
+            innerRadius={60}
+            outerRadius={100}
           >
             <PolarRadiusAxis tick={false} tickLine={false} axisLine={false}>
               <Label

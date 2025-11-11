@@ -56,9 +56,9 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
   if (operationType === 'validation') {
     const structured = result.structured_output as { result?: boolean } | null
     if (structured?.result === true) {
-      return <div className="h-4 w-4 rounded-full bg-green-500" aria-label="True" />
+      return <div className="h-4 w-4 rounded-full" style={{ backgroundColor: 'hsl(142, 76%, 36%)' }} aria-label="True" />
     } else if (structured?.result === false) {
-      return <div className="h-4 w-4 rounded-full bg-red-500" aria-label="False" />
+      return <div className="h-4 w-4 rounded-full" style={{ backgroundColor: 'hsl(0, 84%, 60%)' }} aria-label="False" />
     }
   }
 
@@ -66,11 +66,11 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
   if (operationType === 'traffic_light') {
     const structured = result.structured_output as { traffic_light?: string } | null
     if (structured?.traffic_light === 'green') {
-      return <div className="h-4 w-4 rounded-full bg-green-500" aria-label="Green" />
+      return <div className="h-4 w-4 rounded-full" style={{ backgroundColor: 'hsl(142, 76%, 36%)' }} aria-label="Green" />
     } else if (structured?.traffic_light === 'yellow') {
-      return <div className="h-4 w-4 rounded-full bg-yellow-500" aria-label="Yellow" />
+      return <div className="h-4 w-4 rounded-full" style={{ backgroundColor: 'hsl(48, 96%, 53%)' }} aria-label="Yellow" />
     } else if (structured?.traffic_light === 'red') {
-      return <div className="h-4 w-4 rounded-full bg-red-500" aria-label="Red" />
+      return <div className="h-4 w-4 rounded-full" style={{ backgroundColor: 'hsl(0, 84%, 60%)' }} aria-label="Red" />
     }
   }
 
