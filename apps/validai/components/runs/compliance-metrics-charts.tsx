@@ -376,21 +376,21 @@ export function TrafficLightChart({ operationResults }: TrafficLightChartProps) 
                       <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
                         <tspan
                           x={viewBox.cx}
-                          y={(viewBox.cy || 0) - 12}
+                          y={(viewBox.cy || 0) - 20}
                           className="fill-foreground text-xs"
                         >
                           🟢 {trafficLightMetrics.green}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
-                          y={(viewBox.cy || 0) + 2}
+                          y={(viewBox.cy || 0) - 6}
                           className="fill-foreground text-xs"
                         >
                           🟡 {trafficLightMetrics.yellow}
                         </tspan>
                         <tspan
                           x={viewBox.cx}
-                          y={(viewBox.cy || 0) + 16}
+                          y={(viewBox.cy || 0) + 8}
                           className="fill-foreground text-xs"
                         >
                           🔴 {trafficLightMetrics.red}
