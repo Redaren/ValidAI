@@ -192,7 +192,9 @@
       "tests": "# Tester etc",
       "unknownProcessor": "Okänd processor",
       "unknownDocument": "Okänt dokument",
-      "notAvailable": "Ej tillgänglig"
+      "notAvailable": "Ej tillgänglig",
+      "aiCountdown": "Nedräkning av AI",
+      "aiThinkingExtra": "AI tänker extra"
     }
   },
   "auth": {

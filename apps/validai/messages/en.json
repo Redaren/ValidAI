@@ -192,7 +192,9 @@
       "tests": "# Tests etc",
       "unknownProcessor": "Unknown Processor",
       "unknownDocument": "Unknown Document",
-      "notAvailable": "N/A"
+      "notAvailable": "N/A",
+      "aiCountdown": "AI Countdown",
+      "aiThinkingExtra": "AI thinking extra"
     }
   },
   "auth": {

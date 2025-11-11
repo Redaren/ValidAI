@@ -15,6 +15,7 @@
 
 'use client'
 
+import { useState, useEffect } from 'react'
 import { Label, PolarRadiusAxis, RadialBar, RadialBarChart } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import { ChartConfig, ChartContainer } from '@/components/ui/chart'
@@ -113,6 +114,30 @@ export function ProgressChart({
 }: ProgressChartProps) {
   const t = useTranslations('runs.compliance')
 
+  // Countdown state: 1500 hundredths = 15 seconds
+  const [countdown, setCountdown] = useState(1500)
+
+  // Check if any results have arrived
+  const hasResults = completedOperations + failedOperations > 0
+
+  // Countdown logic
+  useEffect(() => {
+    if (hasResults) return // Stop countdown when results arrive
+
+    const timer = setInterval(() => {
+      setCountdown(prev => Math.max(0, prev - 1))
+    }, 10) // Update every 10ms (1 hundredth of second)
+
+    return () => clearInterval(timer)
+  }, [hasResults])
+
+  // Format countdown as ss:mm (seconds:hundredths)
+  const formatCountdown = (hundredths: number): string => {
+    const seconds = Math.floor(hundredths / 100)
+    const remaining = hundredths % 100
+    return `${seconds.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`
+  }
+
   const progressPercent = Math.round(
     ((completedOperations + failedOperations) / totalOperations) * 100
   )
@@ -123,6 +148,10 @@ export function ProgressChart({
       color: 'hsl(var(--chart-1))',
     },
   } satisfies ChartConfig
+
+  // Determine text to display
+  const countdownText = countdown > 0 ? t('aiCountdown') : t('aiThinkingExtra')
+  const countdownTime = formatCountdown(countdown)
 
   return (
     <Card className="flex flex-col">
@@ -135,7 +164,7 @@ export function ProgressChart({
           className="mx-auto aspect-square w-full max-w-[180px]"
         >
           <RadialBarChart
-            data={[{ progress: progressPercent }]}
+            data={[{ progress: hasResults ? progressPercent : 0 }]}
             startAngle={180}
             endAngle={0}
             innerRadius={80}
@@ -147,20 +176,43 @@ export function ProgressChart({
                   if (viewBox && 'cx' in viewBox && 'cy' in viewBox) {
                     return (
                       <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle">
-                        <tspan
-                          x={viewBox.cx}
-                          y={(viewBox.cy || 0) - 8}
-                          className="fill-foreground text-2xl font-bold"
-                        >
-                          {progressPercent}%
-                        </tspan>
-                        <tspan
-                          x={viewBox.cx}
-                          y={(viewBox.cy || 0) + 12}
-                          className="fill-muted-foreground text-xs"
-                        >
-                          {completedOperations + failedOperations} {t('of')} {totalOperations}
-                        </tspan>
+                        {hasResults ? (
+                          // Progress mode: Show percentage and count
+                          <>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) - 8}
+                              className="fill-foreground text-2xl font-bold"
+                            >
+                              {progressPercent}%
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 12}
+                              className="fill-muted-foreground text-xs"
+                            >
+                              {completedOperations + failedOperations} {t('of')} {totalOperations}
+                            </tspan>
+                          </>
+                        ) : (
+                          // Countdown mode: Show countdown text and time
+                          <>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) - 8}
+                              className="fill-foreground text-sm font-medium"
+                            >
+                              {countdownText}
+                            </tspan>
+                            <tspan
+                              x={viewBox.cx}
+                              y={(viewBox.cy || 0) + 12}
+                              className="fill-muted-foreground text-2xl font-bold"
+                            >
+                              {countdownTime}
+                            </tspan>
+                          </>
+                        )}
                       </text>
                     )
                   }
