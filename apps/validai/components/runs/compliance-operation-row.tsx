@@ -18,7 +18,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronRight, ChevronDown, Loader2, CheckCircle2, XCircle, Circle, Tag, FileText } from 'lucide-react'
+import { ChevronRight, ChevronDown, Loader2, CheckCircle2, XCircle, Circle, Tag, FileText, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Database } from '@playze/shared-types'
 
@@ -29,6 +29,8 @@ interface ComplianceOperationRowProps {
   result: OperationResult
   /** Whether this operation is currently being processed */
   isProcessing?: boolean
+  /** The sequential operation number to display (1, 2, 3...) */
+  operationNumber: number
 }
 
 /**
@@ -83,14 +85,14 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
     }
   }
 
-  // Extraction - NO INDICATOR (value shown in comment)
+  // Extraction - Show magnifying glass icon
   if (operationType === 'extraction') {
-    return null
+    return <Search className="h-4 w-4 text-purple-600" />
   }
 
-  // Classification - NO INDICATOR (value shown in comment)
+  // Classification - Show tag icon
   if (operationType === 'classification') {
-    return null
+    return <Tag className="h-4 w-4 text-indigo-600" />
   }
 
   // Analysis
@@ -107,7 +109,7 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
  */
 function getFullComment(result: OperationResult): string {
   if (result.status === 'pending') {
-    return 'Waiting to process...'
+    return ''  // No text for pending operations
   }
 
   if (result.status === 'failed') {
@@ -131,7 +133,7 @@ function getFullComment(result: OperationResult): string {
 /**
  * Get truncated comment from response text or structured output
  */
-function getTruncatedComment(result: OperationResult, maxLength: number = 200): string {
+function getTruncatedComment(result: OperationResult, maxLength: number = 215): string {
   const fullComment = getFullComment(result)
   return fullComment.length > maxLength
     ? fullComment.substring(0, maxLength) + '...'
@@ -141,7 +143,7 @@ function getTruncatedComment(result: OperationResult, maxLength: number = 200): 
 /**
  * Truncate text helper
  */
-function getTruncatedText(text: string, maxLength: number = 200): string {
+function getTruncatedText(text: string, maxLength: number = 215): string {
   return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
 }
 
@@ -197,7 +199,7 @@ function getFormattedComment(result: OperationResult, truncate: boolean = false)
  * Displays a single operation result in a compact, business-focused format.
  * Click to expand for full details.
  */
-export function ComplianceOperationRow({ result, isProcessing = false }: ComplianceOperationRowProps) {
+export function ComplianceOperationRow({ result, isProcessing = false, operationNumber }: ComplianceOperationRowProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const snapshot = result.operation_snapshot as {
@@ -223,79 +225,71 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
       <div
         className={cn(
           'flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50',
-          isPending && 'opacity-60'
+          isPending && 'opacity-60',
+          isPending && 'cursor-default'
         )}
         onClick={() => !isPending && setIsExpanded(!isExpanded)}
       >
-        {/* Indicator - FIRST (far left) with fixed width */}
+        {/* Operation Number */}
+        <div className="w-6 shrink-0 text-sm text-muted-foreground">
+          {operationNumber}
+        </div>
+
+        {/* Indicator Icon */}
         <div className="w-4 h-4 shrink-0 flex items-center justify-center">
           {getOperationIndicator(result, isProcessing)}
         </div>
 
-        {/* Expand/Collapse Icon */}
-        <button
-          className="shrink-0 mt-0.5"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (!isPending) setIsExpanded(!isExpanded)
-          }}
-          disabled={isPending}
-        >
-          {isExpanded ? (
-            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-          )}
-        </button>
-
         {/* Operation Name and Comment */}
         <div className="flex-1 min-w-0">
           {!isExpanded ? (
-            // COLLAPSED VIEW
-            <div className="flex items-center gap-3">
-              {/* Fixed-width name column */}
-              <span
+            // COLLAPSED VIEW - Vertical layout
+            <div className="flex flex-col gap-1">
+              {/* Name on top (bold) */}
+              <div
                 className={cn(
-                  'w-40 shrink-0 font-medium truncate',
+                  'font-medium',
                   isPending && 'text-muted-foreground'
                 )}
               >
                 {snapshot.name}
-              </span>
+              </div>
 
-              {/* Separator */}
-              <span className="text-muted-foreground shrink-0">|</span>
-
-              {/* Comment (with structured value prepended if applicable) */}
-              <span
-                className={cn(
-                  'text-sm flex-1 min-w-0 line-clamp-1',
-                  isPending && 'text-muted-foreground',
-                  isFailed && 'text-destructive'
-                )}
-              >
-                {getFormattedComment(result, true)}
-              </span>
-            </div>
-          ) : (
-            // EXPANDED VIEW
-            <div className="flex flex-col gap-2">
-              <div className="flex items-start gap-3">
-                {/* Fixed-width name column */}
-                <span
+              {/* Result below name (only if not pending and has content) */}
+              {!isPending && getFormattedComment(result, true) && (
+                <div
                   className={cn(
-                    'w-40 shrink-0 font-medium',
-                    isPending && 'text-muted-foreground'
+                    'text-sm text-muted-foreground line-clamp-2',
+                    isFailed && 'text-destructive'
                   )}
                 >
-                  {snapshot.name}
-                </span>
+                  {getFormattedComment(result, true)}
+                </div>
+              )}
+            </div>
+          ) : (
+            // EXPANDED VIEW - Vertical layout
+            <div className="flex flex-col gap-2">
+              {/* Name on top (bold) */}
+              <div
+                className={cn(
+                  'font-medium',
+                  isPending && 'text-muted-foreground'
+                )}
+              >
+                {snapshot.name}
+              </div>
 
-                {/* Separator */}
-                <span className="text-muted-foreground shrink-0">|</span>
+              {/* Description (if available) */}
+              {snapshot.description && (
+                <div className="text-sm text-muted-foreground">
+                  {snapshot.description}
+                </div>
+              )}
 
-                {/* Comment section */}
-                <div className="flex-1 min-w-0">
+              {/* Full result (no truncation) */}
+              {!isPending && (
+                <div className="text-sm">
                   {(() => {
                     const items = getExtractionItems(result)
                     if (items) {
@@ -318,7 +312,6 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
                       <span
                         className={cn(
                           'text-sm',
-                          isPending && 'text-muted-foreground',
                           isFailed && 'text-destructive'
                         )}
                       >
@@ -327,7 +320,7 @@ export function ComplianceOperationRow({ result, isProcessing = false }: Complia
                     )
                   })()}
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>

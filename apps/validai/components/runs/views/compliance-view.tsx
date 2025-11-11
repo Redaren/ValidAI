@@ -22,7 +22,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import {
   ComplianceMetricsCharts,
@@ -50,15 +50,79 @@ interface ComplianceViewProps {
 }
 
 /**
+ * Merge snapshot operations with actual results
+ * This allows showing all operations at start (with spinners) and updating as results arrive
+ */
+function mergeOperationsWithResults(
+  snapshotOperations: Array<{ id: string; name: string; area?: string | null; [key: string]: any }>,
+  operationResults: OperationResult[]
+): OperationResult[] {
+  return snapshotOperations.map((snapOp, index) => {
+    // Find matching result (if exists)
+    // Match by operation_id OR by operation_snapshot.id (fallback for legacy data where operation_id is null)
+    const result = operationResults.find(
+      (r) => r.operation_id === snapOp.id || (r.operation_snapshot as any)?.id === snapOp.id
+    )
+
+    if (result) {
+      // Use actual result
+      return result
+    } else {
+      // Create synthetic "pending" result
+      // Use placeholder timestamp for pending operations (they haven't actually started yet)
+      const placeholderTimestamp = new Date().toISOString()
+
+      return {
+        id: `pending-${snapOp.id}`,
+        run_id: '',
+        operation_id: snapOp.id,
+        execution_order: index,
+        status: 'pending',
+        operation_snapshot: snapOp,
+        response_text: null,
+        structured_output: null,
+        model_used: null,
+        execution_time_ms: null,
+        tokens_used: null,
+        thinking_blocks: null,
+        cache_hit: null,
+        retry_count: null,
+        started_at: placeholderTimestamp,
+        completed_at: null,
+        error_message: null,
+        error_type: null,
+      } as OperationResult
+    }
+  })
+}
+
+/**
+ * Create sequential operation numbering map based on display order
+ * Numbers operations as they will appear on screen (1, 2, 3...)
+ */
+function createOperationNumbering(groupedOperations: Map<string, OperationResult[]>): Map<string, number> {
+  const numbering = new Map<string, number>()
+  let counter = 1
+
+  // Iterate through grouped operations in display order
+  for (const operations of groupedOperations.values()) {
+    for (const operation of operations) {
+      numbering.set(operation.id, counter++)
+    }
+  }
+
+  return numbering
+}
+
+/**
  * Group operation results by their area field from snapshot
+ * Operations are grouped in the order they appear (snapshot order)
  */
 function groupOperationsByArea(results: OperationResult[]): Map<string, OperationResult[]> {
   const grouped = new Map<string, OperationResult[]>()
 
-  // Sort by execution order first
-  const sortedResults = [...results].sort((a, b) => a.execution_order - b.execution_order)
-
-  sortedResults.forEach((result) => {
+  // Group operations in the order they appear
+  results.forEach((result) => {
     const snapshot = result.operation_snapshot as { area?: string | null }
     const area = snapshot.area || 'Default'
 
@@ -72,23 +136,37 @@ function groupOperationsByArea(results: OperationResult[]): Map<string, Operatio
 }
 
 /**
- * Determine which operation is currently being processed
+ * Get the number of parallel operations from run snapshot
+ * Falls back to 25 if not available
  */
-function getCurrentProcessingOperation(
+function getParallelOperationsCount(run: Run): number {
+  const snapshot = run.snapshot as {
+    execution_config?: { max_concurrency?: number }
+  } | null
+
+  return snapshot?.execution_config?.max_concurrency || 25
+}
+
+/**
+ * Determine which operations are currently being processed in parallel
+ * Returns a Set of operation IDs that should show spinners
+ */
+function getCurrentProcessingOperations(
   results: OperationResult[],
   run: Run
-): string | null {
-  if (run.status !== 'processing') return null
+): Set<string> {
+  if (run.status !== 'processing') return new Set()
 
-  // Find the first pending operation
-  const pendingOp = results.find((r) => r.status === 'pending')
-  if (pendingOp) {
-    // If there are completed/failed operations, the first pending is currently processing
-    const hasProcessed = results.some((r) => r.status !== 'pending')
-    return hasProcessed ? pendingOp.id : null
-  }
+  // Get parallel operations count (defaults to 25)
+  const parallelCount = getParallelOperationsCount(run)
 
-  return null
+  // Find all pending operations
+  const pendingOps = results.filter((r) => r.status === 'pending')
+
+  // Return the first N pending operations (where N = parallelCount)
+  const processingOps = pendingOps.slice(0, parallelCount)
+
+  return new Set(processingOps.map(op => op.id))
 }
 
 /**
@@ -98,11 +176,13 @@ function getCurrentProcessingOperation(
 function AreaSection({
   areaName,
   operations,
-  processingOperationId,
+  processingOperationIds,
+  operationNumbering,
 }: {
   areaName: string
   operations: OperationResult[]
-  processingOperationId: string | null
+  processingOperationIds: Set<string>
+  operationNumbering: Map<string, number>
 }) {
   const [isExpanded, setIsExpanded] = useState(true)
 
@@ -141,7 +221,8 @@ function AreaSection({
               <ComplianceOperationRow
                 key={operation.id}
                 result={operation}
-                isProcessing={operation.id === processingOperationId}
+                isProcessing={processingOperationIds.has(operation.id)}
+                operationNumber={operationNumbering.get(operation.id) ?? 0}
               />
             ))}
           </div>
@@ -189,8 +270,21 @@ export function ComplianceView({
   operationResults,
   isLoadingResults = false,
 }: ComplianceViewProps) {
-  const groupedOperations = groupOperationsByArea(operationResults)
-  const processingOperationId = getCurrentProcessingOperation(operationResults, run)
+  // Merge snapshot operations with actual results
+  // This shows all operations from the start (with spinners) and updates as results arrive
+  const mergedOperations = useMemo(() => {
+    // If snapshot has operations, merge them with results
+    const snapshot = run.snapshot as { operations?: Array<{ id: string; name: string; area?: string | null; [key: string]: any }> } | null
+    if (snapshot?.operations && snapshot.operations.length > 0) {
+      return mergeOperationsWithResults(snapshot.operations, operationResults)
+    }
+    // Otherwise, fall back to just the results
+    return operationResults
+  }, [run.snapshot, operationResults])
+
+  const groupedOperations = groupOperationsByArea(mergedOperations)
+  const operationNumbering = useMemo(() => createOperationNumbering(groupedOperations), [groupedOperations])
+  const processingOperationIds = getCurrentProcessingOperations(mergedOperations, run)
 
   if (isLoadingResults) {
     return (
@@ -209,13 +303,13 @@ export function ComplianceView({
         // Completed: Show Summary Card, Validations, Traffic Lights
         <div className="grid gap-4 md:grid-cols-3">
           <ComplianceSummaryCard run={run} />
-          <ValidationChart operationResults={operationResults} />
-          <TrafficLightChart operationResults={operationResults} />
+          <ValidationChart operationResults={mergedOperations} />
+          <TrafficLightChart operationResults={mergedOperations} />
         </div>
       ) : (
         // Processing: Show Progress, Validations, Traffic Lights
         <ComplianceMetricsCharts
-          operationResults={operationResults}
+          operationResults={mergedOperations}
           totalOperations={run.total_operations}
           completedOperations={run.completed_operations}
           failedOperations={run.failed_operations}
@@ -237,7 +331,8 @@ export function ComplianceView({
                 key={areaName}
                 areaName={areaName}
                 operations={operations}
-                processingOperationId={processingOperationId}
+                processingOperationIds={processingOperationIds}
+                operationNumbering={operationNumbering}
               />
             ))}
           </div>
