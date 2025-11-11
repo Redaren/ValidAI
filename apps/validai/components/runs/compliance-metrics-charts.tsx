@@ -153,10 +153,13 @@ export function ProgressChart({
   const countdownText = countdown > 0 ? t('aiCountdown') : t('aiThinkingExtra')
   const countdownTime = formatCountdown(countdown)
 
+  // Card title changes based on mode
+  const cardTitle = hasResults ? t('progress') : countdownText
+
   return (
     <Card className="flex flex-col">
       <CardHeader className="items-center pb-2">
-        <CardTitle className="text-sm font-medium">{t('progress')}</CardTitle>
+        <CardTitle className="text-sm font-medium">{cardTitle}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-1 items-center pb-4">
         <ChartContainer
@@ -195,23 +198,14 @@ export function ProgressChart({
                             </tspan>
                           </>
                         ) : (
-                          // Countdown mode: Show countdown text and time
-                          <>
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) - 8}
-                              className="fill-foreground text-sm font-medium"
-                            >
-                              {countdownText}
-                            </tspan>
-                            <tspan
-                              x={viewBox.cx}
-                              y={(viewBox.cy || 0) + 12}
-                              className="fill-muted-foreground text-2xl font-bold"
-                            >
-                              {countdownTime}
-                            </tspan>
-                          </>
+                          // Countdown mode: Show only countdown time (large)
+                          <tspan
+                            x={viewBox.cx}
+                            y={viewBox.cy}
+                            className="fill-foreground text-3xl font-bold"
+                          >
+                            {countdownTime}
+                          </tspan>
                         )}
                       </text>
                     )
