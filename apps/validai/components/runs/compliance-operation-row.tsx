@@ -216,7 +216,7 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
   return (
     <div
       className={cn(
-        'border-b last:border-b-0 transition-colors',
+        'transition-colors',
         isPending && 'bg-muted/30',
         isProcessing && 'bg-blue-50 dark:bg-blue-950/20'
       )}
@@ -224,19 +224,19 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
       {/* Row */}
       <div
         className={cn(
-          'flex items-start gap-3 p-3 cursor-pointer hover:bg-muted/50',
+          'flex items-center px-6 py-3 cursor-pointer hover:bg-muted/50',
           isPending && 'opacity-60',
           isPending && 'cursor-default'
         )}
         onClick={() => !isPending && setIsExpanded(!isExpanded)}
       >
         {/* Operation Number */}
-        <div className="w-6 shrink-0 text-sm text-muted-foreground">
+        <div className="w-4 shrink-0 text-sm text-muted-foreground text-center mr-5">
           {operationNumber}
         </div>
 
         {/* Indicator Icon */}
-        <div className="w-4 h-4 shrink-0 flex items-center justify-center">
+        <div className="w-4 h-4 shrink-0 flex items-center justify-center mr-6">
           {getOperationIndicator(result, isProcessing)}
         </div>
 
@@ -255,17 +255,15 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
                 {snapshot.name}
               </div>
 
-              {/* Result below name (only if not pending and has content) */}
-              {!isPending && getFormattedComment(result, true) && (
-                <div
-                  className={cn(
-                    'text-sm text-muted-foreground line-clamp-2',
-                    isFailed && 'text-destructive'
-                  )}
-                >
-                  {getFormattedComment(result, true)}
-                </div>
-              )}
+              {/* Result below name - always shown to maintain consistent row height */}
+              <div
+                className={cn(
+                  'text-xs text-muted-foreground line-clamp-2',
+                  isFailed && 'text-destructive'
+                )}
+              >
+                {isPending ? '\u00A0' : (getFormattedComment(result, true) || '\u00A0')}
+              </div>
             </div>
           ) : (
             // EXPANDED VIEW - Vertical layout
@@ -282,14 +280,14 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
 
               {/* Description (if available) */}
               {snapshot.description && (
-                <div className="text-sm text-muted-foreground">
+                <div className="text-xs text-muted-foreground">
                   {snapshot.description}
                 </div>
               )}
 
               {/* Full result (no truncation) */}
               {!isPending && (
-                <div className="text-sm">
+                <div className="text-xs">
                   {(() => {
                     const items = getExtractionItems(result)
                     if (items) {
@@ -298,12 +296,12 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
                         <>
                           <ul className="list-disc list-inside space-y-1 mb-2">
                             {items.map((item, idx) => (
-                              <li key={idx} className="text-sm">
+                              <li key={idx} className="text-xs">
                                 {item}
                               </li>
                             ))}
                           </ul>
-                          <p className="text-sm">{fullComment}</p>
+                          <p className="text-xs">{fullComment}</p>
                         </>
                       )
                     }
@@ -311,7 +309,7 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
                     return (
                       <span
                         className={cn(
-                          'text-sm',
+                          'text-xs',
                           isFailed && 'text-destructive'
                         )}
                       >

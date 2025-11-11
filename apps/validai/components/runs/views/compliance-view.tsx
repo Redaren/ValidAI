@@ -155,7 +155,7 @@ function getCurrentProcessingOperations(
   results: OperationResult[],
   run: Run
 ): Set<string> {
-  if (run.status !== 'processing') return new Set()
+  if (run.status !== 'processing' && run.status !== 'pending') return new Set()
 
   // Get parallel operations count (defaults to 25)
   const parallelCount = getParallelOperationsCount(run)
@@ -193,7 +193,7 @@ function AreaSection({
   return (
     <Card>
       <CardHeader
-        className="cursor-pointer hover:bg-muted/50 transition-colors"
+        className="cursor-pointer hover:bg-muted/50 transition-colors border-b"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center justify-between">
