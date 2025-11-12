@@ -95,12 +95,17 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
     return <Tag className="h-4 w-4 text-indigo-600" />
   }
 
-  // Analysis
+  // Analysis - Show magnifying glass icon
   if (operationType === 'analysis') {
-    return <FileText className="h-4 w-4 text-blue-600" />
+    return <Search className="h-4 w-4 text-blue-600" />
   }
 
-  // Default: Checkmark for completed (generic and other types)
+  // Generic - Show magnifying glass icon
+  if (operationType === 'generic') {
+    return <Search className="h-4 w-4 text-gray-600" />
+  }
+
+  // Default: Checkmark for completed (other types)
   return <CheckCircle2 className="h-4 w-4 text-green-600" />
 }
 
@@ -117,9 +122,24 @@ function getFullComment(result: OperationResult): string {
   }
 
   // Try to get comment from structured output first
-  const structured = result.structured_output as { comment?: string } | null
+  const structured = result.structured_output as {
+    comment?: string
+    response?: string  // Generic operations
+    conclusion?: string  // Analysis operations
+  } | null
+
   if (structured?.comment) {
     return structured.comment
+  }
+
+  // Handle generic operations (structured_output.response)
+  if (structured?.response) {
+    return structured.response
+  }
+
+  // Handle analysis operations (structured_output.conclusion)
+  if (structured?.conclusion) {
+    return structured.conclusion
   }
 
   // Fall back to response text
@@ -285,38 +305,17 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
                 </div>
               )}
 
-              {/* Full result (no truncation) */}
+              {/* Full result with better text formatting */}
               {!isPending && (
-                <div className="text-xs">
-                  {(() => {
-                    const items = getExtractionItems(result)
-                    if (items) {
-                      // Multi-item extraction: show as list
-                      return (
-                        <>
-                          <ul className="list-disc list-inside space-y-1 mb-2">
-                            {items.map((item, idx) => (
-                              <li key={idx} className="text-xs">
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                          <p className="text-xs">{fullComment}</p>
-                        </>
-                      )
-                    }
-                    // Single item or no items: just show formatted comment
-                    return (
-                      <span
-                        className={cn(
-                          'text-xs',
-                          isFailed && 'text-destructive'
-                        )}
-                      >
-                        {getFormattedComment(result, false)}
-                      </span>
-                    )
-                  })()}
+                <div className="rounded-lg border bg-card p-4 mt-4">
+                  <pre
+                    className={cn(
+                      'whitespace-pre-wrap text-sm leading-relaxed font-sans',
+                      isFailed && 'text-destructive'
+                    )}
+                  >
+                    {getFormattedComment(result, false)}
+                  </pre>
                 </div>
               )}
             </div>

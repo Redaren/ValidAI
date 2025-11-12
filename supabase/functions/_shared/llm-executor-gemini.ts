@@ -450,6 +450,18 @@ export async function executeLLMOperationGemini(
   console.log(`Cache mode: ${cacheRef.cacheName ? 'CACHED' : 'DIRECT FILE REFERENCE'}`)
   console.log(`File URI: ${cacheRef.fileUri}`)
 
+  // DEBUG: Log operation object details to diagnose undefined prompt issue
+  console.log('[DEBUG] Operation object details:', JSON.stringify({
+    id: operation.id,
+    name: operation.name,
+    operation_type: operation.operation_type,
+    has_prompt: !!operation.prompt,
+    prompt_type: typeof operation.prompt,
+    prompt_length: operation.prompt?.length,
+    prompt_preview: operation.prompt?.substring(0, 50),
+    object_keys: Object.keys(operation)
+  }, null, 2))
+
   const ai = new GoogleGenAI({ apiKey })
   const modelToUse = settings.selected_model_id || 'gemini-2.5-flash'
 
@@ -461,6 +473,16 @@ export async function executeLLMOperationGemini(
   // Get JSON Schema for Gemini API (manual definition - no library conversion)
   const jsonSchema = getOperationJsonSchema(operation.operation_type)
   console.log('[DEBUG] JSON Schema for Gemini:', JSON.stringify(jsonSchema, null, 2))
+
+  // DIAGNOSTIC: Log complete schema information to diagnose why specific operations fail
+  console.log('[DEBUG] === SCHEMA DIAGNOSTIC ===')
+  console.log('[DEBUG] Zod schema exists:', !!operationSchema)
+  console.log('[DEBUG] Zod schema type:', operationSchema._def?.typeName)
+  console.log('[DEBUG] Zod schema shape keys:', operationSchema._def?.shape ? Object.keys(operationSchema._def.shape) : 'N/A')
+  console.log('[DEBUG] JSON schema exists:', !!jsonSchema)
+  console.log('[DEBUG] JSON schema type:', jsonSchema?.type)
+  console.log('[DEBUG] JSON schema properties:', jsonSchema?.properties ? Object.keys(jsonSchema.properties) : 'N/A')
+  console.log('[DEBUG] === END DIAGNOSTIC ===')
 
   // Build generation config
   const generationConfig: any = {
@@ -516,11 +538,21 @@ export async function executeLLMOperationGemini(
     // Note: We rely on responseJsonSchema parameter to enforce structure.
     // Adding schema details to system prompt confuses Gemini and causes field name translation.
 
+    // VALIDATION: Check if operation.prompt exists before using it
+    if (!operation.prompt) {
+      const errorMessage = `[Gemini] Operation "${operation.name}" (${operation.operation_type}) has undefined/null prompt. ` +
+        `This indicates a data flow bug. Operation object keys: ${Object.keys(operation).join(', ')}`
+      console.error(errorMessage)
+      throw new Error(errorMessage)
+    }
+
     if (cacheRef.cacheName) {
       // CACHED MODE: Simple prompt (document already in cache)
+      console.log('[Gemini] Using cached mode - prompt length:', operation.prompt?.length ?? 'undefined')
       contents = operation.prompt
     } else {
       // NON-CACHED MODE: Include file reference directly in contents
+      console.log('[Gemini] Using direct mode - prompt length:', operation.prompt?.length ?? 'undefined')
       contents = [
         {
           role: 'user',
@@ -549,8 +581,17 @@ export async function executeLLMOperationGemini(
 
     const executionTime = Date.now() - startTime
 
-    // NEW: Direct .text property
-    const rawText = response.text
+    // Extract text from response (try convenience property first, fallback to candidates structure)
+    const rawText = response.text ?? response.candidates?.[0]?.content?.parts?.[0]?.text
+
+    if (!rawText) {
+      console.error('[Gemini] ❌ Response has no text content!')
+      console.error('[Gemini] Response keys:', Object.keys(response))
+      console.error('[Gemini] Response.candidates:', response.candidates ? 'exists' : 'missing')
+      console.error('[Gemini] Full response structure:', JSON.stringify(response, null, 2))
+      throw new Error(`Gemini response missing text content for operation "${operation.name}" (${operation.operation_type})`)
+    }
+
     console.log(`[DEBUG] Response received (${rawText.length} chars in ${executionTime}ms)`)
     console.log('[DEBUG] Raw Gemini response text:', rawText)
 

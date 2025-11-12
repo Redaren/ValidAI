@@ -28,8 +28,8 @@ import type {
   ParallelExecutionOptions,
   ProcessorSettings,
   LLMError,
-  LLMErrorType,
 } from './types.ts'
+import { LLMErrorType } from './types.ts'
 import { executeLLMOperationWithRetryRouter } from './llm-executor-router.ts'
 
 /**
