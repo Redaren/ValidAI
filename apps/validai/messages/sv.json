@@ -170,7 +170,15 @@
       "document": "Dokument",
       "started": "Startad",
       "duration": "Varaktighet",
-      "progress": "Framsteg"
+      "progress": "Framsteg",
+      "searchPlaceholder": "Sök efter dokumentnamn...",
+      "noResults": "Inga körningar hittades som matchar dina filter",
+      "showingInfo": "Visar {from}-{to} av {total} körningar",
+      "pageInfo": "Sida {current} av {total}",
+      "previous": "Föregående",
+      "next": "Nästa",
+      "noRuns": "Inga körningar ännu",
+      "noRunsDescription": "Klicka på \"Kör processor\" för att köra denna processor på ett dokument"
     },
     "detail": {
       "model": "Modell",

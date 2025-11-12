@@ -12,15 +12,15 @@ type ProcessorStatus = Database['public']['Enums']['processor_status']
 type ProcessorVisibility = Database['public']['Enums']['processor_visibility']
 
 export interface Processor {
-  processor_id: string
-  processor_name: string
-  processor_description: string | null
-  document_type: string | null
+  id: string
+  name: string
+  description: string | null
+  usage_description: string | null
   status: ProcessorStatus
   visibility: ProcessorVisibility
   tags: string[] | null
   created_by: string
-  created_by_name: string | null
+  creator_name: string | null
   created_at: string
   updated_at: string
   published_at: string | null
@@ -28,21 +28,51 @@ export interface Processor {
   is_owner: boolean
 }
 
-export function useUserProcessors(includeArchived: boolean = false) {
+/**
+ * Hook to fetch user's processors with server-side pagination and search
+ *
+ * @param includeArchived - Whether to include archived processors
+ * @param options - Pagination and search options
+ * @returns Query result with processors, total count, and page count
+ *
+ * @example
+ * ```tsx
+ * const { data } = useUserProcessors(false, {
+ *   pageSize: 10,
+ *   pageIndex: 0,
+ *   search: 'contract'
+ * })
+ *
+ * // Access data
+ * data?.processors // Array of processors for current page
+ * data?.totalCount  // Total matching processors
+ * data?.pageCount   // Total number of pages
+ * ```
+ */
+export function useUserProcessors(
+  includeArchived: boolean = false,
+  options?: {
+    pageSize?: number
+    pageIndex?: number
+    search?: string
+  }
+) {
   const supabase = createBrowserClient()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+
+  const pageSize = options?.pageSize ?? 10
+  const pageIndex = options?.pageIndex ?? 0
+  const search = options?.search
 
   useEffect(() => {
     // Check if user is authenticated
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session)
-      if (session) {
-      }
     })
   }, [supabase])
 
   return useQuery({
-    queryKey: ['user-processors', includeArchived],
+    queryKey: ['user-processors', includeArchived, pageSize, pageIndex, search],
     queryFn: async () => {
       // First check if we have a valid session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -51,9 +81,14 @@ export function useUserProcessors(includeArchived: boolean = false) {
         throw new Error('Not authenticated')
       }
 
+      const offset = pageIndex * pageSize
 
+      // Fetch processors for current page
       const { data, error } = await supabase.rpc('get_user_processors', {
-        p_include_archived: includeArchived
+        p_include_archived: includeArchived,
+        p_limit: pageSize,
+        p_offset: offset,
+        p_search: search,
       })
 
       if (error) {
@@ -61,14 +96,36 @@ export function useUserProcessors(includeArchived: boolean = false) {
           message: error.message,
           details: error.details,
           hint: error.hint,
-          code: error.code
+          code: error.code,
         })
         throw new Error(error.message || 'Failed to fetch processors')
       }
 
+      // Fetch total count for pagination
+      const { data: totalCount, error: countError } = await supabase.rpc(
+        'get_user_processors_count',
+        {
+          p_include_archived: includeArchived,
+          p_search: search,
+        }
+      )
 
-      // The RPC function returns data in the correct format already
-      return data as Processor[]
+      if (countError) {
+        logger.error('Error fetching processors count:', {
+          message: countError.message,
+          details: countError.details,
+        })
+        throw new Error(countError.message || 'Failed to fetch processors count')
+      }
+
+      const count = Number(totalCount) || 0
+      const pageCount = Math.ceil(count / pageSize)
+
+      return {
+        processors: data as Processor[],
+        totalCount: count,
+        pageCount,
+      }
     },
     enabled: isAuthenticated, // Only run query when authenticated
     staleTime: 30 * 1000, // 30 seconds

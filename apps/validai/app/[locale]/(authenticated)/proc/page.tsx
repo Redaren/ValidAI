@@ -11,8 +11,15 @@ import { useTranslations } from 'next-intl'
 export default function ProcessorsPage() {
   const t = useTranslations('processors')
   const tCommon = useTranslations('common')
-  const { data: processors, isLoading, error } = useUserProcessors(false)
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false)
+  const [pageIndex, setPageIndex] = useState(0)
+  const [search, setSearch] = useState('')
+
+  const { data, isLoading, error } = useUserProcessors(false, {
+    pageSize: 10,
+    pageIndex,
+    search,
+  })
 
   if (error) {
     return (
@@ -44,8 +51,16 @@ export default function ProcessorsPage() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
         </div>
-      ) : processors && processors.length > 0 ? (
-        <ProcessorsTable data={processors} />
+      ) : data && data.processors && data.processors.length > 0 ? (
+        <ProcessorsTable
+          data={data.processors}
+          totalCount={data.totalCount}
+          pageCount={data.pageCount}
+          pageIndex={pageIndex}
+          onPageChange={setPageIndex}
+          searchValue={search}
+          onSearchChange={setSearch}
+        />
       ) : (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="rounded-full bg-muted p-6 mb-4">

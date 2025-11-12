@@ -615,6 +615,7 @@ export type Database = {
           configuration: Json | null
           created_at: string
           display_name: string
+          execution_config: Json | null
           id: string
           is_active: boolean | null
           is_default: boolean | null
@@ -626,6 +627,7 @@ export type Database = {
           configuration?: Json | null
           created_at?: string
           display_name: string
+          execution_config?: Json | null
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
@@ -637,6 +639,7 @@ export type Database = {
           configuration?: Json | null
           created_at?: string
           display_name?: string
+          execution_config?: Json | null
           id?: string
           is_active?: boolean | null
           is_default?: boolean | null
@@ -948,6 +951,7 @@ export type Database = {
           snapshot: Json
           started_at: string
           status: string
+          storage_status: string
           total_operations: number
           trigger_type: string
           triggered_by: string | null
@@ -965,6 +969,7 @@ export type Database = {
           snapshot: Json
           started_at?: string
           status?: string
+          storage_status?: string
           total_operations?: number
           trigger_type?: string
           triggered_by?: string | null
@@ -982,6 +987,7 @@ export type Database = {
           snapshot?: Json
           started_at?: string
           status?: string
+          storage_status?: string
           total_operations?: number
           trigger_type?: string
           triggered_by?: string | null
@@ -1374,7 +1380,7 @@ export type Database = {
         Args: { p_org_id: string; p_plaintext: string }
         Returns: string
       }
-      generate_unique_org_slug: { Args: { base_name: string }; Returns: string }
+      generate_unique_org_slug: { Args: { base_slug: string }; Returns: string }
       get_available_llm_models: { Args: never; Returns: Json }
       get_billing_usage_summary: {
         Args: { org_id: string; period_end: string; period_start: string }
@@ -1451,22 +1457,31 @@ export type Database = {
       get_processor_with_operations: {
         Args: { p_processor_id: string }
         Returns: {
-          area_configuration: Json
-          configuration: Json
-          created_at: string
-          created_by: string
-          created_by_name: string
-          operations: Json
+          creator_name: string
+          operation_area: string
+          operation_configuration: Json
+          operation_description: string
+          operation_id: string
+          operation_name: string
+          operation_output_schema: Json
+          operation_position: number
+          operation_prompt: string
+          operation_required: boolean
+          operation_type: string
+          operation_validation_rules: Json
+          processor_area_configuration: Json
+          processor_configuration: Json
+          processor_created_at: string
           processor_description: string
           processor_id: string
           processor_name: string
-          published_at: string
-          status: Database["public"]["Enums"]["processor_status"]
-          system_prompt: string
-          tags: string[]
-          updated_at: string
-          usage_description: string
-          visibility: Database["public"]["Enums"]["processor_visibility"]
+          processor_published_at: string
+          processor_status: string
+          processor_system_prompt: string
+          processor_tags: string[]
+          processor_updated_at: string
+          processor_usage_description: string
+          processor_visibility: string
         }[]
       }
       get_user_apps_with_admin: {
@@ -1509,48 +1524,93 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_user_processors: {
-        Args: { p_include_archived?: boolean }
-        Returns: {
-          created_at: string
-          created_by: string
-          created_by_name: string
-          document_type: string
-          is_owner: boolean
-          operation_count: number
-          processor_description: string
-          processor_id: string
-          processor_name: string
-          published_at: string
-          status: Database["public"]["Enums"]["processor_status"]
-          tags: string[]
-          updated_at: string
-          visibility: Database["public"]["Enums"]["processor_visibility"]
-        }[]
+      get_user_processors:
+        | {
+            Args: never
+            Returns: {
+              created_at: string
+              created_by: string
+              creator_name: string
+              description: string
+              id: string
+              name: string
+              operation_count: number
+              organization_id: string
+              published_at: string
+              status: string
+              tags: string[]
+              updated_at: string
+              usage_description: string
+              visibility: string
+            }[]
+          }
+        | {
+            Args: {
+              p_include_archived?: boolean
+              p_limit?: number
+              p_offset?: number
+              p_search?: string
+            }
+            Returns: {
+              created_at: string
+              created_by: string
+              creator_name: string
+              description: string
+              id: string
+              is_owner: boolean
+              name: string
+              operation_count: number
+              published_at: string
+              status: Database["public"]["Enums"]["processor_status"]
+              tags: string[]
+              updated_at: string
+              usage_description: string
+              visibility: Database["public"]["Enums"]["processor_visibility"]
+            }[]
+          }
+      get_user_processors_count: {
+        Args: { p_include_archived?: boolean; p_search?: string }
+        Returns: number
       }
-      get_user_processors_debug: {
-        Args: {
-          p_include_archived?: boolean
-          p_org_id: string
-          p_user_id: string
-        }
-        Returns: {
-          created_at: string
-          created_by: string
-          creator_name: string
-          description: string
-          document_type: string
-          id: string
-          is_owner: boolean
-          name: string
-          operation_count: number
-          published_at: string
-          status: Database["public"]["Enums"]["processor_status"]
-          tags: string[]
-          updated_at: string
-          visibility: Database["public"]["Enums"]["processor_visibility"]
-        }[]
-      }
+      get_user_processors_debug:
+        | {
+            Args: never
+            Returns: {
+              creator_name: string
+              current_org_id: string
+              current_user_id: string
+              is_creator: boolean
+              processor_created_by: string
+              processor_id: string
+              processor_name: string
+              processor_org_id: string
+              processor_visibility: string
+              visibility_check: string
+            }[]
+          }
+        | {
+            Args: {
+              p_include_archived?: boolean
+              p_org_id: string
+              p_user_id: string
+            }
+            Returns: {
+              created_at: string
+              created_by: string
+              creator_name: string
+              description: string
+              document_type: string
+              id: string
+              is_owner: boolean
+              name: string
+              operation_count: number
+              published_at: string
+              status: Database["public"]["Enums"]["processor_status"]
+              tags: string[]
+              updated_at: string
+              visibility: Database["public"]["Enums"]["processor_visibility"]
+            }[]
+          }
       has_app_access: { Args: { app_name: string }; Returns: boolean }
       increment_app_usage: {
         Args: {

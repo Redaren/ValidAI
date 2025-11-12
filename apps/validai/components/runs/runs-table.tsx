@@ -3,22 +3,42 @@
  *
  * @module components/runs/runs-table
  * @description
- * Displays a list of processor runs in a table format.
+ * Displays a list of processor runs in a table format with search, sort, and pagination.
  * Each row is clickable and navigates to the run detail page.
  *
  * **Features:**
- * - Sortable table with run metadata
+ * - Search by document name
+ * - Sortable columns (status, document, started, duration, progress)
+ * - Client-side pagination (10 rows per page default)
  * - Status badges with color coding
  * - Progress indicators
  * - Click to navigate to run details
  * - Empty state when no runs exist
  *
+ * **Performance:**
+ * - Displays up to 50 most recent runs (server limit)
+ * - Pagination prevents whole-page scrolling
+ * - Keeps header and navigation visible
+ *
  * @since Phase 1.8
+ * @updated Phase 1.10 - Added TanStack React Table integration
  */
 
 'use client'
 
+import * as React from 'react'
 import { useRouter } from '@/lib/i18n/navigation'
+import {
+  ColumnDef,
+  ColumnFiltersState,
+  SortingState,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@tanstack/react-table'
 import {
   Table,
   TableBody,
@@ -27,10 +47,12 @@ import {
   TableHeader,
   TableRow,
   Badge,
+  Input,
+  Button,
 } from '@playze/shared-ui'
 import { formatDistanceToNow } from 'date-fns'
 import type { Database } from '@playze/shared-types'
-import { FileText } from 'lucide-react'
+import { FileText, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
@@ -130,19 +152,19 @@ function RunStatusBadge({ status, failedCount }: { status: string; failedCount: 
 /**
  * Runs Table
  *
- * Displays all runs for a processor in a table format.
+ * Displays all runs for a processor in a searchable, sortable, paginated table.
  * Clicking a row navigates to the run detail page.
  *
  * **Table Columns:**
- * - Status - Run completion status
- * - Document - Document name and size
- * - Started - Relative start time
- * - Duration - Total execution time
- * - Progress - Operations completed/failed/total
+ * - Status - Run completion status (filterable, sortable)
+ * - Document - Document name and size (searchable, sortable)
+ * - Started - Relative start time (sortable)
+ * - Duration - Total execution time (sortable)
+ * - Progress - Operations completed/failed/total (sortable)
  *
- * @param runs - Array of run objects
+ * @param runs - Array of run objects (max 50 from server)
  * @param processorId - Processor ID for navigation
- * @returns Table component
+ * @returns Table component with search, sort, and pagination
  *
  * @example
  * ```tsx
@@ -154,94 +176,237 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
   const router = useRouter()
   const t = useTranslations('runs.table')
 
+  const [sorting, setSorting] = React.useState<SortingState>([
+    { id: 'started_at', desc: true }, // Default: newest first
+  ])
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+
+  // Define columns
+  const columns = React.useMemo<ColumnDef<Run>[]>(
+    () => [
+      {
+        accessorKey: 'status',
+        header: () => t('status'),
+        cell: ({ row }) => (
+          <RunStatusBadge status={row.original.status} failedCount={row.original.failed_operations} />
+        ),
+        filterFn: 'includesString',
+      },
+      {
+        id: 'document_name',
+        accessorFn: (row) => {
+          const snapshot = row.snapshot as { document: { name: string; size_bytes: number } }
+          return snapshot.document.name
+        },
+        header: () => t('document'),
+        cell: ({ row }) => {
+          const snapshot = row.original.snapshot as {
+            document: { name: string; size_bytes: number }
+          }
+          return (
+            <div>
+              <p className="font-medium">{snapshot.document.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {formatFileSize(snapshot.document.size_bytes)}
+              </p>
+            </div>
+          )
+        },
+        filterFn: 'includesString',
+      },
+      {
+        accessorKey: 'started_at',
+        header: () => t('started'),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {formatDateTime(row.original.started_at)}
+          </span>
+        ),
+        sortingFn: 'datetime',
+      },
+      {
+        id: 'duration',
+        accessorFn: (row) => {
+          return row.completed_at
+            ? new Date(row.completed_at).getTime() - new Date(row.started_at).getTime()
+            : Date.now() - new Date(row.started_at).getTime()
+        },
+        header: () => t('duration'),
+        cell: ({ row }) => {
+          const duration = row.original.completed_at
+            ? new Date(row.original.completed_at).getTime() - new Date(row.original.started_at).getTime()
+            : Date.now() - new Date(row.original.started_at).getTime()
+          return <span className="font-mono text-sm">{formatDuration(duration)}</span>
+        },
+        sortingFn: 'basic',
+      },
+      {
+        id: 'progress',
+        accessorFn: (row) => (row.completed_operations + row.failed_operations) / row.total_operations,
+        header: () => t('progress'),
+        cell: ({ row }) => {
+          const progressPercent =
+            ((row.original.completed_operations + row.original.failed_operations) /
+              row.original.total_operations) *
+            100
+
+          return (
+            <div className="space-y-1">
+              <div className="text-sm">
+                {row.original.completed_operations + row.original.failed_operations} /{' '}
+                {row.original.total_operations}
+                {row.original.failed_operations > 0 && (
+                  <span className="ml-2 text-xs text-destructive">
+                    ({row.original.failed_operations} failed)
+                  </span>
+                )}
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full bg-primary transition-all"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+          )
+        },
+        sortingFn: 'basic',
+      },
+    ],
+    [t]
+  )
+
+  // Create table instance
+  const table = useReactTable({
+    data: runs,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    state: {
+      sorting,
+      columnFilters,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10, // Show 10 runs per page (prevents whole-page scrolling)
+      },
+    },
+  })
+
+  // Empty state
   if (runs.length === 0) {
     return (
       <div className="flex min-h-[300px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
         <FileText className="h-12 w-12 text-muted-foreground" />
         <div className="space-y-1">
-          <p className="text-sm font-medium">No runs yet</p>
-          <p className="text-xs text-muted-foreground">
-            Click &quot;Run Processor&quot; to execute this processor on a document
-          </p>
+          <p className="text-sm font-medium">{t('noRuns')}</p>
+          <p className="text-xs text-muted-foreground">{t('noRunsDescription')}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('status')}</TableHead>
-            <TableHead>{t('document')}</TableHead>
-            <TableHead>{t('started')}</TableHead>
-            <TableHead>{t('duration')}</TableHead>
-            <TableHead>{t('progress')}</TableHead>
-          </TableRow>
-        </TableHeader>
+    <div className="space-y-4">
+      {/* Search Input */}
+      <div className="flex items-center gap-4">
+        <Input
+          placeholder={t('searchPlaceholder')}
+          value={(table.getColumn('document_name')?.getFilterValue() as string) ?? ''}
+          onChange={(event) => table.getColumn('document_name')?.setFilterValue(event.target.value)}
+          className="max-w-sm"
+        />
+      </div>
 
-        <TableBody>
-          {runs.map((run) => {
-            const snapshot = run.snapshot as {
-              document: { name: string; size_bytes: number }
-            }
+      {/* Table */}
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
 
-            const duration = run.completed_at
-              ? new Date(run.completed_at).getTime() - new Date(run.started_at).getTime()
-              : Date.now() - new Date(run.started_at).getTime()
-
-            const progressPercent =
-              ((run.completed_operations + run.failed_operations) / run.total_operations) * 100
-
-            return (
-              <TableRow
-                key={run.id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() => router.push(`/proc/${processorId}/runs/${run.id}`)}
-              >
-                <TableCell>
-                  <RunStatusBadge status={run.status} failedCount={run.failed_operations} />
-                </TableCell>
-
-                <TableCell>
-                  <div>
-                    <p className="font-medium">{snapshot.document.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatFileSize(snapshot.document.size_bytes)}
-                    </p>
-                  </div>
-                </TableCell>
-
-                <TableCell className="text-sm text-muted-foreground">
-                  {formatDateTime(run.started_at)}
-                </TableCell>
-
-                <TableCell className="font-mono text-sm">{formatDuration(duration)}</TableCell>
-
-                <TableCell>
-                  <div className="space-y-1">
-                    <div className="text-sm">
-                      {run.completed_operations + run.failed_operations} / {run.total_operations}
-                      {run.failed_operations > 0 && (
-                        <span className="ml-2 text-xs text-destructive">
-                          ({run.failed_operations} failed)
-                        </span>
-                      )}
-                    </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                  </div>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => router.push(`/proc/${processorId}/runs/${row.original.id}`)}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  {t('noResults')}
                 </TableCell>
               </TableRow>
-            )
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-between px-2">
+        <div className="text-sm text-muted-foreground">
+          {t('showingInfo', {
+            from: table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1,
+            to: Math.min(
+              (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
+              table.getFilteredRowModel().rows.length
+            ),
+            total: table.getFilteredRowModel().rows.length,
           })}
-        </TableBody>
-      </Table>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.previousPage()}
+            disabled={!table.getCanPreviousPage()}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {t('previous')}
+          </Button>
+
+          <div className="text-sm">
+            {t('pageInfo', {
+              current: table.getState().pagination.pageIndex + 1,
+              total: table.getPageCount(),
+            })}
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => table.nextPage()}
+            disabled={!table.getCanNextPage()}
+          >
+            {t('next')}
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

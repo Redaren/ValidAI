@@ -170,7 +170,15 @@
       "document": "Document",
       "started": "Started",
       "duration": "Duration",
-      "progress": "Progress"
+      "progress": "Progress",
+      "searchPlaceholder": "Search by document name...",
+      "noResults": "No runs found matching your filters",
+      "showingInfo": "Showing {from}-{to} of {total} runs",
+      "pageInfo": "Page {current} of {total}",
+      "previous": "Previous",
+      "next": "Next",
+      "noRuns": "No runs yet",
+      "noRunsDescription": "Click \"Run Processor\" to execute this processor on a document"
     },
     "detail": {
       "model": "Model",

@@ -4,15 +4,13 @@ import * as React from "react"
 import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import {
   ColumnDef,
-  ColumnFiltersState,
   SortingState,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { Lock, Users, History, MoreHorizontal, Play } from "lucide-react"
+import { Lock, Users, History, MoreHorizontal, Play, ChevronLeft, ChevronRight } from "lucide-react"
 import { useRouter, Link } from "@/lib/i18n/navigation"
 
 import {
@@ -38,18 +36,32 @@ import { useTranslations } from 'next-intl'
 
 interface ProcessorsTableProps {
   data: Processor[]
+  totalCount: number
+  pageCount: number
+  pageIndex: number
+  onPageChange: (page: number) => void
+  searchValue: string
+  onSearchChange: (search: string) => void
 }
 
-export function ProcessorsTable({ data }: ProcessorsTableProps) {
+export function ProcessorsTable({
+  data,
+  totalCount,
+  pageCount,
+  pageIndex,
+  onPageChange,
+  searchValue,
+  onSearchChange,
+}: ProcessorsTableProps) {
   const router = useRouter()
   const t = useTranslations('processors')
   const tTable = useTranslations('processors.table')
+  const tPagination = useTranslations('runs.table') // Reuse pagination translations
   const [mounted, setMounted] = React.useState(false)
 
   const [sorting, setSorting] = React.useState<SortingState>([
-    { id: "processor_name", desc: false }
+    { id: "name", desc: false }
   ])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
 
   React.useEffect(() => {
     setMounted(true)
@@ -58,16 +70,16 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
   const columns = React.useMemo<ColumnDef<Processor>[]>(
     () => [
       {
-        accessorKey: "processor_name",
+        accessorKey: "name",
         header: () => tTable('name'),
         cell: ({ row }) => {
           const processor = row.original
           return (
             <Link
-              href={`/proc/${processor.processor_id}`}
+              href={`/proc/${processor.id}`}
               className="font-semibold hover:underline"
             >
-              {row.getValue("processor_name")}
+              {row.getValue("name")}
             </Link>
           )
         },
@@ -80,10 +92,10 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         },
       },
       {
-        accessorKey: "processor_description",
+        accessorKey: "description",
         header: () => tTable('description'),
         cell: ({ row }) => {
-          const description = row.getValue("processor_description") as string | null
+          const description = row.getValue("description") as string | null
           if (!description) return <span className="text-muted-foreground">No description</span>
 
           const truncated = description.length > 60
@@ -121,8 +133,8 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
           return (
             <div className="flex items-center gap-2">
               <RunProcessorDialog
-                processorId={processor.processor_id}
-                processorName={processor.processor_name}
+                processorId={processor.id}
+                processorName={processor.name}
                 defaultView="compliance"
                 trigger={
                   <Button
@@ -145,7 +157,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 title="View runs"
                 onClick={(e) => {
                   e.stopPropagation()
-                  router.push(`/proc/${processor.processor_id}/runs`)
+                  router.push(`/proc/${processor.id}/runs`)
                 }}
               >
                 <History className="h-4 w-4" />
@@ -168,7 +180,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                   <DropdownMenuContent align="end">
                     <DropdownMenuLabel>{t('actions')}</DropdownMenuLabel>
                     <DropdownMenuItem
-                      onClick={() => router.push(`/proc/${processor.processor_id}`)}
+                      onClick={() => router.push(`/proc/${processor.id}`)}
                     >
                       View details
                     </DropdownMenuItem>
@@ -200,23 +212,23 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-    onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
     state: {
       sorting,
-      columnFilters,
     },
+    manualPagination: true, // Server-side pagination
+    pageCount: pageCount,   // Total pages from server
   })
 
   return (
-    <div>
+    <div className="space-y-4">
       <div className="flex items-center py-4">
         <Input
           placeholder={t('filterPlaceholder')}
-          value={(table.getColumn("processor_name")?.getFilterValue() as string) ?? ""}
-          onChange={(event) =>
-            table.getColumn("processor_name")?.setFilterValue(event.target.value)
-          }
+          value={searchValue}
+          onChange={(event) => {
+            onSearchChange(event.target.value)
+            onPageChange(0) // Reset to first page on search
+          }}
           className="max-w-sm"
         />
       </div>
@@ -248,7 +260,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    onClick={() => router.push(`/proc/${processor.processor_id}`)}
+                    onClick={() => router.push(`/proc/${processor.id}`)}
                     className="cursor-pointer hover:bg-muted/50"
                   >
                   {row.getVisibleCells().map((cell) => (
@@ -269,6 +281,48 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination Controls - Only show if more than 1 page (server-side) */}
+      {pageCount > 1 && (
+        <div className="flex items-center justify-between px-2">
+          <div className="text-sm text-muted-foreground">
+            {tPagination('showingInfo', {
+              from: pageIndex * 10 + 1,
+              to: Math.min((pageIndex + 1) * 10, totalCount),
+              total: totalCount,
+            })}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(pageIndex - 1)}
+              disabled={pageIndex === 0}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              {tPagination('previous')}
+            </Button>
+
+            <div className="text-sm">
+              {tPagination('pageInfo', {
+                current: pageIndex + 1,
+                total: pageCount,
+              })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(pageIndex + 1)}
+              disabled={pageIndex >= pageCount - 1}
+            >
+              {tPagination('next')}
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

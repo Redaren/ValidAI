@@ -272,13 +272,20 @@ export function useOperationResults(
  * Fetches runs ordered by start time (newest first).
  * Used for the runs list page.
  *
+ * **Performance:** Defaults to 50 most recent runs to prevent performance degradation.
+ * Use `limit` option to override (e.g., for testing or admin views).
+ *
  * @param processorId - UUID of the processor
  * @param options - Query options
  * @returns Query hook with runs array
  *
  * @example
  * ```tsx
+ * // Default: 50 most recent runs
  * const { data: runs } = useProcessorRuns(processorId)
+ *
+ * // Custom limit
+ * const { data: runs } = useProcessorRuns(processorId, { limit: 100 })
  *
  * runs?.map(run => (
  *   <Link key={run.id} href={`/proc/${processorId}/runs/${run.id}`}>
@@ -290,28 +297,24 @@ export function useOperationResults(
 export function useProcessorRuns(
   processorId: string | undefined,
   options?: {
-    /** Limit number of runs returned */
+    /** Limit number of runs returned (default: 50) */
     limit?: number
   }
 ) {
   const supabase = createBrowserClient()
+  const limit = options?.limit ?? 50 // Default to 50 most recent runs
 
   return useQuery({
-    queryKey: ['processor-runs', processorId, options?.limit],
+    queryKey: ['processor-runs', processorId, limit],
     queryFn: async () => {
       if (!processorId) throw new Error('Processor ID is required')
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('validai_runs')
         .select('*')
         .eq('processor_id', processorId)
         .order('started_at', { ascending: false })
-
-      if (options?.limit) {
-        query = query.limit(options.limit)
-      }
-
-      const { data, error } = await query
+        .limit(limit)
 
       if (error) throw error
       return data as Run[]
