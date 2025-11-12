@@ -25,12 +25,24 @@ import {
 } from "@/components/ui/sidebar"
 import { useCurrentOrganization, useUserOrganizations, useSwitchOrganization } from "@playze/shared-auth"
 
+/**
+ * OrganizationSwitcher - Sidebar-specific wrapper for organization switching
+ *
+ * This component provides a sidebar-optimized UI for the organization switcher,
+ * using shared authentication hooks from @playze/shared-auth for logic.
+ *
+ * Features:
+ * - Sidebar-specific styling (SidebarMenuButton, mobile-responsive)
+ * - Organization switching with page reload
+ * - Organization Settings navigation
+ * - React Query automatic caching (no redundant API calls)
+ */
 export function OrganizationSwitcher() {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
 
-  // Queries (shared hooks return data directly, not wrapped in objects)
+  // Shared hooks from @playze/shared-auth - provides automatic caching
   const { data: currentOrg, isLoading: currentLoading } = useCurrentOrganization()
   const { data: userOrgs = [], isLoading: orgsLoading } = useUserOrganizations()
   const switchOrgMutation = useSwitchOrganization()
@@ -51,7 +63,6 @@ export function OrganizationSwitcher() {
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">Loading...</span>
-              <span className="truncate text-xs">...</span>
             </div>
             <ChevronsUpDown className="ml-auto size-4" />
           </SidebarMenuButton>
@@ -64,23 +75,21 @@ export function OrganizationSwitcher() {
     if (orgId === currentOrg?.id) return
 
     try {
-      // Shared hook expects { organizationId: string }
+      // Shared hook updates JWT metadata and invalidates queries
       await switchOrgMutation.mutateAsync({ organizationId: orgId })
 
-      // Note: The shared hook invalidates queries but doesn't reload the page
-      // Reloading ensures all components get the new organization context
+      // Reload page to apply new organization context
       if (typeof window !== 'undefined') {
         window.location.reload()
       }
     } catch (error) {
       logger.error('Failed to switch organization:', extractErrorDetails(error))
-      // TODO: Show error notification
+      // TODO: Add toast notification for better UX
     }
   }
 
   const handleManageOrganization = () => {
     if (currentOrg) {
-      // Use organization ID instead of slug for settings route
       router.push(`/dashboard/organizations/${currentOrg.id}/settings`)
     }
   }
@@ -100,9 +109,6 @@ export function OrganizationSwitcher() {
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">
                 {currentOrg?.name || 'No Organization'}
-              </span>
-              <span className="truncate text-xs">
-                Slogan here
               </span>
             </div>
             <ChevronsUpDown className="ml-auto size-4" />
@@ -128,9 +134,6 @@ export function OrganizationSwitcher() {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">
                   {currentOrg?.name || 'No Organization'}
-                </span>
-                <span className="truncate text-xs">
-                  Slogan here
                 </span>
               </div>
               <ChevronsUpDown className="ml-auto size-4" />

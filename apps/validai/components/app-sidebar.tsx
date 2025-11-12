@@ -6,15 +6,13 @@ import {
   FileText,
   LifeBuoy,
   Send,
-  Settings2,
   SquareTerminal,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
-import { NavProjects } from "@/components/nav-projects"
 import { NavSecondary } from "@/components/nav-secondary"
 import { NavUser } from "@/components/nav-user"
-import { OrganizationSwitcher } from "@/components/organization-switcher"
+import { OrganizationSwitcher } from "@/components/organization-switcher-wrapper"
 import { LanguageSwitcher } from "@playze/shared-ui"
 import { SUPPORTED_LOCALES, LOCALE_NAMES } from "@/lib/i18n/locales"
 import { createBrowserClient } from "@playze/shared-auth/client"
@@ -55,23 +53,6 @@ const navConfig = {
       icon: Send,
     },
   ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Settings2,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: Settings2,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Settings2,
-    },
-  ],
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -104,7 +85,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navConfig.navMain} />
-        <NavProjects projects={navConfig.projects} />
         <NavSecondary items={navConfig.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
