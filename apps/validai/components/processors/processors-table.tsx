@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Plus } from "lucide-react"
 import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import {
   ColumnDef,
@@ -42,6 +43,9 @@ interface ProcessorsTableProps {
   onPageChange: (page: number) => void
   searchValue: string
   onSearchChange: (search: string) => void
+  isLoading: boolean
+  isEmpty: boolean
+  onCreateClick: () => void
 }
 
 export function ProcessorsTable({
@@ -52,6 +56,9 @@ export function ProcessorsTable({
   onPageChange,
   searchValue,
   onSearchChange,
+  isLoading,
+  isEmpty,
+  onCreateClick,
 }: ProcessorsTableProps) {
   const router = useRouter()
   const t = useTranslations('processors')
@@ -66,6 +73,15 @@ export function ProcessorsTable({
   React.useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Stabilize search handler to prevent unnecessary re-renders
+  const handleSearchChange = React.useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      onSearchChange(event.target.value)
+      onPageChange(0) // Reset to first page on search
+    },
+    [onSearchChange, onPageChange]
+  )
 
   const columns = React.useMemo<ColumnDef<Processor>[]>(
     () => [
@@ -219,20 +235,72 @@ export function ProcessorsTable({
     pageCount: pageCount,   // Total pages from server
   })
 
+  // Show initial loading state (only on first load)
+  if (isLoading && data.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center py-4">
+          <Input
+            placeholder={t('filterPlaceholder')}
+            value={searchValue}
+            onChange={handleSearchChange}
+            className="max-w-sm"
+            disabled
+          />
+        </div>
+        <div className="flex items-center justify-center py-12 rounded-md border">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show empty state
+  if (isEmpty) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center py-4">
+          <Input
+            placeholder={t('filterPlaceholder')}
+            value={searchValue}
+            onChange={handleSearchChange}
+            className="max-w-sm"
+          />
+        </div>
+        <div className="flex flex-col items-center justify-center py-12 text-center rounded-md border">
+          <div className="rounded-full bg-muted p-6 mb-4">
+            <Plus className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">{t('empty.title')}</h2>
+          <p className="text-muted-foreground max-w-md">
+            {t('empty.description')}
+          </p>
+          <Button className="mt-4" onClick={onCreateClick}>
+            <Plus className="mr-2 h-4 w-4" />
+            {t('empty.createFirst')}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center py-4">
         <Input
           placeholder={t('filterPlaceholder')}
           value={searchValue}
-          onChange={(event) => {
-            onSearchChange(event.target.value)
-            onPageChange(0) // Reset to first page on search
-          }}
+          onChange={handleSearchChange}
           className="max-w-sm"
         />
       </div>
-      <div className="rounded-md border">
+      <div className="rounded-md border relative">
+        {/* Show loading overlay during refetch (when data already exists) */}
+        {isLoading && data.length > 0 && (
+          <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-md">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+        )}
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

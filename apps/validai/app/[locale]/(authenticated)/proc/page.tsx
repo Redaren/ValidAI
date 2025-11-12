@@ -6,6 +6,7 @@ import { Button } from "@playze/shared-ui"
 import { ProcessorsTable } from "@/components/processors/processors-table"
 import { CreateProcessorSheet } from "@/components/processors/create-processor-sheet"
 import { useUserProcessors } from "@/app/queries/processors/use-processors"
+import { useDebounce } from "@/hooks/use-debounce"
 import { useTranslations } from 'next-intl'
 
 export default function ProcessorsPage() {
@@ -15,10 +16,13 @@ export default function ProcessorsPage() {
   const [pageIndex, setPageIndex] = useState(0)
   const [search, setSearch] = useState('')
 
+  // Debounce search to reduce API calls (300ms delay)
+  const debouncedSearch = useDebounce(search, 300)
+
   const { data, isLoading, error } = useUserProcessors(false, {
     pageSize: 10,
     pageIndex,
-    search,
+    search: debouncedSearch,
   })
 
   if (error) {
@@ -47,35 +51,18 @@ export default function ProcessorsPage() {
         </Button>
       </div>
 
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      ) : data && data.processors && data.processors.length > 0 ? (
-        <ProcessorsTable
-          data={data.processors}
-          totalCount={data.totalCount}
-          pageCount={data.pageCount}
-          pageIndex={pageIndex}
-          onPageChange={setPageIndex}
-          searchValue={search}
-          onSearchChange={setSearch}
-        />
-      ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <div className="rounded-full bg-muted p-6 mb-4">
-            <Plus className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 className="text-xl font-semibold mb-2">{t('empty.title')}</h2>
-          <p className="text-muted-foreground max-w-md">
-            {t('empty.description')}
-          </p>
-          <Button className="mt-4" onClick={() => setIsCreateSheetOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('empty.createFirst')}
-          </Button>
-        </div>
-      )}
+      <ProcessorsTable
+        data={data?.processors ?? []}
+        totalCount={data?.totalCount ?? 0}
+        pageCount={data?.pageCount ?? 0}
+        pageIndex={pageIndex}
+        onPageChange={setPageIndex}
+        searchValue={search}
+        onSearchChange={setSearch}
+        isLoading={isLoading}
+        isEmpty={!isLoading && (!data?.processors || data.processors.length === 0)}
+        onCreateClick={() => setIsCreateSheetOpen(true)}
+      />
 
       <CreateProcessorSheet
         open={isCreateSheetOpen}

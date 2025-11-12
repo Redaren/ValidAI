@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { Database } from '@playze/shared-types'
 import { useEffect, useState } from 'react'
@@ -114,6 +114,7 @@ export function useUserProcessors(
       }
     },
     enabled: isAuthenticated, // Only run query when authenticated
+    placeholderData: keepPreviousData, // Keep previous data while fetching new data (prevents isLoading on refetch)
     staleTime: 30 * 1000, // 30 seconds
     refetchOnWindowFocus: true,
   })
