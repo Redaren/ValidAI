@@ -125,6 +125,12 @@
       "usageDescription": "Användningsbeskrivning",
       "tags": "Taggar"
     },
+    "table": {
+      "name": "Namn",
+      "status": "Status",
+      "description": "Beskrivning",
+      "visibility": "Synlighet"
+    },
     "header": {
       "status": "Status",
       "visibility": "Synlighet",

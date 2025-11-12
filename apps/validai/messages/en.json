@@ -125,6 +125,12 @@
       "usageDescription": "Usage Description",
       "tags": "Tags"
     },
+    "table": {
+      "name": "Name",
+      "status": "Status",
+      "description": "Description",
+      "visibility": "Visibility"
+    },
     "header": {
       "status": "Status",
       "visibility": "Visibility",

@@ -12,7 +12,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { Lock, Users, Eye, History, MoreHorizontal, Play } from "lucide-react"
+import { Lock, Users, History, MoreHorizontal, Play } from "lucide-react"
 import { useRouter, Link } from "@/lib/i18n/navigation"
 
 import {
@@ -43,6 +43,7 @@ interface ProcessorsTableProps {
 export function ProcessorsTable({ data }: ProcessorsTableProps) {
   const router = useRouter()
   const t = useTranslations('processors')
+  const tTable = useTranslations('processors.table')
   const [mounted, setMounted] = React.useState(false)
 
   const [sorting, setSorting] = React.useState<SortingState>([
@@ -58,7 +59,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
     () => [
       {
         accessorKey: "processor_name",
-        header: "Name",
+        header: () => tTable('name'),
         cell: ({ row }) => {
           const processor = row.original
           return (
@@ -73,14 +74,14 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
       },
       {
         accessorKey: "status",
-        header: "Status",
+        header: () => tTable('status'),
         cell: ({ row }) => {
           return <ProcessorStatusBadge status={row.getValue("status")} />
         },
       },
       {
         accessorKey: "processor_description",
-        header: "Description",
+        header: () => tTable('description'),
         cell: ({ row }) => {
           const description = row.getValue("processor_description") as string | null
           if (!description) return <span className="text-muted-foreground">No description</span>
@@ -98,7 +99,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
       },
       {
         accessorKey: "visibility",
-        header: "Visibility",
+        header: () => tTable('visibility'),
         cell: ({ row }) => {
           const visibility = row.getValue("visibility") as string
           const Icon = visibility === "personal" ? Lock : Users
@@ -129,6 +130,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                     variant="ghost"
                     size="icon"
                     title="Run processor"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <Play className="h-4 w-4" />
                     <span className="sr-only">Run processor</span>
@@ -140,21 +142,9 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                title="View details"
-                onClick={() => {
-                  router.push(`/proc/${processor.processor_id}`)
-                }}
-              >
-                <Eye className="h-4 w-4" />
-                <span className="sr-only">View details</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
                 title="View runs"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation()
                   router.push(`/proc/${processor.processor_id}/runs`)
                 }}
               >
@@ -165,7 +155,12 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
               {mounted && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button type="button" variant="ghost" className="h-8 w-8 p-0">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-8 w-8 p-0"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <span className="sr-only">Open menu</span>
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
@@ -196,7 +191,7 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
         },
       },
     ],
-    [router, mounted, t]
+    [router, mounted, t, tTable]
   )
 
   const table = useReactTable({
@@ -247,18 +242,23 @@ export function ProcessorsTable({ data }: ProcessorsTableProps) {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
+              table.getRowModel().rows.map((row) => {
+                const processor = row.original
+                return (
+                  <TableRow
+                    key={row.id}
+                    data-state={row.getIsSelected() && "selected"}
+                    onClick={() => router.push(`/proc/${processor.processor_id}`)}
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
-              ))
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
