@@ -74,7 +74,14 @@ export function useUploadDocument() {
       // 1. Validate file client-side
       const validation = validateDocumentFile(file)
       if (!validation.valid) {
-        throw new Error(validation.error)
+        // Construct error message from errorType and errorParams
+        const errorMessage =
+          validation.errorType === 'fileSize'
+            ? `File size exceeds maximum of ${validation.errorParams?.size}MB`
+            : validation.errorType === 'invalidType'
+              ? `Invalid file type. Allowed formats: ${validation.errorParams?.formats}`
+              : 'Invalid file'
+        throw new Error(errorMessage)
       }
 
       // 2. Get current user and organization from session
