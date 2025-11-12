@@ -371,7 +371,7 @@ export function BulkImportExportDialog({
                   <TableBody>
                     {validationResult.rows
                       .filter(r => r.valid)
-                      .map(row => {
+                      .map((row, index) => {
                         const op = row.operation!
                         const mode = importModes.get(op.name) || 'create'
                         const isNew = changeDetection.newOperations.some(
@@ -380,7 +380,7 @@ export function BulkImportExportDialog({
 
                         return (
                           <TableRow
-                            key={`${op.area}-${op.name}`}
+                            key={index}
                             className={
                               mode === 'create'
                                 ? 'bg-green-50 dark:bg-green-950/20'
