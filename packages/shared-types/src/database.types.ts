@@ -1524,53 +1524,30 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_user_processors:
-        | {
-            Args: never
-            Returns: {
-              created_at: string
-              created_by: string
-              creator_name: string
-              description: string
-              id: string
-              name: string
-              operation_count: number
-              organization_id: string
-              published_at: string
-              status: string
-              tags: string[]
-              updated_at: string
-              usage_description: string
-              visibility: string
-            }[]
-          }
-        | {
-            Args: {
-              p_include_archived?: boolean
-              p_limit?: number
-              p_offset?: number
-              p_search?: string
-            }
-            Returns: {
-              created_at: string
-              created_by: string
-              creator_name: string
-              description: string
-              id: string
-              is_owner: boolean
-              name: string
-              operation_count: number
-              published_at: string
-              status: Database["public"]["Enums"]["processor_status"]
-              tags: string[]
-              updated_at: string
-              usage_description: string
-              visibility: Database["public"]["Enums"]["processor_visibility"]
-            }[]
-          }
-      get_user_processors_count: {
-        Args: { p_include_archived?: boolean; p_search?: string }
-        Returns: number
+      get_user_processors: {
+        Args: {
+          p_include_archived?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          creator_name: string
+          description: string
+          id: string
+          is_owner: boolean
+          name: string
+          operation_count: number
+          published_at: string
+          status: Database["public"]["Enums"]["processor_status"]
+          tags: string[]
+          total_count: number
+          updated_at: string
+          usage_description: string
+          visibility: Database["public"]["Enums"]["processor_visibility"]
+        }[]
       }
       get_user_processors_debug:
         | {

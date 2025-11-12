@@ -26,6 +26,7 @@ export interface Processor {
   published_at: string | null
   operation_count: number
   is_owner: boolean
+  total_count: number // Total count for pagination (same in all rows)
 }
 
 /**
@@ -83,7 +84,7 @@ export function useUserProcessors(
 
       const offset = pageIndex * pageSize
 
-      // Fetch processors for current page
+      // Fetch processors for current page (now includes total_count in each row)
       const { data, error } = await supabase.rpc('get_user_processors', {
         p_include_archived: includeArchived,
         p_limit: pageSize,
@@ -101,29 +102,14 @@ export function useUserProcessors(
         throw new Error(error.message || 'Failed to fetch processors')
       }
 
-      // Fetch total count for pagination
-      const { data: totalCount, error: countError } = await supabase.rpc(
-        'get_user_processors_count',
-        {
-          p_include_archived: includeArchived,
-          p_search: search,
-        }
-      )
-
-      if (countError) {
-        logger.error('Error fetching processors count:', {
-          message: countError.message,
-          details: countError.details,
-        })
-        throw new Error(countError.message || 'Failed to fetch processors count')
-      }
-
-      const count = Number(totalCount) || 0
-      const pageCount = Math.ceil(count / pageSize)
+      // Extract total count from first row (same value in all rows via window function)
+      const processors = (data as Processor[]) || []
+      const totalCount = processors.length > 0 ? Number(processors[0].total_count) : 0
+      const pageCount = Math.ceil(totalCount / pageSize)
 
       return {
-        processors: data as Processor[],
-        totalCount: count,
+        processors,
+        totalCount,
         pageCount,
       }
     },
