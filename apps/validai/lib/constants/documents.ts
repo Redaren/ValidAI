@@ -14,39 +14,13 @@ export const DOCUMENT_MAX_SIZE_BYTES = DOCUMENT_MAX_SIZE_MB * 1024 * 1024
 /**
  * Allowed MIME types for document uploads
  * Maps MIME type to file extensions and human-readable names
+ *
+ * MVP: Only PDF files are supported
  */
 export const ALLOWED_DOCUMENT_TYPES = {
   'application/pdf': {
     extensions: ['.pdf'],
     name: 'PDF',
-  },
-  'application/msword': {
-    extensions: ['.doc'],
-    name: 'Word Document',
-  },
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': {
-    extensions: ['.docx'],
-    name: 'Word Document',
-  },
-  'text/plain': {
-    extensions: ['.txt'],
-    name: 'Text File',
-  },
-  'text/html': {
-    extensions: ['.html', '.htm'],
-    name: 'HTML',
-  },
-  'text/markdown': {
-    extensions: ['.md', '.markdown'],
-    name: 'Markdown',
-  },
-  'application/vnd.ms-excel': {
-    extensions: ['.xls'],
-    name: 'Excel Spreadsheet',
-  },
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': {
-    extensions: ['.xlsx'],
-    name: 'Excel Spreadsheet',
   },
 } as const
 
@@ -72,17 +46,30 @@ export const ALLOWED_EXTENSIONS = Array.from(
 ).join(',')
 
 /**
- * Validate if a file meets upload requirements
+ * Validation error types
  */
-export function validateDocumentFile(file: File): {
+export type ValidationErrorType = 'fileSize' | 'invalidType'
+
+/**
+ * Validation result with error key for translation
+ */
+export interface ValidationResult {
   valid: boolean
-  error?: string
-} {
+  errorType?: ValidationErrorType
+  errorParams?: Record<string, string | number>
+}
+
+/**
+ * Validate if a file meets upload requirements
+ * Returns error key for translation instead of hardcoded message
+ */
+export function validateDocumentFile(file: File): ValidationResult {
   // Check file size
   if (file.size > DOCUMENT_MAX_SIZE_BYTES) {
     return {
       valid: false,
-      error: `File size exceeds ${DOCUMENT_MAX_SIZE_MB} MB limit`,
+      errorType: 'fileSize',
+      errorParams: { size: DOCUMENT_MAX_SIZE_MB },
     }
   }
 
@@ -90,7 +77,8 @@ export function validateDocumentFile(file: File): {
   if (!ALLOWED_MIME_TYPES.includes(file.type)) {
     return {
       valid: false,
-      error: `File type not supported. Accepted formats: ${ALLOWED_FORMAT_NAMES}`,
+      errorType: 'invalidType',
+      errorParams: { formats: ALLOWED_FORMAT_NAMES },
     }
   }
 

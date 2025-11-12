@@ -330,6 +330,14 @@
     "creating": "Bearbetar med AI-leverantör...",
     "uploading": "Laddar upp till AI-leverantör...",
     "preparing": "Förbereder dina resultat...",
-    "complete": "Uppladdning slutförd"
+    "complete": "Uppladdning slutförd",
+    "dragAndDrop": "Dra och släpp ditt dokument här",
+    "dropToProcess": "Släpp för att börja bearbeta",
+    "clickToBrowse": "eller klicka för att bläddra",
+    "fileTypes": "{types} (max {size} MB)",
+    "errors": {
+      "fileSize": "Filstorleken överskrider {size} MB-gränsen",
+      "invalidType": "Filtypen stöds inte. Accepterade format: {formats}"
+    }
   }
 }

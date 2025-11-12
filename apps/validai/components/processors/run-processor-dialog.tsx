@@ -182,7 +182,11 @@ export function RunProcessorDialog({
     setUploadStatus({ progress: 10, messageKey: 'validating' })
     const validation = validateDocumentFile(file)
     if (!validation.valid) {
-      setUploadError(validation.error!)
+      // Translate error message using error type and params
+      const errorMessage = validation.errorType
+        ? tUpload(`errors.${validation.errorType}`, validation.errorParams)
+        : 'Unknown validation error'
+      setUploadError(errorMessage)
       setUploadStatus({ progress: 0, messageKey: '' })
       setShowProgress(false)
       return
@@ -301,7 +305,7 @@ export function RunProcessorDialog({
             <DialogTitle>{processorName || 'Run'}</DialogTitle>
           </div>
           <DialogDescription>
-            Drag and drop your document here
+            {tUpload('dragAndDrop')}
           </DialogDescription>
         </DialogHeader>
 

@@ -330,6 +330,14 @@
     "creating": "Processing with AI provider...",
     "uploading": "Uploading to AI provider...",
     "preparing": "Preparing your results...",
-    "complete": "Upload complete"
+    "complete": "Upload complete",
+    "dragAndDrop": "Drag and drop your document here",
+    "dropToProcess": "Drop to start processing",
+    "clickToBrowse": "or click to browse",
+    "fileTypes": "{types} (max {size} MB)",
+    "errors": {
+      "fileSize": "File size exceeds {size} MB limit",
+      "invalidType": "File type not supported. Accepted formats: {formats}"
+    }
   }
 }

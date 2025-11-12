@@ -10,6 +10,7 @@ import {
   DOCUMENT_MAX_SIZE_MB,
   validateDocumentFile,
 } from "@/lib/constants/documents"
+import { useTranslations } from "next-intl"
 
 interface DropZoneProps {
   onFileSelect: (file: File) => void | Promise<void>
@@ -40,6 +41,7 @@ export function DropZone({
   disabled = false,
   className,
 }: DropZoneProps) {
+  const tUpload = useTranslations('upload')
   const [isDragOver, setIsDragOver] = useState(false)
 
   const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
@@ -149,15 +151,15 @@ export function DropZone({
             <div className="space-y-1">
               <p className="text-sm font-medium">
                 {isDragOver
-                  ? "Drop to start processing"
-                  : "Drag and drop your document here"}
+                  ? tUpload('dropToProcess')
+                  : tUpload('dragAndDrop')}
               </p>
               <p className="text-xs text-muted-foreground">
-                {ALLOWED_FORMAT_NAMES} (max {DOCUMENT_MAX_SIZE_MB} MB)
+                {tUpload('fileTypes', { types: ALLOWED_FORMAT_NAMES, size: DOCUMENT_MAX_SIZE_MB })}
               </p>
             </div>
 
-            <p className="text-xs text-muted-foreground">or click to browse</p>
+            <p className="text-xs text-muted-foreground">{tUpload('clickToBrowse')}</p>
           </div>
         )}
       </div>
