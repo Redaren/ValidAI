@@ -37,20 +37,146 @@ import { RunProcessorDialog } from "./run-processor-dialog"
 import { Processor } from "@/app/queries/processors/use-processors"
 import { useTranslations } from 'next-intl'
 
+/**
+ * Props for the ProcessorsTable component
+ */
 interface ProcessorsTableProps {
+  /**
+   * Array of processor objects to display
+   * - In client mode: Contains ALL processors (up to 1000)
+   * - In server mode: Contains current page of processors (typically 10)
+   */
   data: Processor[]
+
+  /**
+   * Total number of processors across all pages
+   * Used for pagination controls and empty state logic
+   */
   totalCount: number
+
+  /**
+   * Total number of pages available
+   * - In client mode: Always 1 (all data loaded)
+   * - In server mode: Calculated as Math.ceil(totalCount / pageSize)
+   */
   pageCount: number
+
+  /**
+   * Current page index (0-based)
+   * - In client mode: Managed by TanStack Table internally
+   * - In server mode: Controlled by parent component
+   */
   pageIndex: number
+
+  /**
+   * Callback to change the current page
+   * - In client mode: Updates TanStack Table state (no API call)
+   * - In server mode: Triggers new API request from parent
+   */
   onPageChange: (page: number) => void
+
+  /**
+   * Current search input value
+   * - In client mode: Ignored (uses internal globalFilter state)
+   * - In server mode: Displayed in input and sent to API
+   */
   searchValue: string
+
+  /**
+   * Callback when search input changes
+   * - In client mode: Not called (uses internal state)
+   * - In server mode: Updates parent state → debounced API call
+   */
   onSearchChange: (search: string) => void
+
+  /**
+   * Whether data is currently loading from API
+   * Shows loading spinner/overlay
+   */
   isLoading: boolean
+
+  /**
+   * Whether the table has no data to display
+   * Shows appropriate empty state (with or without "Create" button)
+   */
   isEmpty: boolean
+
+  /**
+   * Callback when user clicks "Create" button in empty state
+   */
   onCreateClick: () => void
-  mode: 'client' | 'server' // Client-side or server-side filtering/pagination
+
+  /**
+   * Operating mode that determines filtering/pagination behavior
+   *
+   * **Client Mode (≤50 processors):**
+   * - All data loaded initially (single API call)
+   * - Instant search: TanStack Table filters in-memory (0ms, 0 API calls)
+   * - Instant pagination: TanStack Table paginates in-memory (0 API calls)
+   * - Best UX for small datasets
+   *
+   * **Server Mode (>50 processors):**
+   * - Paginated data loading (10 processors per page)
+   * - Debounced search: 300ms delay, then API call with search param
+   * - Server-side pagination: API call per page change
+   * - Efficient for large datasets
+   */
+  mode: 'client' | 'server'
 }
 
+/**
+ * Hybrid client/server-side table for displaying and filtering processors
+ *
+ * **Architecture:**
+ * This component supports two operating modes that are determined by the parent
+ * based on dataset size:
+ *
+ * 1. **Client Mode (≤50 total processors)**
+ *    - Parent loads ALL processors in a single API call (up to 1000 limit)
+ *    - This component uses TanStack Table's built-in filtering and pagination
+ *    - Search is instant (filters in-memory with no API calls)
+ *    - Pagination is instant (paginates in-memory with no API calls)
+ *    - Provides native desktop-app-like UX
+ *
+ * 2. **Server Mode (>50 total processors)**
+ *    - Parent loads paginated data (10 processors per page)
+ *    - This component triggers API calls via callbacks
+ *    - Search is debounced (300ms delay, then API call)
+ *    - Pagination triggers API calls
+ *    - Efficient for large datasets
+ *
+ * **Mode Detection:**
+ * The parent component determines mode after fetching initial data:
+ * ```typescript
+ * const totalCount = data?.totalCount ?? 0
+ * const mode = totalCount > 0 && totalCount <= 50 ? 'client' : 'server'
+ * ```
+ *
+ * **Performance:**
+ * - Client mode: 1 API call on mount, then 0 API calls forever
+ * - Server mode: 1 API call on mount, then 1 per search/page change
+ *
+ * **Why Hybrid?**
+ * Most users have <50 processors and benefit from instant search.
+ * Users with >50 processors need server-side pagination to avoid loading
+ * thousands of records into the browser.
+ *
+ * @example
+ * ```tsx
+ * // Parent determines mode and fetches appropriate data
+ * const { data } = useUserProcessors(false, {
+ *   loadAll: shouldUseClientMode,  // Load all if ≤50
+ *   search: shouldUseClientMode ? '' : debouncedSearch,
+ *   pageIndex: shouldUseClientMode ? 0 : pageIndex,
+ * })
+ *
+ * <ProcessorsTable
+ *   data={data?.processors ?? []}
+ *   mode={shouldUseClientMode ? 'client' : 'server'}
+ *   // ... other props
+ * />
+ * ```
+ */
 export function ProcessorsTable({
   data,
   totalCount,
@@ -81,9 +207,29 @@ export function ProcessorsTable({
     setMounted(true)
   }, [])
 
+  /**
+   * Determines which operating mode we're in
+   * This flag controls all conditional behavior throughout the component
+   */
   const isClientMode = mode === 'client'
 
-  // Mode-aware search handler
+  /**
+   * Mode-aware search input handler
+   *
+   * **Client Mode:**
+   * - Updates internal `globalFilter` state
+   * - TanStack Table immediately filters rows in-memory
+   * - No parent state update, no API call
+   * - Instant feedback (0ms delay)
+   *
+   * **Server Mode:**
+   * - Calls parent's `onSearchChange` callback
+   * - Parent updates search state
+   * - After 300ms debounce, parent triggers API call
+   * - Resets to page 0 (first page of search results)
+   *
+   * @param event - React change event from the search input
+   */
   const handleSearchChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const value = event.target.value
@@ -244,6 +390,28 @@ export function ProcessorsTable({
     [router, mounted, t, tTable]
   )
 
+  /**
+   * TanStack Table instance with mode-specific configuration
+   *
+   * **Client Mode Configuration:**
+   * - `getFilteredRowModel()`: Enables in-memory filtering
+   * - `getPaginationRowModel()`: Enables in-memory pagination
+   * - `state.globalFilter`: Tracks search input value internally
+   * - `onGlobalFilterChange`: Updates filter when user types
+   * - `globalFilterFn`: Custom function that searches name AND description fields
+   * - `initialState.pagination.pageSize`: Fixed at 10 rows per page
+   *
+   * **Server Mode Configuration:**
+   * - `manualPagination: true`: Pagination controlled by parent (via API)
+   * - `manualFiltering: true`: Filtering controlled by parent (via API)
+   * - `pageCount`: Total pages from parent (based on totalCount)
+   * - `state.pagination`: Current page from parent props
+   *
+   * **Why Conditional Configuration:**
+   * - Client mode needs TanStack Table's filtering/pagination models
+   * - Server mode needs manual control to trigger API calls via parent
+   * - Using spread operator (...) to conditionally add config properties
+   */
   const table = useReactTable<Processor>({
     data,
     columns,
@@ -253,7 +421,9 @@ export function ProcessorsTable({
 
     // Conditional configuration based on mode
     ...(isClientMode ? {
-      // Client mode: TanStack Table handles filtering and pagination
+      // ========================================
+      // CLIENT MODE: TanStack Table manages everything
+      // ========================================
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
       state: {
@@ -261,8 +431,12 @@ export function ProcessorsTable({
         globalFilter,
       },
       onGlobalFilterChange: setGlobalFilter,
+      /**
+       * Custom global filter function for client-side search
+       * Searches across processor name and description fields
+       * Case-insensitive substring matching
+       */
       globalFilterFn: (row, columnId, filterValue) => {
-        // Custom global filter: Search across name and description
         const search = String(filterValue).toLowerCase()
         const processor = row.original as Processor
         const name = String(processor.name || '').toLowerCase()
@@ -275,7 +449,9 @@ export function ProcessorsTable({
         },
       },
     } : {
-      // Server mode: Manual pagination and filtering (current behavior)
+      // ========================================
+      // SERVER MODE: Parent controls pagination/filtering
+      // ========================================
       manualPagination: true,
       manualFiltering: true,
       pageCount: pageCount,
@@ -289,7 +465,15 @@ export function ProcessorsTable({
     }),
   })
 
-  // Determine search input value based on mode
+  /**
+   * Determines what value to display in the search input field
+   *
+   * - Client mode: Uses internal `globalFilter` state (managed by TanStack Table)
+   * - Server mode: Uses `searchValue` prop (managed by parent component)
+   *
+   * This ensures the input displays the correct value regardless of which
+   * state system is controlling it.
+   */
   const searchInputValue = isClientMode ? globalFilter : searchValue
 
   // Show initial loading state (only on first load)
