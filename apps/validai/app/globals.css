@@ -153,6 +153,28 @@
   --sidebar-ring: hsl(217.2 91.2% 59.8%);
 }
 
+.claude-light {
+  --sidebar: hsl(48 33% 97%); /* Ivory Light - matches theme background */
+  --sidebar-foreground: hsl(60 4% 40%); /* Muted gray - matches breadcrumb */
+  --sidebar-primary: hsl(17 60% 60%); /* Clay */
+  --sidebar-primary-foreground: hsl(48 33% 97%); /* Ivory Light */
+  --sidebar-accent: hsl(45 23% 93%); /* Warm beige hover */
+  --sidebar-accent-foreground: hsl(60 4% 8%); /* Slate Dark */
+  --sidebar-border: hsl(48 15% 85%); /* Warm border */
+  --sidebar-ring: hsl(17 60% 60%); /* Clay focus ring */
+}
+
+.claude-dark {
+  --sidebar: hsl(60 4% 12%); /* Darker slate */
+  --sidebar-foreground: hsl(60 4% 60%); /* Muted light gray */
+  --sidebar-primary: hsl(17 60% 65%); /* Clay - lighter for dark bg */
+  --sidebar-primary-foreground: hsl(60 4% 8%); /* Dark text */
+  --sidebar-accent: hsl(60 4% 15%); /* Darker hover state */
+  --sidebar-accent-foreground: hsl(48 33% 97%); /* Light text */
+  --sidebar-border: hsl(60 4% 20%); /* Dark border */
+  --sidebar-ring: hsl(17 60% 65%); /* Clay focus ring */
+}
+
 @theme inline {
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
