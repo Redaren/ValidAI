@@ -939,6 +939,7 @@ serve(async (req) => {
           .from('validai_llm_global_settings')
           .select('execution_config')
           .eq('provider', provider)
+          .eq('model_name', llmConfig.model)
           .eq('is_active', true)
           .limit(1)
           .single()
