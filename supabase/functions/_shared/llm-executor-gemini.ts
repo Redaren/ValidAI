@@ -581,13 +581,41 @@ export async function executeLLMOperationGemini(
 
     const executionTime = Date.now() - startTime
 
-    // Extract text from response (try convenience property first, fallback to candidates structure)
-    const rawText = response.text ?? response.candidates?.[0]?.content?.parts?.[0]?.text
+    // Extract text from response
+    // When includeThoughts is enabled, Gemini returns multiple parts:
+    // - Parts with thought=true contain thinking/reasoning (markdown)
+    // - Parts with thought=false contain the actual JSON structured output
+    // We must concatenate only the non-thought parts to get the complete JSON response
+    let rawText: string | undefined
+
+    if (response.text) {
+      // Convenience property exists (single-part response, no thoughts)
+      rawText = response.text
+      console.log('[Gemini] Using response.text (single-part response)')
+    } else if (response.candidates?.[0]?.content?.parts) {
+      // Multi-part response: filter for answer parts (non-thought)
+      const parts = response.candidates[0].content.parts
+      const answerParts = parts
+        .filter((part: any) => part.text && !part.thought)
+        .map((part: any) => part.text)
+
+      if (answerParts.length > 0) {
+        rawText = answerParts.join('')
+        console.log(`[Gemini] Extracted ${answerParts.length} answer part(s) from multi-part response`)
+      }
+    }
 
     if (!rawText) {
       console.error('[Gemini] ❌ Response has no text content!')
       console.error('[Gemini] Response keys:', Object.keys(response))
       console.error('[Gemini] Response.candidates:', response.candidates ? 'exists' : 'missing')
+      if (response.candidates?.[0]?.content?.parts) {
+        console.error('[Gemini] Parts structure:', response.candidates[0].content.parts.map((p: any) => ({
+          hasText: !!p.text,
+          thought: p.thought,
+          textLength: p.text?.length
+        })))
+      }
       console.error('[Gemini] Full response structure:', JSON.stringify(response, null, 2))
       throw new Error(`Gemini response missing text content for operation "${operation.name}" (${operation.operation_type})`)
     }
@@ -675,7 +703,11 @@ export async function executeLLMOperationGemini(
     return {
       response: rawText,
       structured_output: validated.success ? validated.data : structuredOutput,
-      thinking_blocks: thinkingSummary ? [{ content: thinkingSummary }] : null,
+      thinking_blocks: thinkingSummary ? [{
+        type: 'thinking',
+        thinking: thinkingSummary,
+        text: thinkingSummary
+      }] : null,
       model: modelToUse,
       tokens: {
         input: usage.promptTokenCount || 0,

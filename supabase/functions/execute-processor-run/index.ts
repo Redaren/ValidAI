@@ -924,6 +924,10 @@ serve(async (req) => {
         top_k: llmConfig.settings?.default_top_k,
         supports_top_p: llmConfig.settings?.supports_top_p,
 
+        // Thinking configuration for Gemini (and future providers)
+        thinking_budget: llmConfig.settings?.thinking_budget,
+        include_thoughts: llmConfig.settings?.include_thoughts ?? false,
+
         // Override with processor-specific settings if present
         ...(snapshot.processor.configuration?.settings_override || {})
       }
