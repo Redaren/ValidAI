@@ -257,6 +257,8 @@ export function ProcessorsTable({
 
   // Show empty state
   if (isEmpty) {
+    const hasActiveSearch = searchValue.trim().length > 0
+
     return (
       <div className="space-y-4">
         <div className="flex items-center py-4">
@@ -267,19 +269,30 @@ export function ProcessorsTable({
             className="max-w-sm"
           />
         </div>
-        <div className="flex flex-col items-center justify-center py-12 text-center rounded-md border">
-          <div className="rounded-full bg-muted p-6 mb-4">
-            <Plus className="h-8 w-8 text-muted-foreground" />
+        {hasActiveSearch ? (
+          // No search results - don't show create button
+          <div className="flex flex-col items-center justify-center py-12 text-center rounded-md border">
+            <h2 className="text-xl font-semibold mb-2">{t('noResults.title')}</h2>
+            <p className="text-muted-foreground max-w-md">
+              {t('noResults.description')}
+            </p>
           </div>
-          <h2 className="text-xl font-semibold mb-2">{t('empty.title')}</h2>
-          <p className="text-muted-foreground max-w-md">
-            {t('empty.description')}
-          </p>
-          <Button className="mt-4" onClick={onCreateClick}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('empty.createFirst')}
-          </Button>
-        </div>
+        ) : (
+          // Truly empty - show create button
+          <div className="flex flex-col items-center justify-center py-12 text-center rounded-md border">
+            <div className="rounded-full bg-muted p-6 mb-4">
+              <Plus className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">{t('empty.title')}</h2>
+            <p className="text-muted-foreground max-w-md">
+              {t('empty.description')}
+            </p>
+            <Button className="mt-4" onClick={onCreateClick}>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('empty.createFirst')}
+            </Button>
+          </div>
+        )}
       </div>
     )
   }

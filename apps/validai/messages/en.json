@@ -113,6 +113,10 @@
       "description": "Get started by creating your first template to analyze contracts, invoices, or any other documents.",
       "createFirst": "Create your first template"
     },
+    "noResults": {
+      "title": "No templates found",
+      "description": "No templates match your search. Try adjusting your search terms."
+    },
     "detail": {
       "operations": "Checks",
       "settings": "Settings",

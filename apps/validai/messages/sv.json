@@ -113,6 +113,10 @@
       "description": "Kom igång genom att skapa din första mall för att analysera kontrakt, fakturor eller andra dokument.",
       "createFirst": "Skapa din första mall"
     },
+    "noResults": {
+      "title": "Inga mallar hittades",
+      "description": "Inga mallar matchar din sökning. Försök justera dina söktermer."
+    },
     "detail": {
       "operations": "Tester",
       "settings": "Inställningar",
