@@ -9,6 +9,8 @@ import {
   flexRender,
   getCoreRowModel,
   getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table"
 import { Lock, Users, History, MoreHorizontal, Play, ChevronLeft, ChevronRight } from "lucide-react"
@@ -46,6 +48,7 @@ interface ProcessorsTableProps {
   isLoading: boolean
   isEmpty: boolean
   onCreateClick: () => void
+  mode: 'client' | 'server' // Client-side or server-side filtering/pagination
 }
 
 export function ProcessorsTable({
@@ -59,6 +62,7 @@ export function ProcessorsTable({
   isLoading,
   isEmpty,
   onCreateClick,
+  mode,
 }: ProcessorsTableProps) {
   const router = useRouter()
   const t = useTranslations('processors')
@@ -70,17 +74,37 @@ export function ProcessorsTable({
     { id: "name", desc: false }
   ])
 
+  // Client-side filter state (only used in client mode)
+  const [globalFilter, setGlobalFilter] = React.useState('')
+
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Stabilize search handler to prevent unnecessary re-renders
+  // Sync server search to client filter when switching to client mode
+  React.useEffect(() => {
+    if (mode === 'client' && searchValue) {
+      setGlobalFilter(searchValue)
+    }
+  }, [mode, searchValue])
+
+  const isClientMode = mode === 'client'
+
+  // Mode-aware search handler
   const handleSearchChange = React.useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      onSearchChange(event.target.value)
-      onPageChange(0) // Reset to first page on search
+      const value = event.target.value
+
+      if (isClientMode) {
+        // Client mode: Update table's global filter (instant, no API call)
+        setGlobalFilter(value)
+      } else {
+        // Server mode: Update parent state (triggers API call after debounce)
+        onSearchChange(value)
+        onPageChange(0) // Reset to first page on search
+      }
     },
-    [onSearchChange, onPageChange]
+    [isClientMode, onSearchChange, onPageChange]
   )
 
   const columns = React.useMemo<ColumnDef<Processor>[]>(
@@ -228,12 +252,40 @@ export function ProcessorsTable({
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
-    state: {
-      sorting,
-    },
-    manualPagination: true, // Server-side pagination
-    pageCount: pageCount,   // Total pages from server
+
+    // Conditional configuration based on mode
+    ...(isClientMode ? {
+      // Client mode: TanStack Table handles filtering and pagination
+      getFilteredRowModel: getFilteredRowModel(),
+      getPaginationRowModel: getPaginationRowModel(),
+      state: {
+        sorting,
+        globalFilter,
+      },
+      onGlobalFilterChange: setGlobalFilter,
+      globalFilterFn: 'includesString', // Search across all string columns
+      initialState: {
+        pagination: {
+          pageSize: 10,
+        },
+      },
+    } : {
+      // Server mode: Manual pagination and filtering (current behavior)
+      manualPagination: true,
+      manualFiltering: true,
+      pageCount: pageCount,
+      state: {
+        sorting,
+        pagination: {
+          pageIndex,
+          pageSize: 10,
+        },
+      },
+    }),
   })
+
+  // Determine search input value based on mode
+  const searchInputValue = isClientMode ? globalFilter : searchValue
 
   // Show initial loading state (only on first load)
   if (isLoading && data.length === 0) {
@@ -242,7 +294,7 @@ export function ProcessorsTable({
         <div className="flex items-center py-4">
           <Input
             placeholder={t('filterPlaceholder')}
-            value={searchValue}
+            value={searchInputValue}
             onChange={handleSearchChange}
             className="max-w-sm"
             disabled
@@ -257,14 +309,14 @@ export function ProcessorsTable({
 
   // Show empty state
   if (isEmpty) {
-    const hasActiveSearch = searchValue.trim().length > 0
+    const hasActiveSearch = searchInputValue.trim().length > 0
 
     return (
       <div className="space-y-4">
         <div className="flex items-center py-4">
           <Input
             placeholder={t('filterPlaceholder')}
-            value={searchValue}
+            value={searchInputValue}
             onChange={handleSearchChange}
             className="max-w-sm"
           />
@@ -302,14 +354,14 @@ export function ProcessorsTable({
       <div className="flex items-center py-4">
         <Input
           placeholder={t('filterPlaceholder')}
-          value={searchValue}
+          value={searchInputValue}
           onChange={handleSearchChange}
           className="max-w-sm"
         />
       </div>
       <div className="rounded-md border relative">
-        {/* Show loading overlay during refetch (when data already exists) */}
-        {isLoading && data.length > 0 && (
+        {/* Show loading overlay during refetch (only in server mode when data already exists) */}
+        {!isClientMode && isLoading && data.length > 0 && (
           <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10 rounded-md">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
           </div>
@@ -363,13 +415,17 @@ export function ProcessorsTable({
         </Table>
       </div>
 
-      {/* Pagination Controls - Only show if more than 1 page (server-side) */}
-      {pageCount > 1 && (
+      {/* Pagination Controls - Mode-aware */}
+      {(isClientMode ? table.getPageCount() > 1 : pageCount > 1) && (
         <div className="flex items-center justify-between px-2">
           <div className="text-sm text-muted-foreground">
             {tPagination('showingInfo', {
-              from: pageIndex * 10 + 1,
-              to: Math.min((pageIndex + 1) * 10, totalCount),
+              from: isClientMode
+                ? table.getState().pagination.pageIndex * 10 + 1
+                : pageIndex * 10 + 1,
+              to: isClientMode
+                ? Math.min((table.getState().pagination.pageIndex + 1) * 10, totalCount)
+                : Math.min((pageIndex + 1) * 10, totalCount),
               total: totalCount,
             })}
           </div>
@@ -378,8 +434,8 @@ export function ProcessorsTable({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(pageIndex - 1)}
-              disabled={pageIndex === 0}
+              onClick={() => isClientMode ? table.previousPage() : onPageChange(pageIndex - 1)}
+              disabled={isClientMode ? !table.getCanPreviousPage() : pageIndex === 0}
             >
               <ChevronLeft className="h-4 w-4" />
               {tPagination('previous')}
@@ -387,16 +443,18 @@ export function ProcessorsTable({
 
             <div className="text-sm">
               {tPagination('pageInfo', {
-                current: pageIndex + 1,
-                total: pageCount,
+                current: isClientMode
+                  ? table.getState().pagination.pageIndex + 1
+                  : pageIndex + 1,
+                total: isClientMode ? table.getPageCount() : pageCount,
               })}
             </div>
 
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onPageChange(pageIndex + 1)}
-              disabled={pageIndex >= pageCount - 1}
+              onClick={() => isClientMode ? table.nextPage() : onPageChange(pageIndex + 1)}
+              disabled={isClientMode ? !table.getCanNextPage() : pageIndex >= pageCount - 1}
             >
               {tPagination('next')}
               <ChevronRight className="h-4 w-4" />

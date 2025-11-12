@@ -9,6 +9,9 @@ import { useUserProcessors } from "@/app/queries/processors/use-processors"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useTranslations } from 'next-intl'
 
+// Threshold for switching between client-side and server-side filtering
+const CLIENT_MODE_THRESHOLD = 50
+
 export default function ProcessorsPage() {
   const t = useTranslations('processors')
   const tCommon = useTranslations('common')
@@ -16,25 +19,48 @@ export default function ProcessorsPage() {
   const [pageIndex, setPageIndex] = useState(0)
   const [search, setSearch] = useState('')
 
-  // Debounce search to reduce API calls (300ms delay)
+  // Debounce search to reduce API calls (only used in server mode)
   const debouncedSearch = useDebounce(search, 300)
 
+  // First query: Determine mode by checking total count
   const { data, isLoading, error } = useUserProcessors(false, {
     pageSize: 10,
-    pageIndex,
-    search: debouncedSearch,
+    pageIndex: 0,
+    search: '',
   })
 
-  if (error) {
+  const totalCount = data?.totalCount ?? 0
+  const shouldUseClientMode = totalCount > 0 && totalCount <= CLIENT_MODE_THRESHOLD
+
+  // Second query: Fetch data based on mode
+  const finalQuery = useUserProcessors(false, {
+    pageSize: 10,
+    pageIndex: shouldUseClientMode ? 0 : pageIndex,
+    search: shouldUseClientMode ? undefined : debouncedSearch,
+    loadAll: shouldUseClientMode,
+  })
+
+  const mode = shouldUseClientMode ? 'client' : 'server' as const
+
+  // Handle errors from either query
+  if (error || finalQuery.error) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <p className="text-red-600">{t('failedList')}</p>
         <p className="text-sm text-muted-foreground mt-2">
-          {error instanceof Error ? error.message : t('unknownError')}
+          {error instanceof Error
+            ? error.message
+            : finalQuery.error instanceof Error
+            ? finalQuery.error.message
+            : t('unknownError')}
         </p>
       </div>
     )
   }
+
+  // Use finalQuery for rendering (contains the actual data for current mode)
+  const displayData = shouldUseClientMode ? finalQuery.data : finalQuery.data
+  const displayLoading = isLoading || finalQuery.isLoading
 
   return (
     <div className="space-y-6">
@@ -52,16 +78,17 @@ export default function ProcessorsPage() {
       </div>
 
       <ProcessorsTable
-        data={data?.processors ?? []}
-        totalCount={data?.totalCount ?? 0}
-        pageCount={data?.pageCount ?? 0}
+        data={displayData?.processors ?? []}
+        totalCount={displayData?.totalCount ?? 0}
+        pageCount={displayData?.pageCount ?? 0}
         pageIndex={pageIndex}
         onPageChange={setPageIndex}
         searchValue={search}
         onSearchChange={setSearch}
-        isLoading={isLoading}
-        isEmpty={!isLoading && (!data?.processors || data.processors.length === 0)}
+        isLoading={displayLoading}
+        isEmpty={!displayLoading && (!displayData?.processors || displayData.processors.length === 0)}
         onCreateClick={() => setIsCreateSheetOpen(true)}
+        mode={mode}
       />
 
       <CreateProcessorSheet

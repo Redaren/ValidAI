@@ -30,22 +30,29 @@ export interface Processor {
 }
 
 /**
- * Hook to fetch user's processors with server-side pagination and search
+ * Hook to fetch user's processors with hybrid client/server-side pagination and search
  *
  * @param includeArchived - Whether to include archived processors
  * @param options - Pagination and search options
+ * @param options.loadAll - Load all data for client-side filtering (for small datasets)
  * @returns Query result with processors, total count, and page count
  *
  * @example
  * ```tsx
+ * // Server-side mode (large datasets)
  * const { data } = useUserProcessors(false, {
  *   pageSize: 10,
  *   pageIndex: 0,
  *   search: 'contract'
  * })
  *
+ * // Client-side mode (small datasets)
+ * const { data } = useUserProcessors(false, {
+ *   loadAll: true  // Loads all data, enables client-side filtering
+ * })
+ *
  * // Access data
- * data?.processors // Array of processors for current page
+ * data?.processors // Array of processors (page or all data)
  * data?.totalCount  // Total matching processors
  * data?.pageCount   // Total number of pages
  * ```
@@ -56,6 +63,7 @@ export function useUserProcessors(
     pageSize?: number
     pageIndex?: number
     search?: string
+    loadAll?: boolean
   }
 ) {
   const supabase = createBrowserClient()
@@ -64,6 +72,7 @@ export function useUserProcessors(
   const pageSize = options?.pageSize ?? 10
   const pageIndex = options?.pageIndex ?? 0
   const search = options?.search
+  const loadAll = options?.loadAll ?? false
 
   useEffect(() => {
     // Check if user is authenticated
@@ -73,7 +82,10 @@ export function useUserProcessors(
   }, [supabase])
 
   return useQuery({
-    queryKey: ['user-processors', includeArchived, pageSize, pageIndex, search],
+    // Different query keys for loadAll vs paginated modes to prevent cache conflicts
+    queryKey: loadAll
+      ? ['user-processors', includeArchived, 'all']
+      : ['user-processors', includeArchived, pageSize, pageIndex, search],
     queryFn: async () => {
       // First check if we have a valid session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -82,35 +94,64 @@ export function useUserProcessors(
         throw new Error('Not authenticated')
       }
 
-      const offset = pageIndex * pageSize
-
-      // Fetch processors for current page (now includes total_count in each row)
-      const { data, error } = await supabase.rpc('get_user_processors', {
-        p_include_archived: includeArchived,
-        p_limit: pageSize,
-        p_offset: offset,
-        p_search: search,
-      })
-
-      if (error) {
-        logger.error('Error fetching processors:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
+      if (loadAll) {
+        // Client-side mode: Load ALL data (up to reasonable limit)
+        const { data, error } = await supabase.rpc('get_user_processors', {
+          p_include_archived: includeArchived,
+          p_limit: 1000, // Large limit for client-side filtering
+          p_offset: 0,
+          p_search: undefined, // No server-side search in loadAll mode
         })
-        throw new Error(error.message || 'Failed to fetch processors')
-      }
 
-      // Extract total count from first row (same value in all rows via window function)
-      const processors = (data as Processor[]) || []
-      const totalCount = processors.length > 0 ? Number(processors[0].total_count) : 0
-      const pageCount = Math.ceil(totalCount / pageSize)
+        if (error) {
+          logger.error('Error fetching all processors:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          })
+          throw new Error(error.message || 'Failed to fetch processors')
+        }
 
-      return {
-        processors,
-        totalCount,
-        pageCount,
+        const processors = (data as Processor[]) || []
+        const totalCount = processors.length > 0 ? Number(processors[0].total_count) : 0
+
+        return {
+          processors,
+          totalCount,
+          pageCount: 1, // Single page contains all data
+        }
+      } else {
+        // Server-side mode: Load paginated data (current behavior)
+        const offset = pageIndex * pageSize
+
+        const { data, error } = await supabase.rpc('get_user_processors', {
+          p_include_archived: includeArchived,
+          p_limit: pageSize,
+          p_offset: offset,
+          p_search: search,
+        })
+
+        if (error) {
+          logger.error('Error fetching processors:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          })
+          throw new Error(error.message || 'Failed to fetch processors')
+        }
+
+        // Extract total count from first row (same value in all rows via window function)
+        const processors = (data as Processor[]) || []
+        const totalCount = processors.length > 0 ? Number(processors[0].total_count) : 0
+        const pageCount = Math.ceil(totalCount / pageSize)
+
+        return {
+          processors,
+          totalCount,
+          pageCount,
+        }
       }
     },
     enabled: isAuthenticated, // Only run query when authenticated
