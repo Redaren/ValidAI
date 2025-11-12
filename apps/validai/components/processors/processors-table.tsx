@@ -81,13 +81,6 @@ export function ProcessorsTable({
     setMounted(true)
   }, [])
 
-  // Sync server search to client filter when switching to client mode
-  React.useEffect(() => {
-    if (mode === 'client' && searchValue) {
-      setGlobalFilter(searchValue)
-    }
-  }, [mode, searchValue])
-
   const isClientMode = mode === 'client'
 
   // Mode-aware search handler
@@ -112,6 +105,7 @@ export function ProcessorsTable({
       {
         accessorKey: "name",
         header: () => tTable('name'),
+        enableGlobalFilter: true,
         cell: ({ row }) => {
           const processor = row.original
           return (
@@ -127,6 +121,7 @@ export function ProcessorsTable({
       {
         accessorKey: "status",
         header: () => tTable('status'),
+        enableGlobalFilter: false,
         cell: ({ row }) => {
           return <ProcessorStatusBadge status={row.getValue("status")} />
         },
@@ -134,6 +129,7 @@ export function ProcessorsTable({
       {
         accessorKey: "description",
         header: () => tTable('description'),
+        enableGlobalFilter: true,
         cell: ({ row }) => {
           const description = row.getValue("description") as string | null
           if (!description) return <span className="text-muted-foreground">No description</span>
@@ -152,6 +148,7 @@ export function ProcessorsTable({
       {
         accessorKey: "visibility",
         header: () => tTable('visibility'),
+        enableGlobalFilter: false,
         cell: ({ row }) => {
           const visibility = row.getValue("visibility") as string
           const Icon = visibility === "personal" ? Lock : Users
@@ -167,6 +164,7 @@ export function ProcessorsTable({
       },
       {
         id: "actions",
+        enableGlobalFilter: false,
         cell: ({ row }) => {
           const processor = row.original
 
@@ -246,7 +244,7 @@ export function ProcessorsTable({
     [router, mounted, t, tTable]
   )
 
-  const table = useReactTable({
+  const table = useReactTable<Processor>({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
@@ -263,7 +261,14 @@ export function ProcessorsTable({
         globalFilter,
       },
       onGlobalFilterChange: setGlobalFilter,
-      globalFilterFn: 'includesString', // Search across all string columns
+      globalFilterFn: (row, columnId, filterValue) => {
+        // Custom global filter: Search across name and description
+        const search = String(filterValue).toLowerCase()
+        const processor = row.original as Processor
+        const name = String(processor.name || '').toLowerCase()
+        const description = String(processor.description || '').toLowerCase()
+        return name.includes(search) || description.includes(search)
+      },
       initialState: {
         pagination: {
           pageSize: 10,
