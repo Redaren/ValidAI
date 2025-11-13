@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import tailwindAnimate from "tailwindcss-animate";
+import typography from "@tailwindcss/typography";
 
 export default {
   darkMode: ["class"],
@@ -62,7 +63,46 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            '--tw-prose-body': 'hsl(var(--foreground))',
+            '--tw-prose-headings': 'hsl(var(--foreground))',
+            '--tw-prose-links': 'hsl(var(--primary))',
+            '--tw-prose-bold': 'hsl(var(--foreground))',
+            '--tw-prose-th-borders': 'hsl(var(--border))',
+            '--tw-prose-td-borders': 'hsl(var(--border))',
+            maxWidth: 'none',
+            table: {
+              fontSize: '0.875rem',
+              borderCollapse: 'collapse',
+              width: '100%',
+            },
+            thead: {
+              backgroundColor: 'hsl(var(--muted))',
+            },
+            'thead th': {
+              border: '1px solid hsl(var(--border))',
+              padding: '0.5rem 1rem',
+              textAlign: 'left',
+              fontWeight: '600',
+              color: 'hsl(var(--foreground))',
+            },
+            'tbody td': {
+              border: '1px solid hsl(var(--border))',
+              padding: '0.5rem 1rem',
+              verticalAlign: 'top',
+            },
+            'tbody tr': {
+              borderBottom: '1px solid hsl(var(--border))',
+            },
+            'tbody tr:hover': {
+              backgroundColor: 'hsl(var(--muted) / 0.5)',
+            },
+          },
+        },
+      },
     },
   },
-  plugins: [tailwindAnimate],
+  plugins: [tailwindAnimate, typography],
 } satisfies Config;

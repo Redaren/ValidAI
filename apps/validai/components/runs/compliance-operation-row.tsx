@@ -21,6 +21,7 @@ import { useState } from 'react'
 import { ChevronRight, ChevronDown, Loader2, CheckCircle2, XCircle, Circle, Tag, FileText, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Database } from '@playze/shared-types'
+import { SmartCommentRenderer } from './smart-comment-renderer'
 
 type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
@@ -307,16 +308,11 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
 
               {/* Full result with better text formatting */}
               {!isPending && (
-                <div className="rounded-lg border bg-card p-4 mt-4">
-                  <pre
-                    className={cn(
-                      'whitespace-pre-wrap text-sm leading-relaxed font-sans',
-                      isFailed && 'text-destructive'
-                    )}
-                  >
-                    {getFormattedComment(result, false)}
-                  </pre>
-                </div>
+                <SmartCommentRenderer
+                  content={getFormattedComment(result, false)}
+                  isFailed={isFailed}
+                  className="mt-4"
+                />
               )}
             </div>
           )}

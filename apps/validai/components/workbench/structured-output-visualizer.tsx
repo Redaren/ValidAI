@@ -35,6 +35,7 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { SmartCommentRenderer } from '@/components/runs/smart-comment-renderer'
 
 interface StructuredOutputVisualizerProps {
   data: unknown
@@ -295,7 +296,7 @@ function BadgeListView({ data }: { data: unknown[] | unknown }) {
               </div>
             </div>
           </div>
-          <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+          <SmartCommentRenderer content={String(dataObj.comment)} />
         </div>
       )
     }
@@ -346,7 +347,7 @@ function CardView({ data }: { data: unknown }) {
             <div className="text-xs text-muted-foreground">{t('rating')}</div>
           </div>
         </div>
-        <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+        <SmartCommentRenderer content={String(dataObj.comment)} />
       </div>
     )
   }
@@ -361,7 +362,7 @@ function CardView({ data }: { data: unknown }) {
             <div className="text-xs text-muted-foreground">{t('classification')}</div>
           </div>
         </div>
-        <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+        <SmartCommentRenderer content={String(dataObj.comment)} />
       </div>
     )
   }
@@ -378,7 +379,7 @@ function CardView({ data }: { data: unknown }) {
         </div>
         <div>
           <div className="text-xs text-muted-foreground mb-1">{t('analysis')}</div>
-          <div className="text-sm whitespace-pre-wrap">{String(dataObj.comment)}</div>
+          <SmartCommentRenderer content={String(dataObj.comment)} />
         </div>
       </div>
     )

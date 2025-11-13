@@ -31,6 +31,7 @@ import {
 } from '@playze/shared-ui'
 import { ChevronDown, ChevronRight, Zap } from 'lucide-react'
 import { StructuredOutputVisualizer } from '@/components/workbench/structured-output-visualizer'
+import { SmartCommentRenderer } from './smart-comment-renderer'
 import type { Database } from '@playze/shared-types'
 import { useTranslations } from 'next-intl'
 
@@ -268,11 +269,10 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                         {result.response_text && (
                           <div>
                             <p className="mb-2 text-sm font-medium">{tDetail('response')}</p>
-                            <div className="rounded-lg border bg-card p-4">
-                              <pre className="whitespace-pre-wrap text-sm">
-                                {result.response_text}
-                              </pre>
-                            </div>
+                            <SmartCommentRenderer
+                              content={result.response_text}
+                              isFailed={result.status === 'failed'}
+                            />
                           </div>
                         )}
 
