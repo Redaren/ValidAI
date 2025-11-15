@@ -27,7 +27,7 @@ export async function middleware(request: NextRequest) {
   if (isRedirect) {
     // Intl wants to redirect (e.g., / → /en/)
     // Update session but return intl's redirect with auth cookies merged
-    const authResponse = await updateSession(request);
+    const { response: authResponse } = await updateSession(request);
 
     // Merge auth cookies into the redirect response
     authResponse.cookies.getAll().forEach((cookie: { name: string; value: string }) => {
@@ -41,7 +41,7 @@ export async function middleware(request: NextRequest) {
   // ============================================================
   // STEP 2: No redirect - continue with auth flow
   // ============================================================
-  const authResponse = await updateSession(request);
+  const { response: authResponse, user } = await updateSession(request);
 
   // ⚠️ CRITICAL: Check if auth middleware wants to redirect (e.g., to /auth/login)
   const isAuthRedirect = authResponse.status >= 300 && authResponse.status < 400;
@@ -81,8 +81,6 @@ export async function middleware(request: NextRequest) {
   // ============================================================
   // Note: Unauthenticated users are redirected by shared-auth middleware,
   // so if we reach here, user should be authenticated.
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
 
   // If no user (edge case - shouldn't happen with updated shared-auth),
   // let it pass through - shared-auth will redirect on next request
@@ -100,15 +98,33 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const { data: hasAccess, error } = await supabase
-    .rpc('check_validai_access' as any, { p_org_id: orgId })
-    .single();
+  // Check subscription from JWT metadata first (fastest)
+  const appSubscriptions = user.app_metadata?.app_subscriptions as string[] | undefined;
 
-  if (error || !hasAccess) {
-    // Organization doesn't have ValidAI access - redirect to no-access
-    const url = request.nextUrl.clone();
-    url.pathname = `/${locale}/no-access`;
-    return NextResponse.redirect(url);
+  // If app_subscriptions in JWT, use it directly (no database call)
+  if (appSubscriptions) {
+    const hasAccess = appSubscriptions.includes('validai');
+
+    if (!hasAccess) {
+      // Organization doesn't have ValidAI access - redirect to no-access
+      const url = request.nextUrl.clone();
+      url.pathname = `/${locale}/no-access`;
+      return NextResponse.redirect(url);
+    }
+  } else {
+    // Fallback: Query database for existing sessions without app_subscriptions in JWT
+    // This ensures backward compatibility until all JWTs are updated
+    const supabase = await createServerClient();
+    const { data: hasAccess, error } = await supabase
+      .rpc('check_validai_access' as any, { p_org_id: orgId })
+      .single();
+
+    if (error || !hasAccess) {
+      // Organization doesn't have ValidAI access - redirect to no-access
+      const url = request.nextUrl.clone();
+      url.pathname = `/${locale}/no-access`;
+      return NextResponse.redirect(url);
+    }
   }
 
   return intlResponse;

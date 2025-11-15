@@ -1,8 +1,8 @@
-import { createAdminClient } from '../../_shared/supabaseAdmin.ts'
-import { handleCors } from '../../_shared/cors.ts'
-import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse } from '../../_shared/response.ts'
-import { getUserFromRequest, validateOrgMembership } from '../../_shared/auth.ts'
-import { validateRequired, validateUuid } from '../../_shared/validation.ts'
+import { createAdminClient } from '@shared/supabaseAdmin.ts'
+import { handleCors } from '@shared/cors.ts'
+import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse } from '@shared/response.ts'
+import { getUserFromRequest, validateOrgMembership } from '@shared/auth.ts'
+import { validateRequired, validateUuid } from '@shared/validation.ts'
 
 /**
  * Edge Function: auth/switch-organization
@@ -73,13 +73,30 @@ Deno.serve(async (req) => {
       return forbiddenResponse('You are not a member of this organization')
     }
 
-    // Update user's JWT metadata with new organization_id
+    // Fetch organization's active app subscriptions
+    const { data: subscriptions, error: subscriptionError } = await supabase
+      .from('organization_app_subscriptions')
+      .select('app_id')
+      .eq('organization_id', organizationId)
+      .eq('status', 'active')
+
+    if (subscriptionError) {
+      console.error('Error fetching subscriptions:', subscriptionError)
+      // Don't fail the org switch if subscription query fails
+      // Fall back to empty array
+    }
+
+    // Extract app IDs into array (e.g., ['validai', 'futureapp'])
+    const appSubscriptions = subscriptions?.map(sub => sub.app_id) || []
+
+    // Update user's JWT metadata with new organization_id AND app_subscriptions
     const { error: updateError } = await supabase.auth.admin.updateUserById(
       user.id,
       {
         app_metadata: {
           ...user.app_metadata,
           organization_id: organizationId,
+          app_subscriptions: appSubscriptions,
         }
       }
     )

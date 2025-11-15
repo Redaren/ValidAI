@@ -30,9 +30,12 @@ function extractLocale(pathname: string): string {
  * This function should be called in your Next.js middleware to:
  * 1. Refresh the user's session
  * 2. Optionally redirect unauthenticated users
+ * 3. Return user claims for use in app-specific middleware
  *
  * Multi-language support: Automatically detects and preserves locale prefixes
  * in redirects (e.g., /sv/dashboard → /sv/auth/login)
+ *
+ * @returns Object with NextResponse and user claims
  */
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -81,8 +84,8 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone()
     // Preserve locale prefix in redirect URL
     url.pathname = locale ? `/${locale}/auth/login` : "/auth/login"
-    return NextResponse.redirect(url)
+    return { response: NextResponse.redirect(url), user: null }
   }
 
-  return supabaseResponse
+  return { response: supabaseResponse, user }
 }

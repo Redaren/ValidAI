@@ -98,14 +98,24 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Enrich JWT with first organization
+      // Enrich JWT with first organization and app subscriptions
       const organization = firstOrg.organizations;
+
+      // Fetch organization's active app subscriptions
+      const { data: subscriptions } = await supabaseAdmin
+        .from('organization_app_subscriptions')
+        .select('app_id')
+        .eq('organization_id', organization.id)
+        .eq('status', 'active');
+
+      const appSubscriptions = subscriptions?.map(sub => sub.app_id) || [];
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
         app_metadata: {
           ...user.app_metadata,
           organization_id: organization.id,
           organization_name: organization.name,
-          organization_role: firstOrg.role
+          organization_role: firstOrg.role,
+          app_subscriptions: appSubscriptions,
         }
       });
 
@@ -176,13 +186,23 @@ Deno.serve(async (req) => {
 
     const organization = orgWithRole.organizations;
 
-    // Enrich JWT with organization details
+    // Fetch organization's active app subscriptions
+    const { data: subscriptions } = await supabaseAdmin
+      .from('organization_app_subscriptions')
+      .select('app_id')
+      .eq('organization_id', organizationId)
+      .eq('status', 'active');
+
+    const appSubscriptions = subscriptions?.map(sub => sub.app_id) || [];
+
+    // Enrich JWT with organization details and app subscriptions
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
       app_metadata: {
         ...user.app_metadata,
         organization_id: organizationId,
         organization_name: organization.name,
-        organization_role: orgWithRole.role
+        organization_role: orgWithRole.role,
+        app_subscriptions: appSubscriptions,
       }
     });
 
