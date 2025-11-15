@@ -111,7 +111,6 @@ Deno.serve(async (req) => {
       const appSubscriptions = subscriptions?.map(sub => sub.app_id) || [];
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
         app_metadata: {
-          ...user.app_metadata,
           organization_id: organization.id,
           organization_name: organization.name,
           organization_role: firstOrg.role,
@@ -198,7 +197,6 @@ Deno.serve(async (req) => {
     // Enrich JWT with organization details and app subscriptions
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
       app_metadata: {
-        ...user.app_metadata,
         organization_id: organizationId,
         organization_name: organization.name,
         organization_role: orgWithRole.role,

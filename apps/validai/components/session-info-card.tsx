@@ -13,8 +13,6 @@ import { useTranslations } from 'next-intl'
 interface Organization {
   id: string
   name: string
-  slug: string
-  plan_type: string
 }
 
 interface CurrentOrganization {
@@ -115,17 +113,13 @@ export function SessionInfoCard() {
           // Extract organization details from JWT app_metadata
           const orgId = user.app_metadata.organization_id
           const orgName = user.app_metadata.organization_name
-          const orgSlug = user.app_metadata.organization_slug
-          const orgPlanType = user.app_metadata.organization_plan_type
           const userRole = user.app_metadata.organization_role
 
           if (orgName) {
             currentOrg = {
               organization: {
                 id: orgId,
-                name: orgName,
-                slug: orgSlug,
-                plan_type: orgPlanType || 'free'
+                name: orgName
               },
               role: userRole || 'member'
             }
@@ -267,12 +261,6 @@ export function SessionInfoCard() {
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{currentOrg.organization?.name}</span>
                       <Badge variant="outline">{currentOrg.role}</Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      {t('plan')} {currentOrg.organization?.plan_type || 'Free'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {t('slug')} {currentOrg.organization?.slug}
                     </div>
                   </div>
                 </div>

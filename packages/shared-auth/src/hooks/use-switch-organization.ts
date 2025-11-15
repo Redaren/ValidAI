@@ -23,12 +23,17 @@ export function useSwitchOrganization() {
     mutationFn: async (input: SwitchOrganizationInput) => {
       const supabase = createBrowserClient()
 
-      // Call Edge Function to update JWT
+      // Call Edge Function to update JWT in database
       const { data, error } = await supabase.functions.invoke('switch-organization', {
         body: { organizationId: input.organizationId }
       })
 
       if (error) throw error
+
+      // Refresh session to get updated JWT from database
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) throw refreshError
+
       return data
     },
     onSuccess: () => {
