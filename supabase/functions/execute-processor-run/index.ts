@@ -303,20 +303,30 @@ serve(async (req) => {
         // Service role: use processor's organization_id
         organization_id = processor.organization_id
       } else {
-        // Regular user: verify organization membership
-        const { data: membership, error: memberError } = await supabase
-          .from('organization_members')
-          .select('organization_id')
-          .eq('user_id', user.id)
-          .single()
+        // Regular user: use organization from JWT context
+        organization_id = user.app_metadata?.organization_id
 
-        if (memberError || !membership) {
+        if (!organization_id) {
           return new Response(
-            JSON.stringify({ error: 'User not member of any organization' }),
+            JSON.stringify({ error: 'No active organization in user context' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
-        organization_id = membership.organization_id
+
+        // Validate user is actually a member of this organization
+        const { data: membership } = await supabase
+          .from('organization_members')
+          .select('role')
+          .eq('organization_id', organization_id)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (!membership) {
+          return new Response(
+            JSON.stringify({ error: 'User not member of active organization' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
       }
 
       // 6. Resolve LLM config to determine provider (before creating snapshot)
