@@ -78,9 +78,9 @@ export function OrganizationSwitcher() {
       // Shared hook updates JWT metadata and invalidates queries
       await switchOrgMutation.mutateAsync({ organizationId: orgId })
 
-      // Reload page to apply new organization context
+      // Redirect to dashboard to prevent accessing previous org's resources
       if (typeof window !== 'undefined') {
-        window.location.reload()
+        window.location.href = '/dashboard'
       }
     } catch (error) {
       logger.error('Failed to switch organization:', extractErrorDetails(error))

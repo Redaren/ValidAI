@@ -37,9 +37,9 @@ export function useSwitchOrganization() {
       return data
     },
     onSuccess: () => {
-      // Invalidate all organization-related queries
-      queryClient.invalidateQueries({ queryKey: queryKeys.organizations.all() })
-      queryClient.invalidateQueries({ queryKey: queryKeys.auth.all() })
+      // Clear entire query cache to prevent stale data from previous organization context
+      // This is critical for security - ensures no cached data from previous org remains
+      queryClient.clear()
     },
   })
 }

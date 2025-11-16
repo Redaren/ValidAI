@@ -42,8 +42,8 @@ export function OrgSwitcher() {
       const supabase = createBrowserClient()
       await supabase.auth.refreshSession()
 
-      // Step 3: Reload page with new session cookies
-      window.location.reload()
+      // Step 3: Redirect to dashboard to prevent accessing previous org's resources
+      window.location.href = '/dashboard'
     } catch (error) {
       console.error('Failed to switch organization:', error)
       alert('Failed to switch organization. Please try again.')
