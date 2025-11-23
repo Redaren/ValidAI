@@ -142,11 +142,12 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
   }
 
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[40px]"></TableHead>
+    <div className="rounded-lg border flex flex-col min-h-0">
+      <div className="overflow-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]"></TableHead>
             <TableHead className="w-[60px]">#</TableHead>
             <TableHead>{t('operation')}</TableHead>
             <TableHead>{t('status')}</TableHead>
@@ -319,6 +320,7 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
           })}
         </TableBody>
       </Table>
+      </div>
     </div>
   )
 }

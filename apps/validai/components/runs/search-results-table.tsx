@@ -123,10 +123,11 @@ export function SearchResultsTable({
   }
 
   return (
-    <div className="rounded-lg border">
-      <table className="w-full border-collapse">
-        <thead className="border-b bg-muted/30">
-          <tr>
+    <div className="rounded-lg border flex flex-col min-h-0">
+      <div className="overflow-auto">
+        <table className="w-full border-collapse">
+          <thead className="border-b bg-muted/30">
+            <tr>
             {/* # Column */}
             <SortableHeader column="number" className="w-[60px] text-center">
               {t('columns.number')}
@@ -162,6 +163,7 @@ export function SearchResultsTable({
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

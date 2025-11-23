@@ -24,6 +24,7 @@
 
 import { RunDetailHeader } from '@/components/runs/run-detail-header'
 import { OperationResultsTable } from '@/components/runs/operation-results-table'
+import { RunViewLayout } from './run-view-layout'
 import type { Database } from '@playze/shared-types'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
@@ -76,10 +77,7 @@ export function TechnicalView({
   isLoadingResults = false,
 }: TechnicalViewProps) {
   return (
-    <div className="space-y-6">
-      {/* Run Header */}
-      <RunDetailHeader run={run} />
-
+    <RunViewLayout header={<RunDetailHeader run={run} />}>
       {/* Operation Results */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Operation Results</h2>
@@ -92,6 +90,6 @@ export function TechnicalView({
           <OperationResultsTable results={operationResults || []} />
         )}
       </div>
-    </div>
+    </RunViewLayout>
   )
 }

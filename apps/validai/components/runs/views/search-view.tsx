@@ -30,6 +30,7 @@ import {
   type SortColumn,
   type SortDirection,
 } from '../search-results-table'
+import { RunViewLayout } from './run-view-layout'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
 type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
@@ -216,27 +217,27 @@ export function SearchView({ run, operationResults, isLoadingResults }: SearchVi
     }
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Metric Cards Section */}
-      {run.status === 'completed' ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          <ComplianceSummaryCard run={run} />
-          <ValidationChart operationResults={operationResults} />
-          <PerAreaChart run={run} operationResults={operationResults} />
-        </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-3">
-          <ProgressChart
-            totalOperations={run.total_operations ?? 0}
-            completedOperations={run.completed_operations ?? 0}
-            failedOperations={run.failed_operations ?? 0}
-          />
-          <ValidationChart operationResults={operationResults} />
-          <PerAreaChart run={run} operationResults={operationResults} />
-        </div>
-      )}
+  // Metrics Dashboard Header
+  const metricsHeader = run.status === 'completed' ? (
+    <div className="grid gap-4 md:grid-cols-3">
+      <ComplianceSummaryCard run={run} />
+      <ValidationChart operationResults={operationResults} />
+      <PerAreaChart run={run} operationResults={operationResults} />
+    </div>
+  ) : (
+    <div className="grid gap-4 md:grid-cols-3">
+      <ProgressChart
+        totalOperations={run.total_operations ?? 0}
+        completedOperations={run.completed_operations ?? 0}
+        failedOperations={run.failed_operations ?? 0}
+      />
+      <ValidationChart operationResults={operationResults} />
+      <PerAreaChart run={run} operationResults={operationResults} />
+    </div>
+  )
 
+  return (
+    <RunViewLayout header={metricsHeader}>
       {/* Search and Filter Section */}
       <div className="space-y-4">
         <SearchFiltersBar
@@ -253,6 +254,6 @@ export function SearchView({ run, operationResults, isLoadingResults }: SearchVi
           onSortChange={handleSortChange}
         />
       </div>
-    </div>
+    </RunViewLayout>
   )
 }

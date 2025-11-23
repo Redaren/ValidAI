@@ -31,6 +31,7 @@ import {
 import { PerAreaChart } from '@/components/runs/per-area-chart'
 import { ComplianceSummaryCard } from '@/components/runs/compliance-summary-card'
 import { ComplianceOperationRow } from '@/components/runs/compliance-operation-row'
+import { RunViewLayout } from './run-view-layout'
 import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import type { Database } from '@playze/shared-types'
 
@@ -296,29 +297,29 @@ export function ComplianceView({
     )
   }
 
-  return (
-    <div className="space-y-6">
-      {/* Metrics Dashboard: Summary Card + Charts OR Progress + Charts */}
-      {run.status === 'completed' ? (
-        // Completed: Show Summary Card, Validations, Per Area
-        <div className="grid gap-4 md:grid-cols-3">
-          <ComplianceSummaryCard run={run} />
-          <ValidationChart operationResults={mergedOperations} />
-          <PerAreaChart run={run} operationResults={mergedOperations} />
-        </div>
-      ) : (
-        // Processing: Show Progress, Validations, Per Area
-        <div className="grid gap-4 md:grid-cols-3">
-          <ProgressChart
-            totalOperations={run.total_operations}
-            completedOperations={run.completed_operations}
-            failedOperations={run.failed_operations}
-          />
-          <ValidationChart operationResults={mergedOperations} />
-          <PerAreaChart run={run} operationResults={mergedOperations} />
-        </div>
-      )}
+  // Metrics Dashboard Header
+  const metricsHeader = run.status === 'completed' ? (
+    // Completed: Show Summary Card, Validations, Per Area
+    <div className="grid gap-4 md:grid-cols-3">
+      <ComplianceSummaryCard run={run} />
+      <ValidationChart operationResults={mergedOperations} />
+      <PerAreaChart run={run} operationResults={mergedOperations} />
+    </div>
+  ) : (
+    // Processing: Show Progress, Validations, Per Area
+    <div className="grid gap-4 md:grid-cols-3">
+      <ProgressChart
+        totalOperations={run.total_operations}
+        completedOperations={run.completed_operations}
+        failedOperations={run.failed_operations}
+      />
+      <ValidationChart operationResults={mergedOperations} />
+      <PerAreaChart run={run} operationResults={mergedOperations} />
+    </div>
+  )
 
+  return (
+    <RunViewLayout header={metricsHeader}>
       {/* Grouped Operations */}
       <div className="space-y-4">
         <h2 className="text-xl font-semibold">Tests & comments</h2>
@@ -341,6 +342,6 @@ export function ComplianceView({
           </div>
         )}
       </div>
-    </div>
+    </RunViewLayout>
   )
 }

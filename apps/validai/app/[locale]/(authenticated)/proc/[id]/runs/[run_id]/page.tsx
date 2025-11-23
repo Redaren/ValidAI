@@ -151,16 +151,20 @@ export default function RunDetailPage({ params }: RunDetailPageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* View Switcher */}
-      <ViewSwitcher currentView={currentView} onViewChange={handleViewChange} />
+    <div className="flex flex-col h-full">
+      {/* View Switcher - Fixed at top */}
+      <div className="flex-shrink-0 mb-6">
+        <ViewSwitcher currentView={currentView} onViewChange={handleViewChange} />
+      </div>
 
-      {/* Selected View Component */}
-      <ViewComponent
-        run={run}
-        operationResults={operationResults || []}
-        isLoadingResults={isLoadingResults}
-      />
+      {/* Selected View Component - Scrollable area */}
+      <div className="flex-1 min-h-0">
+        <ViewComponent
+          run={run}
+          operationResults={operationResults || []}
+          isLoadingResults={isLoadingResults}
+        />
+      </div>
     </div>
   )
 }
