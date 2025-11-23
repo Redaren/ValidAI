@@ -223,7 +223,7 @@
     },
     "search": {
       "title": "Search & Filter",
-      "searchPlaceholder": "Search operations, results, descriptions...",
+      "searchPlaceholder": "Search",
       "clearSearch": "Clear search",
       "filters": {
         "type": "Type",

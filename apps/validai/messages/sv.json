@@ -223,7 +223,7 @@
     },
     "search": {
       "title": "Sök & filtrera",
-      "searchPlaceholder": "Sök operationer, resultat, beskrivningar...",
+      "searchPlaceholder": "Sök",
       "clearSearch": "Rensa sökning",
       "filters": {
         "type": "Typ",

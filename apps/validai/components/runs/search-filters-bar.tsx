@@ -141,18 +141,18 @@ export function SearchFiltersBar({
     filters.resultFilter
 
   return (
-    <div className="space-y-4">
-      {/* Search and Filter Controls */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        {/* Search Input */}
-        <div className="relative flex-1">
+    <div className="flex items-center gap-3 py-3">
+      {/* LEFT ZONE: Search + Filter Dropdowns */}
+      <div className="flex items-center gap-2">
+        {/* Search Input - constrained to 320px */}
+        <div className="relative w-80">
           <SearchIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
             placeholder={t('searchPlaceholder')}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className="pl-9 pr-9"
+            className="pl-9 pr-9 shadow-none"
           />
           {searchInput && (
             <button
@@ -168,7 +168,7 @@ export function SearchFiltersBar({
         {/* Type Filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm">
               {t('filters.type')}
               {filters.types.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
@@ -195,7 +195,7 @@ export function SearchFiltersBar({
         {/* Area Filter */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto">
+            <Button variant="outline" size="sm">
               {t('filters.area')}
               {filters.areas.length > 0 && (
                 <Badge variant="secondary" className="ml-2">
@@ -226,49 +226,54 @@ export function SearchFiltersBar({
         </DropdownMenu>
       </div>
 
-      {/* Active Filters and Result Count */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Active Filter Badges */}
-        {filters.types.map((type) => (
-          <Badge key={`type-${type}`} variant="secondary" className="gap-1">
-            {t(`operationTypes.${type}`)}
-            <button
-              onClick={() => removeTypeFilter(type)}
-              className="ml-1 hover:text-foreground"
+      {/* CENTER ZONE: Active Filter Chips (conditional) */}
+      {hasActiveFilters && (
+        <>
+          {/* Visual separator */}
+          <div className="h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            {/* Active Filter Badges */}
+            {filters.types.map((type) => (
+              <Badge key={`type-${type}`} variant="secondary" className="gap-1">
+                {t(`operationTypes.${type}`)}
+                <button
+                  onClick={() => removeTypeFilter(type)}
+                  className="ml-1 hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+
+            {filters.areas.map((area) => (
+              <Badge key={`area-${area}`} variant="secondary" className="gap-1">
+                {area}
+                <button
+                  onClick={() => removeAreaFilter(area)}
+                  className="ml-1 hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+
+            {/* Clear All Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClearAll}
+              className="h-6 px-2 text-xs"
             >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ))}
+              {t('filters.clearAll')}
+            </Button>
+          </div>
+        </>
+      )}
 
-        {filters.areas.map((area) => (
-          <Badge key={`area-${area}`} variant="secondary" className="gap-1">
-            {area}
-            <button
-              onClick={() => removeAreaFilter(area)}
-              className="ml-1 hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ))}
-
-        {/* Clear All Button */}
-        {hasActiveFilters && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClearAll}
-            className="h-6 px-2 text-xs"
-          >
-            {t('filters.clearAll')}
-          </Button>
-        )}
-
-        {/* Result Count */}
-        <div className="ml-auto text-sm text-muted-foreground">
-          {t('showing', { count: filteredCount, total: totalResults.length })}
-        </div>
+      {/* RIGHT ZONE: Result Counter */}
+      <div className="ml-auto text-sm text-muted-foreground">
+        {t('showing', { count: filteredCount, total: totalResults.length })}
       </div>
     </div>
   )
