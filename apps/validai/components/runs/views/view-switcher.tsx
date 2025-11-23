@@ -18,14 +18,14 @@
 'use client'
 
 // import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { BarChart3, FileText, Scale } from 'lucide-react'
+import { BarChart3, FileText, Scale, Search } from 'lucide-react'
 import { Button } from '@playze/shared-ui'
 import { cn } from '@/lib/utils'
 
 /**
  * Available view types for processor runs
  */
-export type ViewType = 'technical' | 'compliance' | 'contract-comments'
+export type ViewType = 'technical' | 'compliance' | 'search' | 'contract-comments'
 
 /**
  * View metadata including display information
@@ -56,6 +56,12 @@ export const AVAILABLE_VIEWS: ViewMetadata[] = [
     label: 'Compliance',
     icon: Scale,
     description: 'Traffic light status and compliance statistics (Coming soon)',
+  },
+  {
+    value: 'search',
+    label: 'Search',
+    icon: Search,
+    description: 'Search and filter operation results',
   },
   {
     value: 'contract-comments',

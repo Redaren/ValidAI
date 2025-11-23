@@ -213,6 +213,65 @@
       "notAvailable": "N/A",
       "aiCountdown": "AI Countdown",
       "aiThinkingExtra": "AI thinking extra"
+    },
+    "search": {
+      "title": "Search & Filter",
+      "searchPlaceholder": "Search operations, results, descriptions...",
+      "clearSearch": "Clear search",
+      "filters": {
+        "type": "Type",
+        "area": "Area",
+        "result": "Result",
+        "all": "All",
+        "selected": "{count} selected",
+        "clearAll": "Clear all filters"
+      },
+      "columns": {
+        "number": "#",
+        "area": "Area",
+        "name": "Name",
+        "type": "Type",
+        "result": "Result"
+      },
+      "operationTypes": {
+        "validation": "Validation",
+        "extraction": "Extraction",
+        "rating": "Rating",
+        "classification": "Classification",
+        "analysis": "Analysis",
+        "traffic_light": "Traffic Light",
+        "generic": "Generic"
+      },
+      "resultFilters": {
+        "true": "True",
+        "false": "False",
+        "any": "Any",
+        "green": "Green",
+        "yellow": "Yellow",
+        "red": "Red",
+        "range": "Range: {min} - {max}"
+      },
+      "resultDisplay": {
+        "true": "True",
+        "false": "False",
+        "itemsExtracted": "{count} items extracted",
+        "green": "Green",
+        "yellow": "Yellow",
+        "red": "Red"
+      },
+      "showing": "Showing {count} of {total} operations",
+      "noResults": "No operations found",
+      "noResultsDescription": "Try adjusting your search or filters",
+      "sort": {
+        "ascending": "Sort ascending",
+        "descending": "Sort descending",
+        "unsorted": "Click to sort"
+      },
+      "expandRow": "Click to expand details",
+      "collapseRow": "Click to collapse",
+      "operationDetails": "Operation Details",
+      "result": "Result",
+      "thinking": "Thinking"
     }
   },
   "auth": {

@@ -349,7 +349,7 @@ export function useUpdateProcessor() {
       visibility?: 'personal' | 'organization'
       system_prompt?: string | null
       tags?: string[] | null
-      default_run_view?: 'technical' | 'compliance' | 'contract-comments'
+      default_run_view?: 'technical' | 'compliance' | 'search' | 'contract-comments'
     }) => {
       // Only fetch and update configuration if default_run_view is provided
       let updatedConfig: Json | undefined = undefined

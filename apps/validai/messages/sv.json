@@ -213,6 +213,65 @@
       "notAvailable": "Ej tillgänglig",
       "aiCountdown": "Nedräkning av AI",
       "aiThinkingExtra": "AI tänker extra"
+    },
+    "search": {
+      "title": "Sök & filtrera",
+      "searchPlaceholder": "Sök operationer, resultat, beskrivningar...",
+      "clearSearch": "Rensa sökning",
+      "filters": {
+        "type": "Typ",
+        "area": "Område",
+        "result": "Resultat",
+        "all": "Alla",
+        "selected": "{count} valda",
+        "clearAll": "Rensa alla filter"
+      },
+      "columns": {
+        "number": "#",
+        "area": "Område",
+        "name": "Namn",
+        "type": "Typ",
+        "result": "Resultat"
+      },
+      "operationTypes": {
+        "validation": "Validering",
+        "extraction": "Extraktion",
+        "rating": "Betygsättning",
+        "classification": "Klassificering",
+        "analysis": "Analys",
+        "traffic_light": "Trafikljus",
+        "generic": "Generisk"
+      },
+      "resultFilters": {
+        "true": "Sant",
+        "false": "Falskt",
+        "any": "Alla",
+        "green": "Grön",
+        "yellow": "Gul",
+        "red": "Röd",
+        "range": "Intervall: {min} - {max}"
+      },
+      "resultDisplay": {
+        "true": "Sant",
+        "false": "Falskt",
+        "itemsExtracted": "{count} objekt extraherade",
+        "green": "Grön",
+        "yellow": "Gul",
+        "red": "Röd"
+      },
+      "showing": "Visar {count} av {total} operationer",
+      "noResults": "Inga operationer hittades",
+      "noResultsDescription": "Försök justera din sökning eller filter",
+      "sort": {
+        "ascending": "Sortera stigande",
+        "descending": "Sortera fallande",
+        "unsorted": "Klicka för att sortera"
+      },
+      "expandRow": "Klicka för att expandera detaljer",
+      "collapseRow": "Klicka för att kollapsa",
+      "operationDetails": "Operationsdetaljer",
+      "result": "Resultat",
+      "thinking": "Tänker"
     }
   },
   "auth": {

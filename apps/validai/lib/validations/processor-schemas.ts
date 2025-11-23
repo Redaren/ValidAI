@@ -40,7 +40,7 @@ export const updateProcessorSchema = z.object({
   usage_description: descriptionSchema,
   system_prompt: z.string().trim().max(2000).optional(),
   tags: tagsSchema,
-  default_run_view: z.enum(['technical', 'compliance', 'contract-comments']).optional(),
+  default_run_view: z.enum(['technical', 'compliance', 'search', 'contract-comments']).optional(),
 })
 
 export type UpdateProcessorInput = z.infer<typeof updateProcessorSchema>

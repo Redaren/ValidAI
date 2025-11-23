@@ -24,6 +24,7 @@
 import type { ComponentType } from 'react'
 import { TechnicalView } from './technical-view'
 import { ComplianceView as ComplianceViewComponent } from './compliance-view'
+import { SearchView } from './search-view'
 import type { ViewType } from './view-switcher'
 import type { Database } from '@playze/shared-types'
 
@@ -89,6 +90,7 @@ const ContractCommentsView: RunViewComponent = () => (
 export const VIEW_REGISTRY: Record<ViewType, RunViewComponent> = {
   technical: TechnicalView,
   compliance: ComplianceViewComponent,
+  search: SearchView,
   'contract-comments': ContractCommentsView,
 }
 
