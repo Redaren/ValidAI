@@ -29,5 +29,10 @@ nul
 *.tmp
 pre-migration-state.txt
 
+# Analysis and utility scripts
+analyze-har.js
+analyze-waterfall.js
+dump.sql
+
 # Supabase
 supabase/.temp/
