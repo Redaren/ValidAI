@@ -705,8 +705,7 @@ export async function executeLLMOperationGemini(
       structured_output: validated.success ? validated.data : structuredOutput,
       thinking_blocks: thinkingSummary ? [{
         type: 'thinking',
-        thinking: thinkingSummary,
-        text: thinkingSummary
+        thinking: thinkingSummary
       }] : null,
       model: modelToUse,
       tokens: {

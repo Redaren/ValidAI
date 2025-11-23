@@ -292,13 +292,21 @@ export function OperationResultsTable({ results }: OperationResultsTableProps) {
                           <div>
                             <p className="mb-2 text-sm font-medium">{tDetail('thinking')}</p>
                             <div className="space-y-2">
-                              {(result.thinking_blocks as any[]).map((block, idx) => (
-                                <div key={idx} className="rounded-lg border bg-muted/50 p-4">
-                                  <pre className="whitespace-pre-wrap text-sm">
-                                    {typeof block === 'string' ? block : JSON.stringify(block, null, 2)}
-                                  </pre>
-                                </div>
-                              ))}
+                              {(result.thinking_blocks as any[]).map((block, idx) => {
+                                // Handle both string and object formats
+                                // Support both 'thinking' (new) and 'text' (old) fields for backwards compatibility
+                                const content = typeof block === 'string'
+                                  ? block
+                                  : (block.thinking || block.text || '')
+
+                                return (
+                                  <div key={idx} className="rounded-lg border bg-muted/50 p-4">
+                                    <pre className="whitespace-pre-wrap text-sm">
+                                      {content}
+                                    </pre>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         )}

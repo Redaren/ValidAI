@@ -423,8 +423,7 @@ Do not include any text outside the JSON object. Do not use markdown code blocks
     } else if (block.type === 'thinking') {
       thinkingBlocks.push({
         type: 'thinking',
-        thinking: block.thinking,
-        text: block.thinking
+        thinking: block.thinking
       })
       console.log(`Thinking block captured: ${block.thinking?.substring(0, 100)}...`)
     }
