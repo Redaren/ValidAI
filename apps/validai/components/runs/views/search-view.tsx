@@ -21,9 +21,9 @@
 
 import { useState, useMemo } from 'react'
 import type { Database } from '@playze/shared-types'
-import { ComplianceMetricsCharts } from '../compliance-metrics-charts'
+import { ProgressChart, ValidationChart } from '../compliance-metrics-charts'
 import { ComplianceSummaryCard } from '../compliance-summary-card'
-import { ValidationChart, TrafficLightChart } from '../compliance-metrics-charts'
+import { PerAreaChart } from '../per-area-chart'
 import { SearchFiltersBar, type SearchFilters } from '../search-filters-bar'
 import {
   SearchResultsTable,
@@ -223,15 +223,18 @@ export function SearchView({ run, operationResults, isLoadingResults }: SearchVi
         <div className="grid gap-4 md:grid-cols-3">
           <ComplianceSummaryCard run={run} />
           <ValidationChart operationResults={operationResults} />
-          <TrafficLightChart operationResults={operationResults} />
+          <PerAreaChart run={run} operationResults={operationResults} />
         </div>
       ) : (
-        <ComplianceMetricsCharts
-          operationResults={operationResults}
-          totalOperations={run.total_operations ?? 0}
-          completedOperations={run.completed_operations ?? 0}
-          failedOperations={run.failed_operations ?? 0}
-        />
+        <div className="grid gap-4 md:grid-cols-3">
+          <ProgressChart
+            totalOperations={run.total_operations ?? 0}
+            completedOperations={run.completed_operations ?? 0}
+            failedOperations={run.failed_operations ?? 0}
+          />
+          <ValidationChart operationResults={operationResults} />
+          <PerAreaChart run={run} operationResults={operationResults} />
+        </div>
       )}
 
       {/* Search and Filter Section */}

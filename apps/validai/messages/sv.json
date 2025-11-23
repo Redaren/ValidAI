@@ -212,7 +212,13 @@
       "unknownDocument": "Okänt dokument",
       "notAvailable": "Ej tillgänglig",
       "aiCountdown": "Nedräkning av AI",
-      "aiThinkingExtra": "AI tänker extra"
+      "aiThinkingExtra": "AI tänker extra",
+      "perArea": {
+        "title": "Per område",
+        "area": "Område",
+        "total": "Totalt",
+        "noAreas": "Inga områden definierade"
+      }
     },
     "search": {
       "title": "Sök & filtrera",

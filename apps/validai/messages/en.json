@@ -212,7 +212,13 @@
       "unknownDocument": "Unknown Document",
       "notAvailable": "N/A",
       "aiCountdown": "AI Countdown",
-      "aiThinkingExtra": "AI thinking extra"
+      "aiThinkingExtra": "AI thinking extra",
+      "perArea": {
+        "title": "Per Area",
+        "area": "Area",
+        "total": "Total",
+        "noAreas": "No areas defined"
+      }
     },
     "search": {
       "title": "Search & Filter",
