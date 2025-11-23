@@ -418,7 +418,7 @@ export function SearchResultRow({ result, operationNumber }: SearchResultRowProp
 
   // Truncate area if too long
   const truncatedArea =
-    operationArea.length > 18 ? `${operationArea.substring(0, 18)}...` : operationArea
+    operationArea.length > 24 ? `${operationArea.substring(0, 24)}...` : operationArea
 
   return (
     <>
