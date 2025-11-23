@@ -20,10 +20,10 @@
 
 'use client'
 
-import { format } from 'date-fns'
 import { Card, CardContent, CardHeader, CardTitle } from '@playze/shared-ui'
 import type { Database } from '@playze/shared-types'
 import { useTranslations } from 'next-intl'
+import { formatCompletionDateTime } from '@/lib/date-utils'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
 
@@ -33,14 +33,6 @@ type Run = Database['public']['Tables']['validai_runs']['Row']
 interface ComplianceSummaryCardProps {
   /** The completed run to display */
   run: Run
-}
-
-/**
- * Formats ISO date string to readable date and time without seconds
- * Example: "Oct 16, 2025 14:30"
- */
-function formatCompletionDateTime(isoString: string): string {
-  return format(new Date(isoString), 'MMM dd, yyyy HH:mm')
 }
 
 /**
@@ -92,11 +84,11 @@ export function ComplianceSummaryCard({ run }: ComplianceSummaryCardProps) {
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t('date')}</span>
-            <span className="font-medium">{completedAt}</span>
+            <span className="text-muted-foreground">{completedAt}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-muted-foreground">{t('tests')}</span>
-            <span className="font-medium">{totalTests}</span>
+            <span className="text-muted-foreground">{totalTests}</span>
           </div>
         </div>
       </CardContent>

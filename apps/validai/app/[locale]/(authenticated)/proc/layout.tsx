@@ -15,6 +15,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { useProcessorDetail } from "@/app/queries/processors/use-processor-detail"
+import { useRun } from "@/app/queries/runs"
+import { formatCompletionDateTime } from "@/lib/date-utils"
 
 export default function ProcessorsLayout({
   children,
@@ -30,6 +32,7 @@ export default function ProcessorsLayout({
   const runsMatch = pathname.match(/^\/proc\/([^\/]+)\/runs(?:\/([^\/]+))?$/)
 
   const processorId = detailMatch?.[1] || workbenchMatch?.[1] || runsMatch?.[1] || null
+  const runId = runsMatch?.[2] || null
   const isWorkbenchPage = !!workbenchMatch
   const isRunsPage = !!runsMatch && !runsMatch[2] // runs list page
   const isRunDetailPage = !!runsMatch?.[2] // specific run detail page
@@ -39,8 +42,25 @@ export default function ProcessorsLayout({
     enabled: !!processorId,
   })
 
+  // Fetch run data for run detail page
+  const { data: run, isLoading: isLoadingRun } = useRun(runId || "", {
+    enabled: !!runId,
+    realtime: false, // Layout doesn't need realtime updates
+  })
+
   const isDetailPage = !!detailMatch
   const hasProcessor = !!processorId
+
+  // Determine run detail breadcrumb text
+  const runBreadcrumbText = isRunDetailPage
+    ? isLoadingRun
+      ? t('loading')
+      : run?.completed_at
+        ? formatCompletionDateTime(run.completed_at)
+        : run
+          ? t('inProgress')
+          : t('runDetail')
+    : t('runDetail')
 
   return (
     <div className="flex flex-col h-full">
@@ -102,7 +122,7 @@ export default function ProcessorsLayout({
                   <>
                     <BreadcrumbSeparator />
                     <BreadcrumbItem>
-                      <BreadcrumbPage>{t('runDetail')}</BreadcrumbPage>
+                      <BreadcrumbPage>{runBreadcrumbText}</BreadcrumbPage>
                     </BreadcrumbItem>
                   </>
                 )}
