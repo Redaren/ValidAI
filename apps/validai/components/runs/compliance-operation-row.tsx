@@ -111,6 +111,31 @@ function getOperationIndicator(result: OperationResult, isProcessing: boolean) {
 }
 
 /**
+ * Get structured content for Analysis operations
+ * Returns both conclusion and comment if available
+ */
+function getAnalysisContent(result: OperationResult): { conclusion?: string; comment?: string } | null {
+  const snapshot = result.operation_snapshot as { operation_type: string }
+  if (snapshot.operation_type !== 'analysis') {
+    return null
+  }
+
+  const structured = result.structured_output as {
+    conclusion?: string
+    comment?: string
+  } | null
+
+  if (structured?.conclusion || structured?.comment) {
+    return {
+      conclusion: structured.conclusion,
+      comment: structured.comment
+    }
+  }
+
+  return null
+}
+
+/**
  * Get full comment from response text or structured output
  */
 function getFullComment(result: OperationResult): string {
@@ -122,7 +147,20 @@ function getFullComment(result: OperationResult): string {
     return result.error_message || 'Operation failed'
   }
 
-  // Try to get comment from structured output first
+  // Handle analysis operations specially - prioritize conclusion
+  const analysisContent = getAnalysisContent(result)
+  if (analysisContent) {
+    // For collapsed view, return only conclusion
+    if (analysisContent.conclusion) {
+      return analysisContent.conclusion
+    }
+    // Fallback to comment if no conclusion
+    if (analysisContent.comment) {
+      return analysisContent.comment
+    }
+  }
+
+  // Try to get comment from structured output
   const structured = result.structured_output as {
     comment?: string
     response?: string  // Generic operations
@@ -307,13 +345,34 @@ export function ComplianceOperationRow({ result, isProcessing = false, operation
               )}
 
               {/* Full result with better text formatting */}
-              {!isPending && (
-                <SmartCommentRenderer
-                  content={getFormattedComment(result, false)}
-                  isFailed={isFailed}
-                  className="mt-4"
-                />
-              )}
+              {!isPending && (() => {
+                // Special handling for Analysis operations with both conclusion and comment
+                const analysisContent = getAnalysisContent(result)
+                if (analysisContent && analysisContent.conclusion && analysisContent.comment) {
+                  return (
+                    <div className="flex flex-col gap-3">
+                      {/* Conclusion */}
+                      <SmartCommentRenderer
+                        content={analysisContent.conclusion}
+                        isFailed={isFailed}
+                      />
+                      {/* Comment */}
+                      <SmartCommentRenderer
+                        content={analysisContent.comment}
+                        isFailed={isFailed}
+                      />
+                    </div>
+                  )
+                }
+
+                // Default rendering for all other cases
+                return (
+                  <SmartCommentRenderer
+                    content={getFormattedComment(result, false)}
+                    isFailed={isFailed}
+                  />
+                )
+              })()}
             </div>
           )}
         </div>
