@@ -31,7 +31,7 @@ export function RunViewLayout({ header, children, className }: RunViewLayoutProp
       )}
 
       {/* Scrollable Content Section - scrolls when content exceeds height */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto [scrollbar-gutter:stable]">
         <div className="space-y-6">
           {children}
         </div>
