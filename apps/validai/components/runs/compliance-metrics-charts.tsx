@@ -36,34 +36,54 @@ interface ComplianceMetricsChartsProps {
 }
 
 /**
- * Calculate validation pass rate from True/False operations
+ * Calculate validation pass rate from True/False operations and Traffic Light operations
  */
 function calculateValidationMetrics(results: OperationResult[]) {
-  const validationResults = results.filter((r) => {
+  // Filter for both validation and traffic_light operations
+  const relevantResults = results.filter((r) => {
     const snapshot = r.operation_snapshot as { operation_type: string }
-    return snapshot.operation_type === 'validation' && r.status === 'completed'
+    return (
+      (snapshot.operation_type === 'validation' || snapshot.operation_type === 'traffic_light') &&
+      r.status === 'completed'
+    )
   })
 
-  if (validationResults.length === 0) {
-    return { trueCount: 0, falseCount: 0, passRate: 0, total: 0 }
+  if (relevantResults.length === 0) {
+    return { passed: 0, yellow: 0, failed: 0, passRate: 0, total: 0 }
   }
 
-  let trueCount = 0
-  let falseCount = 0
+  let passed = 0
+  let yellow = 0
+  let failed = 0
 
-  validationResults.forEach((result) => {
-    const structured = result.structured_output as { result?: boolean } | null
-    if (structured?.result === true) {
-      trueCount++
-    } else if (structured?.result === false) {
-      falseCount++
+  relevantResults.forEach((result) => {
+    const snapshot = result.operation_snapshot as { operation_type: string }
+
+    if (snapshot.operation_type === 'validation') {
+      // Validation operations: true = passed, false = failed
+      const structured = result.structured_output as { result?: boolean } | null
+      if (structured?.result === true) {
+        passed++
+      } else if (structured?.result === false) {
+        failed++
+      }
+    } else if (snapshot.operation_type === 'traffic_light') {
+      // Traffic light operations: green = passed, yellow = warning, red = failed
+      const structured = result.structured_output as { traffic_light?: string } | null
+      if (structured?.traffic_light === 'green') {
+        passed++
+      } else if (structured?.traffic_light === 'yellow') {
+        yellow++
+      } else if (structured?.traffic_light === 'red') {
+        failed++
+      }
     }
   })
 
-  const total = trueCount + falseCount
-  const passRate = total > 0 ? Math.round((trueCount / total) * 100) : 0
+  const total = passed + yellow + failed
+  const passRate = total > 0 ? Math.round((passed / total) * 100) : 0
 
-  return { trueCount, falseCount, passRate, total }
+  return { passed, yellow, failed, passRate, total }
 }
 
 /**
@@ -243,6 +263,10 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
       label: t('passed'),
       color: 'hsl(142, 76%, 36%)',
     },
+    yellow: {
+      label: t('yellow'),
+      color: 'hsl(48, 96%, 53%)',
+    },
     failed: {
       label: t('failed'),
       color: 'hsl(0, 84%, 60%)',
@@ -262,8 +286,9 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
           <RadialBarChart
             data={[
               {
-                passed: validationMetrics.trueCount,
-                failed: validationMetrics.falseCount,
+                passed: validationMetrics.passed,
+                yellow: validationMetrics.yellow,
+                failed: validationMetrics.failed,
               },
             ]}
             startAngle={180}
@@ -289,7 +314,7 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
                           y={(viewBox.cy || 0) + 12}
                           className="fill-muted-foreground text-xs"
                         >
-                          {validationMetrics.trueCount} {t('passedOf')} {validationMetrics.total}
+                          {validationMetrics.passed} {t('passedOf')} {validationMetrics.total}
                         </tspan>
                       </text>
                     )
@@ -302,6 +327,13 @@ export function ValidationChart({ operationResults }: ValidationChartProps) {
               stackId="a"
               cornerRadius={5}
               fill="var(--color-passed)"
+              className="stroke-transparent stroke-2"
+            />
+            <RadialBar
+              dataKey="yellow"
+              stackId="a"
+              cornerRadius={5}
+              fill="var(--color-yellow)"
               className="stroke-transparent stroke-2"
             />
             <RadialBar
