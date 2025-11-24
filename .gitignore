@@ -27,6 +27,8 @@ nul
 # Temp files
 *.log
 *.tmp
+*.bak
+*-patch.txt
 pre-migration-state.txt
 
 # Analysis and utility scripts
