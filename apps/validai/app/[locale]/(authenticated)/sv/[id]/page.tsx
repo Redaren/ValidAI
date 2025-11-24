@@ -3,6 +3,7 @@ import { createServerClient } from '@playze/shared-auth/server'
 import { createQueryClient } from '@/lib/query-client'
 import { GalleryUserViewClient } from './gallery-user-view-client'
 import { notFound } from 'next/navigation'
+import { transformGalleryData } from '@/app/queries/galleries'
 
 /**
  * Props for the GalleryUserViewPage component.
@@ -55,7 +56,8 @@ export default async function GalleryUserViewPage({
           throw new Error('Gallery not found')
         }
 
-        return data
+        // Transform flat database rows into nested structure with areas and processors
+        return transformGalleryData(data as any)
       },
     })
   } catch (error) {
