@@ -500,8 +500,12 @@ export function SearchResultRow({ result, operationNumber }: SearchResultRowProp
         <tr ref={expandedRowRef}>
           <td colSpan={5} className="bg-accent/10 px-4 py-6 shadow-[inset_4px_0_0_0_hsl(var(--accent))]">
             <div className="space-y-4">
-              {/* Operation Name and Description */}
-              <div>
+              {/* Operation Name and Description - Clickable to Collapse */}
+              <div
+                onClick={() => setIsExpanded(false)}
+                className="cursor-pointer hover:bg-muted/30 -mx-4 -mt-6 px-4 pt-6 pb-2 rounded-t-lg transition-colors"
+                title={t('collapseRow')}
+              >
                 <h3 className="text-lg font-semibold">{operationName}</h3>
                 {operationDescription && (
                   <p className="mt-1 text-sm text-muted-foreground">
