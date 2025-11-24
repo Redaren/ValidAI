@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from '@/lib/i18n/navigation'
 import type { CreateProcessorInput } from '@/lib/validations'
 import { logger, extractErrorDetails } from '@/lib/utils/logger'
+import type { Session } from '@supabase/supabase-js'
 
 type ProcessorStatus = Database['public']['Enums']['processor_status']
 type ProcessorVisibility = Database['public']['Enums']['processor_visibility']
@@ -76,7 +77,7 @@ export function useUserProcessors(
 
   useEffect(() => {
     // Check if user is authenticated
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
       setIsAuthenticated(!!session)
     })
   }, [supabase])

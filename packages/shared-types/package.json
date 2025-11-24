@@ -17,6 +17,6 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@supabase/supabase-js": "latest"
+    "@supabase/supabase-js": "^2.84.0"
   }
 }

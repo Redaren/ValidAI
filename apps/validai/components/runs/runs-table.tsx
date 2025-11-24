@@ -32,6 +32,7 @@ import {
   ColumnDef,
   ColumnFiltersState,
   SortingState,
+  RowSelectionState,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -49,11 +50,13 @@ import {
   Badge,
   Input,
   Button,
+  Checkbox,
 } from '@playze/shared-ui'
 import { formatDistanceToNow } from 'date-fns'
 import type { Database } from '@playze/shared-types'
 import { FileText, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { SelectionActionBar } from './selection-action-bar'
 
 type Run = Database['public']['Tables']['validai_runs']['Row']
 
@@ -175,15 +178,54 @@ function RunStatusBadge({ status, failedCount }: { status: string; failedCount: 
 export function RunsTable({ runs, processorId }: RunsTableProps) {
   const router = useRouter()
   const t = useTranslations('runs.table')
+  const tCompare = useTranslations('runs.compare')
 
   const [sorting, setSorting] = React.useState<SortingState>([
     { id: 'started_at', desc: true }, // Default: newest first
   ])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({})
 
   // Define columns
   const columns = React.useMemo<ColumnDef<Run>[]>(
     () => [
+      // Checkbox column for row selection
+      {
+        id: 'select',
+        header: ({ table }) => (
+          <Checkbox
+            checked={table.getIsAllPageRowsSelected()}
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            aria-label="Select all"
+            // Disable if no completed runs on page
+            disabled={table.getRowModel().rows.every(row => row.original.status !== 'completed')}
+          />
+        ),
+        cell: ({ row }) => {
+          const isCompleted = row.original.status === 'completed'
+          const selectedCount = Object.keys(rowSelection).length
+          const isDisabled = !isCompleted || (selectedCount >= 5 && !row.getIsSelected())
+
+          return (
+            <Checkbox
+              checked={row.getIsSelected()}
+              onCheckedChange={(value) => row.toggleSelected(!!value)}
+              aria-label="Select row"
+              disabled={isDisabled}
+              title={
+                !isCompleted
+                  ? tCompare('onlyCompletedRuns')
+                  : selectedCount >= 5 && !row.getIsSelected()
+                  ? 'Maximum 5 runs can be selected'
+                  : undefined
+              }
+            />
+          )
+        },
+        enableSorting: false,
+        enableHiding: false,
+        size: 40,
+      },
       {
         accessorKey: 'status',
         header: () => t('status'),
@@ -273,7 +315,7 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
         sortingFn: 'basic',
       },
     ],
-    [t]
+    [t, tCompare, rowSelection]
   )
 
   // Create table instance
@@ -286,9 +328,13 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: (row) => row.original.status === 'completed', // Only allow completed runs to be selected
+    enableMultiRowSelection: true,
     state: {
       sorting,
       columnFilters,
+      rowSelection,
     },
     initialState: {
       pagination: {
@@ -296,6 +342,11 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
       },
     },
   })
+
+  // Get selected run IDs
+  const selectedRunIds = React.useMemo(() => {
+    return table.getSelectedRowModel().rows.map((row) => row.original.id)
+  }, [table, rowSelection])
 
   // Empty state
   if (runs.length === 0) {
@@ -345,7 +396,14 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
                 <TableRow
                   key={row.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => router.push(`/proc/${processorId}/runs/${row.original.id}`)}
+                  onClick={(e) => {
+                    // Don't navigate if clicking checkbox
+                    const target = e.target as HTMLElement
+                    if (target.closest('button[role="checkbox"]')) {
+                      return
+                    }
+                    router.push(`/proc/${processorId}/runs/${row.original.id}`)
+                  }}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -407,6 +465,13 @@ export function RunsTable({ runs, processorId }: RunsTableProps) {
           </Button>
         </div>
       </div>
+
+      {/* Selection Action Bar */}
+      <SelectionActionBar
+        selectedRunIds={selectedRunIds}
+        onClearSelection={() => table.resetRowSelection()}
+        processorId={processorId}
+      />
     </div>
   )
 }

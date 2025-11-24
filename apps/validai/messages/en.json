@@ -5,7 +5,10 @@
     "delete": "Delete",
     "edit": "Edit",
     "loading": "Loading...",
-    "error": "An error occurred",
+    "error": {
+      "default": "An error occurred",
+      "loadingData": "Error loading data"
+    },
     "success": "Success",
     "confirm": "Confirm",
     "close": "Close",
@@ -221,6 +224,21 @@
         "noAreas": "No areas defined"
       }
     },
+    "compare": {
+      "title": "Compare Runs",
+      "description": "Comparing {count} runs side-by-side",
+      "selectRuns": "Select 2-5 completed runs to compare",
+      "compareSelected": "Compare Selected ({count})",
+      "clearSelection": "Clear Selection",
+      "backToHistory": "Back to Run History",
+      "copyToExcel": "Copy to Excel",
+      "exportToPDF": "Export to PDF",
+      "copiedToClipboard": "Comparison copied to clipboard",
+      "invalidRunIds": "Invalid run selection. Please return to run history.",
+      "differentProcessors": "Cannot compare runs from different processors",
+      "onlyCompletedRuns": "Only completed runs can be compared",
+      "loadingComparison": "Loading comparison..."
+    },
     "search": {
       "title": "Search & Filter",
       "searchPlaceholder": "Search",
@@ -280,6 +298,13 @@
       "result": "Result",
       "thinking": "Thinking",
       "howAiThought": "How AI thought"
+    },
+    "technical": {
+      "prompt": "Prompt",
+      "response": "Response",
+      "structuredOutput": "Structured Output",
+      "thinking": "Thinking Blocks",
+      "metrics": "Performance Metrics"
     }
   },
   "auth": {

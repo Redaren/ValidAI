@@ -23,7 +23,7 @@
 
 'use client'
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueries, useQueryClient } from '@tanstack/react-query'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { useEffect } from 'react'
 import type { Database } from '@playze/shared-types'
@@ -321,4 +321,103 @@ export function useProcessorRuns(
     },
     enabled: !!processorId,
   })
+}
+
+/**
+ * Hook to fetch multiple runs by IDs (for comparison)
+ *
+ * Fetches multiple runs in parallel using useQueries.
+ * Used for the run comparison feature.
+ *
+ * @param runIds - Array of run UUIDs to fetch
+ * @returns Object with runs array and loading/error states
+ *
+ * @example
+ * ```tsx
+ * const { runs, isLoading, isError } = useMultipleRuns(['id1', 'id2', 'id3'])
+ *
+ * runs?.map(run => (
+ *   <div key={run.id}>{run.snapshot.document.name}</div>
+ * ))
+ * ```
+ */
+export function useMultipleRuns(runIds: string[]) {
+  const supabase = createBrowserClient()
+
+  const queries = useQueries({
+    queries: runIds.map((runId) => ({
+      queryKey: ['run', runId],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('validai_runs')
+          .select('*')
+          .eq('id', runId)
+          .single()
+
+        if (error) throw error
+        return data as Run
+      },
+      enabled: !!runId,
+    })),
+  })
+
+  return {
+    runs: queries.map((q) => q.data).filter(Boolean) as Run[],
+    isLoading: queries.some((q) => q.isLoading),
+    isError: queries.some((q) => q.isError),
+    errors: queries.map((q) => q.error).filter(Boolean),
+  }
+}
+
+/**
+ * Hook to fetch operation results for multiple runs (for comparison)
+ *
+ * Fetches operation results for multiple runs in parallel using useQueries.
+ * Used for the run comparison feature.
+ *
+ * @param runIds - Array of run UUIDs
+ * @returns Object with results map (runId -> OperationResult[]) and loading/error states
+ *
+ * @example
+ * ```tsx
+ * const { resultsMap, isLoading } = useMultipleRunResults(['id1', 'id2'])
+ *
+ * // Access results for specific run
+ * const run1Results = resultsMap['id1']
+ * ```
+ */
+export function useMultipleRunResults(runIds: string[]) {
+  const supabase = createBrowserClient()
+
+  const queries = useQueries({
+    queries: runIds.map((runId) => ({
+      queryKey: ['operation-results', runId],
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('validai_operation_results')
+          .select('*')
+          .eq('run_id', runId)
+          .order('execution_order', { ascending: true })
+
+        if (error) throw error
+        return { runId, results: data as OperationResult[] }
+      },
+      enabled: !!runId,
+    })),
+  })
+
+  // Convert array to map for easier lookup
+  const resultsMap: Record<string, OperationResult[]> = {}
+  queries.forEach((query) => {
+    if (query.data) {
+      resultsMap[query.data.runId] = query.data.results
+    }
+  })
+
+  return {
+    resultsMap,
+    isLoading: queries.some((q) => q.isLoading),
+    isError: queries.some((q) => q.isError),
+    errors: queries.map((q) => q.error).filter(Boolean),
+  }
 }

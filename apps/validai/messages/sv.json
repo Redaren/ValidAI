@@ -280,6 +280,28 @@
       "result": "Resultat",
       "thinking": "Tänker",
       "howAiThought": "Hur AI tänkte"
+    },
+    "compare": {
+      "title": "Jämför körningar",
+      "description": "Jämför {count} körningar sida vid sida",
+      "selectRuns": "Välj 2-5 slutförda körningar att jämföra",
+      "compareSelected": "Jämför valda ({count})",
+      "clearSelection": "Rensa val",
+      "backToHistory": "Tillbaka till körhistorik",
+      "copyToExcel": "Kopiera till Excel",
+      "exportToPDF": "Exportera till PDF",
+      "copiedToClipboard": "Jämförelse kopierad till urklipp",
+      "invalidRunIds": "Ogiltigt val av körningar. Vänligen gå tillbaka till körhistorik.",
+      "differentProcessors": "Kan inte jämföra körningar från olika processorer",
+      "onlyCompletedRuns": "Endast slutförda körningar kan jämföras",
+      "loadingComparison": "Laddar jämförelse..."
+    },
+    "technical": {
+      "prompt": "Prompt",
+      "response": "Svar",
+      "structuredOutput": "Strukturerad utdata",
+      "thinking": "Tankeblock",
+      "metrics": "Prestandamått"
     }
   },
   "auth": {
