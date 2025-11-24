@@ -5,7 +5,10 @@
     "delete": "Ta bort",
     "edit": "Redigera",
     "loading": "Laddar...",
-    "error": "Ett fel uppstod",
+    "error": {
+      "default": "Ett fel uppstod",
+      "loadingData": "Fel vid laddning av data"
+    },
     "success": "Framgång",
     "confirm": "Bekräfta",
     "close": "Stäng",
@@ -27,6 +30,7 @@
   "nav": {
     "dashboard": "Översikt",
     "processors": "Mallar",
+    "galleries": "Gallerier",
     "operations": "Tester",
     "runs": "Historik",
     "documents": "Dokument",
@@ -151,6 +155,86 @@
       "name": "Namn",
       "type": "Typ",
       "new": "Ny"
+    }
+  },
+  "galleries": {
+    "title": "Gallerier",
+    "description": "Organisera processorer i tematiska samlingar för enkel åtkomst",
+    "loading": "Laddar gallerier...",
+    "loadingGallery": "Laddar galleri...",
+    "failed": "Kunde inte ladda gallerier",
+    "failedGallery": "Kunde inte ladda galleri",
+    "new": "Nytt galleri",
+    "backToList": "Tillbaka till gallerier",
+    "empty": {
+      "title": "Inga gallerier ännu",
+      "description": "Skapa gallerier för att organisera processorer efter teman som Försäljning, HR eller Efterlevnad.",
+      "createFirst": "Skapa ditt första galleri"
+    },
+    "noResults": {
+      "title": "Inga gallerier hittades",
+      "description": "Inga gallerier matchar din sökning. Försök justera dina söktermer."
+    },
+    "table": {
+      "name": "Namn",
+      "status": "Status",
+      "description": "Beskrivning",
+      "areas": "Områden",
+      "processors": "Processorer",
+      "searchPlaceholder": "Sök gallerier...",
+      "filterPlaceholder": "Filtrera status..."
+    },
+    "form": {
+      "name": "Gallerinamn",
+      "namePlaceholder": "Ange gallerinamn",
+      "description": "Beskrivning",
+      "descriptionPlaceholder": "Beskriv detta galleri",
+      "icon": "Ikon",
+      "iconPlaceholder": "Sök ikoner...",
+      "status": "Status",
+      "draft": "Utkast",
+      "published": "Publicerad",
+      "archived": "Arkiverad",
+      "creating": "Skapar...",
+      "create": "Skapa galleri",
+      "updating": "Uppdaterar...",
+      "update": "Uppdatera galleri",
+      "areaName": "Områdesnamn",
+      "areaNamePlaceholder": "Ange områdesnamn",
+      "areaDescription": "Områdesbeskrivning",
+      "areaDescriptionPlaceholder": "Beskriv detta område",
+      "areaIcon": "Områdesikon",
+      "addProcessors": "Lägg till processorer",
+      "selectProcessors": "Välj processorer att lägga till i detta område",
+      "onlyPublishedShown": "Endast publicerade processorer visas"
+    },
+    "header": {
+      "status": "Status",
+      "areas": "Områden",
+      "processors": "Processorer",
+      "edit": "Redigera galleri",
+      "delete": "Ta bort galleri",
+      "areasAndProcessors": "Områden & Processorer"
+    },
+    "area": {
+      "createArea": "Skapa område",
+      "editArea": "Redigera område",
+      "deleteArea": "Ta bort område",
+      "addProcessors": "Lägg till processorer",
+      "noAreas": "Inga områden ännu",
+      "noAreasDescription": "Skapa områden för att organisera processorer efter teman som Försäljning, HR eller Efterlevnad.",
+      "noProcessors": "Inga processorer ännu. Klicka på \"Lägg till processorer\" för att lägga till några.",
+      "processorCount": "{count} processor",
+      "processorCount_plural": "{count} processorer",
+      "deleting": "Tar bort...",
+      "confirmDelete": "Är du säker på att du vill ta bort detta område?",
+      "confirmDeleteDescription": "Detta tar bort området och avlänkar alla processorer. Processorer kommer inte att tas bort."
+    },
+    "user": {
+      "title": "Galleri",
+      "backToGalleries": "Tillbaka till gallerier",
+      "noAreas": "Inga områden i detta galleri ännu",
+      "run": "Kör"
     }
   },
   "runs": {
