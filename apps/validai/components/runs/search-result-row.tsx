@@ -27,6 +27,8 @@ import {
   Search,
   BarChart3,
   Lightbulb,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Database } from '@playze/shared-types'
@@ -407,6 +409,7 @@ function renderExpandedResult(result: OperationResult, t: any): React.ReactNode 
  */
 export function SearchResultRow({ result, operationNumber }: SearchResultRowProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [isThinkingExpanded, setIsThinkingExpanded] = useState(false)
   const collapsedRowRef = useRef<HTMLTableRowElement>(null)
   const expandedRowRef = useRef<HTMLTableRowElement>(null)
   const previousScrollPositionRef = useRef<number>(0)
@@ -509,37 +512,54 @@ export function SearchResultRow({ result, operationNumber }: SearchResultRowProp
 
               {/* Result Section */}
               <div>
-                <p className="mb-2 text-sm font-medium">{t('result')}:</p>
                 <div className="rounded-lg border bg-background p-4">
                   {renderExpandedResult(result, t)}
                 </div>
               </div>
 
-              {/* Thinking Blocks */}
+              {/* Thinking Blocks - Collapsible */}
               {result.thinking_blocks &&
                 Array.isArray(result.thinking_blocks) &&
                 result.thinking_blocks.length > 0 && (
                   <div>
-                    <p className="mb-2 text-sm font-medium">{t('thinking')}:</p>
-                    <div className="space-y-2">
-                      {(result.thinking_blocks as any[]).map((block, idx) => {
-                        const content =
-                          typeof block === 'string'
-                            ? block
-                            : block.thinking || block.text || ''
+                    {/* Collapsible Header */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setIsThinkingExpanded(!isThinkingExpanded)
+                      }}
+                      className="flex items-center gap-2 text-sm font-medium hover:text-accent transition-colors"
+                    >
+                      {isThinkingExpanded ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      <span>{t('howAiThought')}</span>
+                    </button>
 
-                        return (
-                          <div
-                            key={idx}
-                            className="rounded-lg border bg-muted/50 p-4"
-                          >
-                            <pre className="whitespace-pre-wrap text-sm font-sans">
-                              {content}
-                            </pre>
-                          </div>
-                        )
-                      })}
-                    </div>
+                    {/* Thinking Blocks Content */}
+                    {isThinkingExpanded && (
+                      <div className="mt-2 space-y-2">
+                        {(result.thinking_blocks as any[]).map((block, idx) => {
+                          const content =
+                            typeof block === 'string'
+                              ? block
+                              : block.thinking || block.text || ''
+
+                          return (
+                            <div
+                              key={idx}
+                              className="rounded-lg border bg-muted/50 p-4"
+                            >
+                              <pre className="whitespace-pre-wrap text-sm font-sans">
+                                {content}
+                              </pre>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
             </div>

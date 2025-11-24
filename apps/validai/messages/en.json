@@ -278,7 +278,8 @@
       "collapseRow": "Click to collapse",
       "operationDetails": "Operation Details",
       "result": "Result",
-      "thinking": "Thinking"
+      "thinking": "Thinking",
+      "howAiThought": "How AI thought"
     }
   },
   "auth": {

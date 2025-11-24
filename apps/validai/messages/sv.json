@@ -278,7 +278,8 @@
       "collapseRow": "Klicka för att kollapsa",
       "operationDetails": "Operationsdetaljer",
       "result": "Resultat",
-      "thinking": "Tänker"
+      "thinking": "Tänker",
+      "howAiThought": "Hur AI tänkte"
     }
   },
   "auth": {
