@@ -96,6 +96,9 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
   // Type-specific rendering
   switch (operationType) {
     case 'validation': {
+      const comment = structured?.comment || result.response_text || ''
+      const truncatedComment = comment.length > 60 ? `${comment.substring(0, 60)}...` : comment
+
       if (structured?.result === true) {
         return (
           <div className="flex items-center gap-1.5">
@@ -104,7 +107,7 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
               style={{ backgroundColor: 'hsl(142, 76%, 36%)' }}
               aria-label="True"
             />
-            <span className="text-sm font-medium">{t('resultDisplay.true')}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
           </div>
         )
       } else if (structured?.result === false) {
@@ -115,7 +118,7 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
               style={{ backgroundColor: 'hsl(0, 84%, 60%)' }}
               aria-label="False"
             />
-            <span className="text-sm font-medium">{t('resultDisplay.false')}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
           </div>
         )
       }
@@ -124,6 +127,9 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
 
     case 'traffic_light': {
       const trafficLight = structured?.traffic_light
+      const comment = structured?.comment || result.response_text || ''
+      const truncatedComment = comment.length > 60 ? `${comment.substring(0, 60)}...` : comment
+
       if (trafficLight === 'green') {
         return (
           <div className="flex items-center gap-1.5">
@@ -132,7 +138,7 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
               style={{ backgroundColor: 'hsl(142, 76%, 36%)' }}
               aria-label="Green"
             />
-            <span className="text-sm font-medium">{t('resultDisplay.green')}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
           </div>
         )
       } else if (trafficLight === 'yellow') {
@@ -143,7 +149,7 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
               style={{ backgroundColor: 'hsl(48, 96%, 53%)' }}
               aria-label="Yellow"
             />
-            <span className="text-sm font-medium">{t('resultDisplay.yellow')}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
           </div>
         )
       } else if (trafficLight === 'red') {
@@ -154,7 +160,7 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
               style={{ backgroundColor: 'hsl(0, 84%, 60%)' }}
               aria-label="Red"
             />
-            <span className="text-sm font-medium">{t('resultDisplay.red')}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
           </div>
         )
       }
@@ -163,26 +169,45 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
 
     case 'rating': {
       const value = structured?.value
+      const comment = structured?.comment || result.response_text || ''
+      const truncatedComment = comment.length > 60 ? `${comment.substring(0, 60)}...` : comment
+
       if (value !== undefined && value !== null) {
-        return <span className="text-sm font-medium">{value}</span>
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium">{value}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
+          </div>
+        )
       }
       break
     }
 
     case 'extraction': {
       const items = structured?.items
+      const comment = structured?.comment || result.response_text || ''
+      const truncatedComment = comment.length > 60 ? `${comment.substring(0, 60)}...` : comment
+
       if (Array.isArray(items)) {
         if (items.length === 1) {
           // Show single item, truncated
           const item = items[0]
           const truncated = item.length > 50 ? `${item.substring(0, 50)}...` : item
-          return <span className="text-sm">{truncated}</span>
+          return (
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm">{truncated}</span>
+              {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
+            </div>
+          )
         } else if (items.length > 1) {
           // Show count
           return (
-            <span className="text-sm text-muted-foreground">
-              {t('resultDisplay.itemsExtracted', { count: items.length })}
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm text-muted-foreground">
+                {t('resultDisplay.itemsExtracted', { count: items.length })}
+              </span>
+              {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
+            </div>
           )
         }
       }
@@ -191,12 +216,20 @@ function renderResult(result: OperationResult, t: any): React.ReactNode {
 
     case 'classification': {
       const classification = structured?.classification
+      const comment = structured?.comment || result.response_text || ''
+      const truncatedComment = comment.length > 60 ? `${comment.substring(0, 60)}...` : comment
+
       if (classification) {
         const truncated =
           classification.length > 40
             ? `${classification.substring(0, 40)}...`
             : classification
-        return <span className="text-sm">{truncated}</span>
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm">{truncated}</span>
+            {truncatedComment && <span className="text-sm text-muted-foreground">{truncatedComment}</span>}
+          </div>
+        )
       }
       break
     }
