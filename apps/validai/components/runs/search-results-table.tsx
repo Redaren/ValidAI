@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils'
 
 type OperationResult = Database['public']['Tables']['validai_operation_results']['Row']
 
-export type SortColumn = 'number' | 'area' | 'name' | 'result' | null
+export type SortColumn = 'area' | 'name' | 'result' | null
 export type SortDirection = 'asc' | 'desc'
 
 interface SearchResultsTableProps {
@@ -128,9 +128,9 @@ export function SearchResultsTable({
         <thead className="border-b bg-muted/30">
           <tr>
             {/* # Column */}
-            <SortableHeader column="number" className="w-[60px] text-center">
+            <Header className="w-[60px] text-center">
               {t('columns.number')}
-            </SortableHeader>
+            </Header>
 
             {/* Area Column */}
             <SortableHeader column="area" className="w-[140px]">
@@ -153,11 +153,11 @@ export function SearchResultsTable({
         </thead>
 
         <tbody className="divide-y">
-          {results.map((result, index) => (
+          {results.map((result) => (
             <SearchResultRow
               key={result.id}
               result={result}
-              operationNumber={index + 1}
+              operationNumber={result.execution_order + 1}
             />
           ))}
         </tbody>

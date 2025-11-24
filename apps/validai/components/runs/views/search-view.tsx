@@ -126,7 +126,7 @@ export function SearchView({ run, operationResults, isLoadingResults }: SearchVi
     resultFilter: null,
   })
 
-  const [sortColumn, setSortColumn] = useState<SortColumn>('number')
+  const [sortColumn, setSortColumn] = useState<SortColumn>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   // Filter results
@@ -168,12 +168,6 @@ export function SearchView({ run, operationResults, isLoadingResults }: SearchVi
       let bValue: any
 
       switch (sortColumn) {
-        case 'number':
-          // Sort by execution_order
-          aValue = a.execution_order ?? 0
-          bValue = b.execution_order ?? 0
-          break
-
         case 'area':
           // Sort by area name
           aValue = ((a.operation_snapshot as any)?.area || 'Default').toLowerCase()
