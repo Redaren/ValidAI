@@ -17,7 +17,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   CheckCircle2,
   XCircle,
@@ -407,6 +407,9 @@ function renderExpandedResult(result: OperationResult, t: any): React.ReactNode 
  */
 export function SearchResultRow({ result, operationNumber }: SearchResultRowProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const collapsedRowRef = useRef<HTMLTableRowElement>(null)
+  const expandedRowRef = useRef<HTMLTableRowElement>(null)
+  const previousScrollPositionRef = useRef<number>(0)
   const t = useTranslations('runs.search')
   const tDetail = useTranslations('runs.detail')
 
@@ -420,14 +423,46 @@ export function SearchResultRow({ result, operationNumber }: SearchResultRowProp
   const truncatedArea =
     operationArea.length > 24 ? `${operationArea.substring(0, 24)}...` : operationArea
 
+  // Handle scroll-to-view on expansion/collapse
+  useEffect(() => {
+    if (isExpanded && collapsedRowRef.current) {
+      // Store current scroll position before expanding
+      const scrollContainer = collapsedRowRef.current.closest('[class*="overflow-y-auto"]')
+      if (scrollContainer) {
+        previousScrollPositionRef.current = scrollContainer.scrollTop
+      }
+
+      // Scroll to the collapsed row (the one clicked) to keep it visible
+      // Using setTimeout to ensure the DOM has updated with the expanded content
+      setTimeout(() => {
+        collapsedRowRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 50)
+    } else if (!isExpanded && previousScrollPositionRef.current !== 0) {
+      // Restore previous scroll position when collapsing
+      const scrollContainer = document.querySelector('[class*="overflow-y-auto"]')
+      if (scrollContainer) {
+        scrollContainer.scrollTo({
+          top: previousScrollPositionRef.current,
+          behavior: 'smooth',
+        })
+        // Reset the stored position
+        previousScrollPositionRef.current = 0
+      }
+    }
+  }, [isExpanded])
+
   return (
     <>
       {/* Collapsed Row */}
       <tr
+        ref={collapsedRowRef}
         onClick={() => setIsExpanded(!isExpanded)}
         className={cn(
           'cursor-pointer transition-colors hover:bg-muted/50',
-          isExpanded && 'bg-muted/30'
+          isExpanded && 'bg-accent/20 font-medium'
         )}
         title={t('expandRow')}
       >
@@ -459,8 +494,8 @@ export function SearchResultRow({ result, operationNumber }: SearchResultRowProp
 
       {/* Expanded Row */}
       {isExpanded && (
-        <tr>
-          <td colSpan={5} className="bg-muted/20 px-4 py-6">
+        <tr ref={expandedRowRef}>
+          <td colSpan={5} className="bg-accent/10 px-4 py-6 shadow-[inset_4px_0_0_0_hsl(var(--accent))]">
             <div className="space-y-4">
               {/* Operation Name and Description */}
               <div>
