@@ -16,6 +16,9 @@ export {
   type GalleryProcessor,
 } from './use-gallery-detail'
 
+// Transform function (shared between server and client)
+export { transformGalleryData } from './transform-gallery-data'
+
 // Area and processor mutation hooks
 export {
   useCreateGalleryArea,

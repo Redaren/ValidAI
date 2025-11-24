@@ -51,6 +51,7 @@
   },
   "breadcrumb": {
     "processors": "Mallar",
+    "galleries": "Gallerier",
     "workbench": "Verktygslåda",
     "history": "Historik",
     "runDetail": "Körningsdetaljer",

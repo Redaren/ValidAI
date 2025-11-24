@@ -78,6 +78,20 @@ export function GalleryDetailClient({
   const t = useTranslations('galleries')
   const tCommon = useTranslations('common')
   const { data: gallery, isLoading, error } = useGalleryDetail(galleryId)
+  console.log('[GalleryDetailClient] 🎨 Component render:', {
+    galleryId,
+    isLoading,
+    hasError: !!error,
+    hasGallery: !!gallery,
+    galleryName: gallery?.gallery_name,
+    areasCount: gallery?.areas?.length,
+    areas: gallery?.areas?.map(a => ({
+      areaId: a.area_id,
+      areaName: a.area_name,
+      processorsCount: a.processors.length
+    })),
+    timestamp: new Date().toISOString()
+  })
 
   // Mutation hooks
   const createArea = useCreateGalleryArea()
@@ -170,7 +184,7 @@ export function GalleryDetailClient({
   }
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="container mx-auto space-y-6">
       {/* Gallery Header */}
       <GalleryHeader gallery={gallery} />
 

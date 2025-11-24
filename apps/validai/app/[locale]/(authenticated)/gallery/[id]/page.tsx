@@ -2,6 +2,7 @@ import { HydrationBoundary, dehydrate } from '@tanstack/react-query'
 import { createServerClient } from '@playze/shared-auth/server'
 import { createQueryClient } from '@/lib/query-client'
 import { GalleryDetailClient } from './gallery-detail-client'
+import { transformGalleryData } from '@/app/queries/galleries'
 import { notFound } from 'next/navigation'
 
 /**
@@ -48,22 +49,54 @@ export default async function GalleryDetailPage({
 
   // Prefetch gallery data
   try {
+    console.log('[ServerPage] 🚀 Starting server prefetch for gallery:', id)
+
     await queryClient.prefetchQuery({
       queryKey: ['gallery', id],
       queryFn: async () => {
+        console.log('[ServerPage] 🔄 Fetching from RPC:', id)
+
         const { data, error } = await supabase.rpc('get_gallery_detail', {
           p_gallery_id: id,
         })
 
+        console.log('[ServerPage] 📦 Server RPC returned:', {
+          galleryId: id,
+          rowCount: data?.length || 0,
+          hasError: !!error,
+        })
+
         if (error || !data || data.length === 0) {
+          console.error('[ServerPage] ❌ Server prefetch failed:', error)
           throw new Error('Gallery not found')
         }
 
-        // Transform flat rows to nested structure (transformation happens in hook)
-        return data
+        // ✅ Transform data to match client cache expectations
+        try {
+          console.log('[ServerPage] 🔧 About to transform data...')
+          const transformed = transformGalleryData(data as any)
+          console.log('[ServerPage] ✅ Server transformed gallery:', {
+            galleryId: transformed.gallery_id,
+            galleryName: transformed.gallery_name,
+            areasCount: transformed.areas.length,
+          })
+          return transformed
+        } catch (transformError) {
+          console.error('[ServerPage] ❌ Transform failed!', {
+            error: transformError,
+            errorMessage: transformError instanceof Error ? transformError.message : String(transformError),
+            errorStack: transformError instanceof Error ? transformError.stack : undefined,
+            dataLength: data?.length,
+            firstRow: data?.[0]
+          })
+          throw transformError
+        }
       },
     })
+
+    console.log('[ServerPage] ✅ Server prefetch completed')
   } catch (error) {
+    console.error('[ServerPage] ❌ Prefetch error, returning 404:', error)
     // If prefetch fails, the gallery doesn't exist or user doesn't have access
     notFound()
   }

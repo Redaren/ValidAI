@@ -14,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from "@playze/shared-ui"
 import {
-  ArrowLeft,
   Eye,
   LayoutGrid,
   Lock,
@@ -63,16 +62,6 @@ export function GalleryHeader({ gallery }: GalleryHeaderProps) {
 
   return (
     <div className="space-y-4 rounded-lg border bg-card p-6">
-      {/* Back button */}
-      <div>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/gallery">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Galleries
-          </Link>
-        </Button>
-      </div>
-
       {/* Title, Icon, and Action Buttons */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-4 flex-1 min-w-0">

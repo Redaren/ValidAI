@@ -51,6 +51,7 @@
   },
   "breadcrumb": {
     "processors": "Templates",
+    "galleries": "Galleries",
     "workbench": "Workbench",
     "history": "History",
     "runDetail": "Run Detail",
