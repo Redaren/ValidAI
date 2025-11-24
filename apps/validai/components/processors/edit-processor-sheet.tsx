@@ -31,7 +31,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronRight, Lock, Users } from 'lucide-react'
+import { ChevronRight, Lock, Users, FileText, CheckCircle, Archive } from 'lucide-react'
 import { AVAILABLE_VIEWS, type ViewType } from '@/components/runs/views'
 import { useTranslations } from 'next-intl'
 
@@ -151,6 +151,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
     resolver: zodResolver(updateProcessorSchema),
     defaultValues: {
       name: processor.processor_name,
+      status: processor.status,
       visibility: processor.visibility,
       description: processor.processor_description || '',
       usage_description: processor.usage_description || '',
@@ -170,6 +171,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
 
       form.reset({
         name: processor.processor_name,
+        status: processor.status,
         visibility: processor.visibility,
         description: processor.processor_description || '',
         usage_description: processor.usage_description || '',
@@ -359,6 +361,61 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
                 {form.formState.errors.visibility && (
                   <p className="text-sm text-destructive" role="alert">
                     {form.formState.errors.visibility.message}
+                  </p>
+                )}
+              </div>
+
+              {/**
+               * Status Field - Required Select/Enum
+               *
+               * Validation (via updateProcessorSchema):
+               * - Required: Must be 'draft', 'published', or 'archived'
+               * - Enum validation: Only accepts predefined values
+               *
+               * Pattern: Select component with manual setValue()
+               * - form.watch('status') - subscribes to value changes
+               * - form.setValue() - manually updates value with validation trigger
+               * - { shouldValidate: true } - triggers Zod validation on change
+               */}
+              <div className="space-y-2">
+                <Label htmlFor="status">
+                  Status <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={form.watch('status')}
+                  onValueChange={(value) =>
+                    form.setValue('status', value as 'draft' | 'published' | 'archived', {
+                      shouldValidate: true,
+                    })
+                  }
+                >
+                  <SelectTrigger id="status" className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5" />
+                        Draft
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="published">
+                      <span className="flex items-center gap-2">
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Published
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="archived">
+                      <span className="flex items-center gap-2">
+                        <Archive className="h-3.5 w-3.5" />
+                        Archived
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.status && (
+                  <p className="text-sm text-destructive" role="alert">
+                    {form.formState.errors.status.message}
                   </p>
                 )}
               </div>

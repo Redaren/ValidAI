@@ -337,6 +337,7 @@ export function useUpdateProcessor() {
       name,
       description,
       usage_description,
+      status,
       visibility,
       system_prompt,
       tags,
@@ -346,6 +347,7 @@ export function useUpdateProcessor() {
       name?: string
       description?: string | null
       usage_description?: string | null
+      status?: 'draft' | 'published' | 'archived'
       visibility?: 'personal' | 'organization'
       system_prompt?: string | null
       tags?: string[] | null
@@ -374,6 +376,8 @@ export function useUpdateProcessor() {
         name?: string
         description?: string | null
         usage_description?: string | null
+        status?: 'draft' | 'published' | 'archived'
+        published_at?: string | null
         visibility?: 'personal' | 'organization'
         system_prompt?: string | null
         tags?: string[] | null
@@ -386,6 +390,18 @@ export function useUpdateProcessor() {
       if (name !== undefined) updates.name = name
       if (description !== undefined) updates.description = description
       if (usage_description !== undefined) updates.usage_description = usage_description
+      if (status !== undefined) {
+        updates.status = status
+        // Handle published_at based on status (satisfies database constraint)
+        // Constraint: (status = 'published' AND published_at IS NOT NULL) OR (status <> 'published')
+        if (status === 'published') {
+          // When publishing, set published_at to now if not already set
+          updates.published_at = new Date().toISOString()
+        } else {
+          // When moving to draft/archived, clear published_at
+          updates.published_at = null
+        }
+      }
       if (visibility !== undefined) updates.visibility = visibility
       if (system_prompt !== undefined) updates.system_prompt = system_prompt
       if (tags !== undefined) updates.tags = tags
@@ -399,7 +415,7 @@ export function useUpdateProcessor() {
 
       if (error) throw error
     },
-    onMutate: async ({ processorId, name, description, visibility, default_run_view }) => {
+    onMutate: async ({ processorId, name, description, status, visibility, default_run_view }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: ['processor', processorId] })
 
@@ -415,6 +431,14 @@ export function useUpdateProcessor() {
           ...previousProcessor,
           ...(name !== undefined ? { processor_name: name } : {}),
           ...(description !== undefined ? { processor_description: description } : {}),
+          ...(status !== undefined
+            ? {
+                status,
+                // Update published_at based on status (matches mutation logic)
+                published_at:
+                  status === 'published' ? new Date().toISOString() : null,
+              }
+            : {}),
           ...(visibility !== undefined ? { visibility } : {}),
           ...(default_run_view !== undefined
             ? {
