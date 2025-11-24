@@ -29,6 +29,7 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
 import { useTranslations } from 'next-intl'
+import { EditGallerySheet } from './edit-gallery-sheet'
 
 interface GalleryHeaderProps {
   gallery: GalleryDetail
@@ -74,6 +75,7 @@ export function GalleryHeader({ gallery }: GalleryHeaderProps) {
   const t = useTranslations('galleries.header')
   const router = useRouter()
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
 
   const IconComponent = gallery.gallery_icon ? getIconComponent(gallery.gallery_icon) : null
@@ -118,11 +120,9 @@ export function GalleryHeader({ gallery }: GalleryHeaderProps) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href={`/gallery/${gallery.gallery_id}/edit`}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit Settings
-                    </Link>
+                  <DropdownMenuItem onClick={() => setIsEditSheetOpen(true)}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit Settings
                   </DropdownMenuItem>
                   {gallery.gallery_status === 'published' && (
                     <DropdownMenuItem asChild>
@@ -233,6 +233,13 @@ export function GalleryHeader({ gallery }: GalleryHeaderProps) {
           )}
         </div>
       </CollapsibleContent>
+
+      {/* Edit Gallery Sheet */}
+      <EditGallerySheet
+        gallery={gallery}
+        open={isEditSheetOpen}
+        onOpenChange={setIsEditSheetOpen}
+      />
     </Collapsible>
   )
 }
