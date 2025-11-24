@@ -45,7 +45,7 @@ interface ComplianceViewProps {
   /** The run to display */
   run: Run
   /** Operation results for the run */
-  operationResults: OperationResult[]
+  operationResults: OperationResult[] | undefined
   /** Whether operation results are still loading */
   isLoadingResults?: boolean
 }
@@ -56,12 +56,15 @@ interface ComplianceViewProps {
  */
 function mergeOperationsWithResults(
   snapshotOperations: Array<{ id: string; name: string; area?: string | null; [key: string]: any }>,
-  operationResults: OperationResult[]
+  operationResults: OperationResult[] | undefined
 ): OperationResult[] {
+  // Defensive check: ensure operationResults is an array
+  const results = operationResults || []
+
   return snapshotOperations.map((snapOp, index) => {
     // Find matching result (if exists)
     // Match by operation_id OR by operation_snapshot.id (fallback for legacy data where operation_id is null)
-    const result = operationResults.find(
+    const result = results.find(
       (r) => r.operation_id === snapOp.id || (r.operation_snapshot as any)?.id === snapOp.id
     )
 
@@ -280,7 +283,7 @@ export function ComplianceView({
       return mergeOperationsWithResults(snapshot.operations, operationResults)
     }
     // Otherwise, fall back to just the results
-    return operationResults
+    return operationResults || []
   }, [run.snapshot, operationResults])
 
   const groupedOperations = groupOperationsByArea(mergedOperations)
