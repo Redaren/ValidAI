@@ -4,6 +4,7 @@ import * as React from "react"
 import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import {
   FileText,
+  LayoutGrid,
   LifeBuoy,
   Send,
   SquareTerminal,
@@ -37,6 +38,13 @@ const navConfig = {
       titleKey: "processors",
       url: "/proc",
       icon: FileText,
+      isActive: false,
+      items: [],
+    },
+    {
+      titleKey: "galleries",
+      url: "/gallery",
+      icon: LayoutGrid,
       isActive: false,
       items: [],
     },

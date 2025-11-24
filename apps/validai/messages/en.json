@@ -30,6 +30,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "processors": "Templates",
+    "galleries": "Galleries",
     "operations": "Checks",
     "runs": "Runs",
     "documents": "Documents",
@@ -154,6 +155,86 @@
       "name": "Name",
       "type": "Type",
       "new": "New"
+    }
+  },
+  "galleries": {
+    "title": "Galleries",
+    "description": "Organize processors into themed collections for easy access",
+    "loading": "Loading galleries...",
+    "loadingGallery": "Loading gallery...",
+    "failed": "Failed to load galleries",
+    "failedGallery": "Failed to load gallery",
+    "new": "New Gallery",
+    "backToList": "Back to Galleries",
+    "empty": {
+      "title": "No galleries yet",
+      "description": "Create galleries to organize processors by themes like Sales, HR, or Compliance.",
+      "createFirst": "Create your first gallery"
+    },
+    "noResults": {
+      "title": "No galleries found",
+      "description": "No galleries match your search. Try adjusting your search terms."
+    },
+    "table": {
+      "name": "Name",
+      "status": "Status",
+      "description": "Description",
+      "areas": "Areas",
+      "processors": "Processors",
+      "searchPlaceholder": "Search galleries...",
+      "filterPlaceholder": "Filter status..."
+    },
+    "form": {
+      "name": "Gallery Name",
+      "namePlaceholder": "Enter gallery name",
+      "description": "Description",
+      "descriptionPlaceholder": "Describe this gallery",
+      "icon": "Icon",
+      "iconPlaceholder": "Search icons...",
+      "status": "Status",
+      "draft": "Draft",
+      "published": "Published",
+      "archived": "Archived",
+      "creating": "Creating...",
+      "create": "Create Gallery",
+      "updating": "Updating...",
+      "update": "Update Gallery",
+      "areaName": "Area Name",
+      "areaNamePlaceholder": "Enter area name",
+      "areaDescription": "Area Description",
+      "areaDescriptionPlaceholder": "Describe this area",
+      "areaIcon": "Area Icon",
+      "addProcessors": "Add Processors",
+      "selectProcessors": "Select processors to add to this area",
+      "onlyPublishedShown": "Only published processors are shown"
+    },
+    "header": {
+      "status": "Status",
+      "areas": "Areas",
+      "processors": "Processors",
+      "edit": "Edit Gallery",
+      "delete": "Delete Gallery",
+      "areasAndProcessors": "Areas & Processors"
+    },
+    "area": {
+      "createArea": "Create Area",
+      "editArea": "Edit Area",
+      "deleteArea": "Delete Area",
+      "addProcessors": "Add Processors",
+      "noAreas": "No areas yet",
+      "noAreasDescription": "Create areas to organize processors by themes like Sales, HR, or Compliance.",
+      "noProcessors": "No processors yet. Click \"Add Processors\" to add some.",
+      "processorCount": "{count} processor",
+      "processorCount_plural": "{count} processors",
+      "deleting": "Deleting...",
+      "confirmDelete": "Are you sure you want to delete this area?",
+      "confirmDeleteDescription": "This will remove the area and unlink all processors. Processors will not be deleted."
+    },
+    "user": {
+      "title": "Gallery",
+      "backToGalleries": "Back to Galleries",
+      "noAreas": "No areas in this gallery yet",
+      "run": "Run"
     }
   },
   "runs": {

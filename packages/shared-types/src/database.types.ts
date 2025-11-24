@@ -610,6 +610,142 @@ export type Database = {
           },
         ]
       }
+      validai_galleries: {
+        Row: {
+          created_at: string
+          created_by: string
+          deleted_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          organization_id: string
+          status: Database["public"]["Enums"]["gallery_status"]
+          tags: string[] | null
+          updated_at: string
+          visibility: Database["public"]["Enums"]["gallery_visibility"]
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          deleted_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          status?: Database["public"]["Enums"]["gallery_status"]
+          tags?: string[] | null
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["gallery_visibility"]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          deleted_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          status?: Database["public"]["Enums"]["gallery_status"]
+          tags?: string[] | null
+          updated_at?: string
+          visibility?: Database["public"]["Enums"]["gallery_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validai_galleries_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      validai_gallery_area_processors: {
+        Row: {
+          created_at: string
+          gallery_area_id: string
+          id: string
+          position: number
+          processor_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          gallery_area_id: string
+          id?: string
+          position: number
+          processor_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          gallery_area_id?: string
+          id?: string
+          position?: number
+          processor_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validai_gallery_area_processors_gallery_area_id_fkey"
+            columns: ["gallery_area_id"]
+            isOneToOne: false
+            referencedRelation: "validai_gallery_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validai_gallery_area_processors_processor_id_fkey"
+            columns: ["processor_id"]
+            isOneToOne: false
+            referencedRelation: "validai_processors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      validai_gallery_areas: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number
+          gallery_id: string
+          icon: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order: number
+          gallery_id: string
+          icon?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number
+          gallery_id?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validai_gallery_areas_gallery_id_fkey"
+            columns: ["gallery_id"]
+            isOneToOne: false
+            referencedRelation: "validai_galleries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       validai_llm_global_settings: {
         Row: {
           configuration: Json | null
@@ -661,6 +797,7 @@ export type Database = {
           model_used: string | null
           operation_id: string | null
           operation_snapshot: Json
+          organization_id: string
           response_text: string | null
           retry_count: number | null
           run_id: string
@@ -681,6 +818,7 @@ export type Database = {
           model_used?: string | null
           operation_id?: string | null
           operation_snapshot: Json
+          organization_id: string
           response_text?: string | null
           retry_count?: number | null
           run_id: string
@@ -701,6 +839,7 @@ export type Database = {
           model_used?: string | null
           operation_id?: string | null
           operation_snapshot?: Json
+          organization_id?: string
           response_text?: string | null
           retry_count?: number | null
           run_id?: string
@@ -725,6 +864,13 @@ export type Database = {
             referencedRelation: "validai_runs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "validai_operation_results_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       validai_operations: {
@@ -736,6 +882,7 @@ export type Database = {
           id: string
           name: string
           operation_type: Database["public"]["Enums"]["operation_type"]
+          organization_id: string
           output_schema: Json | null
           position: number
           processor_id: string
@@ -752,6 +899,7 @@ export type Database = {
           id?: string
           name: string
           operation_type: Database["public"]["Enums"]["operation_type"]
+          organization_id: string
           output_schema?: Json | null
           position: number
           processor_id: string
@@ -768,6 +916,7 @@ export type Database = {
           id?: string
           name?: string
           operation_type?: Database["public"]["Enums"]["operation_type"]
+          organization_id?: string
           output_schema?: Json | null
           position?: number
           processor_id?: string
@@ -782,6 +931,13 @@ export type Database = {
             columns: ["processor_id"]
             isOneToOne: false
             referencedRelation: "validai_processors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validai_operations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -1406,6 +1562,34 @@ export type Database = {
         }[]
       }
       get_current_organization_id: { Args: never; Returns: string }
+      get_gallery_detail: {
+        Args: { p_gallery_id: string }
+        Returns: {
+          area_description: string
+          area_display_order: number
+          area_icon: string
+          area_id: string
+          area_name: string
+          gallery_created_at: string
+          gallery_created_by: string
+          gallery_creator_name: string
+          gallery_description: string
+          gallery_icon: string
+          gallery_id: string
+          gallery_is_owner: boolean
+          gallery_name: string
+          gallery_status: Database["public"]["Enums"]["gallery_status"]
+          gallery_tags: string[]
+          gallery_updated_at: string
+          gallery_visibility: Database["public"]["Enums"]["gallery_visibility"]
+          processor_description: string
+          processor_id: string
+          processor_name: string
+          processor_position: number
+          processor_status: Database["public"]["Enums"]["processor_status"]
+          processor_usage_description: string
+        }[]
+      }
       get_llm_config_for_run:
         | {
             Args: { p_processor_id?: string; p_user_id?: string }
@@ -1498,6 +1682,34 @@ export type Database = {
           tier_display_name: string
           tier_name: string
         }[]
+      }
+      get_user_galleries: {
+        Args: {
+          p_include_archived?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+        }
+        Returns: {
+          area_count: number
+          created_at: string
+          created_by: string
+          creator_name: string
+          description: string
+          icon: string
+          id: string
+          is_owner: boolean
+          name: string
+          processor_count: number
+          status: Database["public"]["Enums"]["gallery_status"]
+          tags: string[]
+          updated_at: string
+          visibility: Database["public"]["Enums"]["gallery_visibility"]
+        }[]
+      }
+      get_user_galleries_count: {
+        Args: { p_include_archived?: boolean; p_search?: string }
+        Returns: number
       }
       get_user_organizations: {
         Args: never
@@ -1646,6 +1858,8 @@ export type Database = {
       }
     }
     Enums: {
+      gallery_status: "draft" | "published" | "archived"
+      gallery_visibility: "personal" | "organization"
       operation_type:
         | "extraction"
         | "validation"
@@ -1783,6 +1997,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      gallery_status: ["draft", "published", "archived"],
+      gallery_visibility: ["personal", "organization"],
       operation_type: [
         "extraction",
         "validation",

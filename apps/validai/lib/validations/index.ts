@@ -74,3 +74,30 @@ export {
   type RowValidationResult,
   type BulkValidationResult,
 } from './bulk-operation-schemas'
+
+// Gallery schemas
+export {
+  iconSchema,
+  galleryNameSchema,
+  areaNameSchema as galleryAreaNameSchema,
+  createGallerySchema,
+  updateGallerySchema,
+  createGalleryAreaSchema,
+  updateGalleryAreaSchema,
+  addProcessorsToAreaSchema,
+  reorderAreasSchema,
+  reorderProcessorsSchema,
+  deleteGallerySchema,
+  deleteGalleryAreaSchema,
+  removeProcessorFromAreaSchema,
+  type CreateGalleryInput,
+  type UpdateGalleryInput,
+  type CreateGalleryAreaInput,
+  type UpdateGalleryAreaInput,
+  type AddProcessorsToAreaInput,
+  type ReorderAreasInput,
+  type ReorderProcessorsInput,
+  type DeleteGalleryInput,
+  type DeleteGalleryAreaInput,
+  type RemoveProcessorFromAreaInput,
+} from './gallery-schemas'

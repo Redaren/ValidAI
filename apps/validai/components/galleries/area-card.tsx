@@ -1,0 +1,169 @@
+"use client"
+
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { type GalleryArea } from "@/app/queries/galleries"
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@playze/shared-ui"
+import { GripVertical, MoreHorizontal, Plus, Pencil, Trash2, X } from "lucide-react"
+import * as LucideIcons from 'lucide-react'
+import { Link } from "@/lib/i18n/navigation"
+import { ProcessorCard } from "./processor-card"
+
+interface AreaCardProps {
+  area: GalleryArea
+  onAddProcessors: () => void
+  onEdit: () => void
+  onDelete: () => void
+  onRemoveProcessor: (areaId: string, processorId: string) => void
+  isDragging: boolean
+}
+
+// Get icon component by name
+function getIconComponent(iconName: string) {
+  if (!iconName) return null
+  const pascalName = iconName
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join('')
+  return (LucideIcons as any)[pascalName] || null
+}
+
+/**
+ * Area Card - Sortable Area Container with Sortable Processors
+ *
+ * A draggable card representing a gallery area. The card itself can be
+ * dragged to reorder areas, and processors within it can be dragged to reorder.
+ */
+export function AreaCard({
+  area,
+  onAddProcessors,
+  onEdit,
+  onDelete,
+  onRemoveProcessor,
+  isDragging,
+}: AreaCardProps) {
+  // Make the area sortable
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: `area-${area.area_id}` })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const IconComponent = area.area_icon ? getIconComponent(area.area_icon) : null
+
+  // Processor IDs for sortable context
+  const processorIds = area.processors.map(p => p.processor_id)
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="rounded-lg border bg-card/50 p-4 space-y-3"
+    >
+      {/* Area Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          {/* Drag Handle */}
+          <button
+            className="mt-1 cursor-grab active:cursor-grabbing touch-none"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-5 w-5 text-muted-foreground hover:text-foreground transition-colors" />
+          </button>
+
+          {/* Area Icon */}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-muted">
+            {IconComponent ? (
+              <IconComponent className="h-5 w-5" />
+            ) : (
+              <LucideIcons.Folder className="h-5 w-5" />
+            )}
+          </div>
+
+          {/* Area Name and Description */}
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold">{area.area_name}</h3>
+            {area.area_description && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {area.area_description}
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              {area.processors.length} {area.processors.length === 1 ? 'processor' : 'processors'}
+            </p>
+          </div>
+        </div>
+
+        {/* Area Actions */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onAddProcessors}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Processors
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit Area
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Area
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Processors List */}
+      {area.processors.length === 0 ? (
+        <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+          No processors yet. Click "Add Processors" to add some.
+        </div>
+      ) : (
+        <SortableContext items={processorIds} strategy={verticalListSortingStrategy}>
+          <div className="grid gap-2">
+            {area.processors.map((processor) => (
+              <ProcessorCard
+                key={processor.processor_id}
+                processor={processor}
+                areaId={area.area_id}
+                onRemove={() => onRemoveProcessor(area.area_id, processor.processor_id)}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      )}
+    </div>
+  )
+}
