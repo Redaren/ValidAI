@@ -165,7 +165,7 @@
     "loadingGallery": "Loading gallery...",
     "failed": "Failed to load galleries",
     "failedGallery": "Failed to load gallery",
-    "new": "New Gallery",
+    "new": "New",
     "backToList": "Back to Galleries",
     "empty": {
       "title": "No galleries yet",
@@ -211,8 +211,12 @@
     },
     "header": {
       "status": "Status",
+      "visibility": "Visibility",
       "areas": "Areas",
       "processors": "Processors",
+      "createdBy": "Created by",
+      "updated": "Updated",
+      "tags": "Tags",
       "edit": "Edit Gallery",
       "delete": "Delete Gallery",
       "areasAndProcessors": "Areas & Processors"

@@ -165,7 +165,7 @@
     "loadingGallery": "Laddar galleri...",
     "failed": "Kunde inte ladda gallerier",
     "failedGallery": "Kunde inte ladda galleri",
-    "new": "Nytt galleri",
+    "new": "Ny",
     "backToList": "Tillbaka till gallerier",
     "empty": {
       "title": "Inga gallerier ännu",
@@ -211,8 +211,12 @@
     },
     "header": {
       "status": "Status",
+      "visibility": "Synlighet",
       "areas": "Områden",
       "processors": "Processorer",
+      "createdBy": "Skapad av",
+      "updated": "Uppdaterad",
+      "tags": "Taggar",
       "edit": "Redigera galleri",
       "delete": "Ta bort galleri",
       "areasAndProcessors": "Områden & Processorer"

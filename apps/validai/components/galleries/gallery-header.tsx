@@ -14,6 +14,11 @@ import {
   DropdownMenuTrigger,
 } from "@playze/shared-ui"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
   Eye,
   LayoutGrid,
   Lock,
@@ -23,7 +28,6 @@ import {
   Users,
 } from "lucide-react"
 import { formatDistanceToNow } from 'date-fns'
-import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
 
 interface GalleryHeaderProps {
@@ -38,6 +42,20 @@ function getIconComponent(iconName: string) {
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join('')
   return (LucideIcons as any)[pascalName] || null
+}
+
+// Get status color using processor header pattern
+function getStatusColor(status: string) {
+  switch (status) {
+    case "published":
+      return "bg-green-500/10 text-green-700 dark:text-green-400"
+    case "draft":
+      return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
+    case "archived":
+      return "bg-gray-500/10 text-gray-700 dark:text-gray-400"
+    default:
+      return "bg-gray-500/10 text-gray-700 dark:text-gray-400"
+  }
 }
 
 /**
@@ -56,133 +74,165 @@ export function GalleryHeader({ gallery }: GalleryHeaderProps) {
   const t = useTranslations('galleries.header')
   const router = useRouter()
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const IconComponent = gallery.gallery_icon ? getIconComponent(gallery.gallery_icon) : null
   const VisibilityIcon = gallery.gallery_visibility === "personal" ? Lock : Users
 
   return (
-    <div className="space-y-4 rounded-lg border bg-card p-6">
-      {/* Title, Icon, and Action Buttons */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4 flex-1 min-w-0">
-          {/* Icon */}
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted">
-            {IconComponent ? (
-              <IconComponent className="h-8 w-8" />
-            ) : (
-              <LayoutGrid className="h-8 w-8" />
-            )}
-          </div>
-
-          {/* Name and Description */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-2xl font-bold tracking-tight">{gallery.gallery_name}</h1>
-              <Badge
-                variant={gallery.gallery_status === 'published' ? 'default' : gallery.gallery_status === 'archived' ? 'secondary' : 'outline'}
-                className={cn(
-                  'text-xs',
-                  gallery.gallery_status === 'draft' && 'border-yellow-600/50 bg-yellow-50 text-yellow-700 dark:bg-yellow-950/50',
-                  gallery.gallery_status === 'archived' && 'text-muted-foreground'
-                )}
-              >
-                {gallery.gallery_status === 'draft' && 'Draft'}
-                {gallery.gallery_status === 'published' && 'Published'}
-                {gallery.gallery_status === 'archived' && 'Archived'}
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                <VisibilityIcon className="mr-1 h-3 w-3" />
-                {gallery.gallery_visibility === 'personal' ? 'Personal' : 'Organization'}
-              </Badge>
-            </div>
-
-            {gallery.gallery_description && (
-              <p className="mt-2 text-sm text-muted-foreground">
-                {gallery.gallery_description}
-              </p>
-            )}
-
-            {/* Metadata */}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-              <div>
-                Created by {gallery.gallery_creator_name || 'Unknown'}
-              </div>
-              {gallery.gallery_updated_at && (
-                <>
-                  <div>•</div>
-                  <div>
-                    Updated {formatDistanceToNow(new Date(gallery.gallery_updated_at), { addSuffix: true })}
-                  </div>
-                </>
-              )}
-              <div>•</div>
-              <div>
-                {gallery.areas?.length ?? 0} {(gallery.areas?.length ?? 0) === 1 ? 'area' : 'areas'}
-              </div>
-              <div>•</div>
-              <div>
-                {gallery.areas?.reduce((sum, area) => sum + area.processors.length, 0) ?? 0} processors
-              </div>
-            </div>
-
-            {/* Tags */}
-            {gallery.gallery_tags && gallery.gallery_tags.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {gallery.gallery_tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
+    <Collapsible
+      open={isExpanded}
+      onOpenChange={setIsExpanded}
+      className="space-y-4 rounded-lg border bg-card p-6"
+    >
+      {/* Two-column layout: Icon on left, content on right */}
+      <div className="flex gap-4 items-center">
+        {/* Column 1: Icon */}
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-muted">
+          {IconComponent ? (
+            <IconComponent className="h-8 w-8" />
+          ) : (
+            <LayoutGrid className="h-8 w-8" />
+          )}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-2">
-          {gallery.gallery_status === 'published' && (
-            <Button variant="default" asChild>
-              <Link href={`/sv/${gallery.gallery_id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Gallery
-              </Link>
-            </Button>
-          )}
+        {/* Column 2: All content */}
+        <div className="flex-1 space-y-4 min-w-0">
+          {/* Row 1: Title and Action Buttons */}
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-2xl font-bold tracking-tight">{gallery.gallery_name}</h1>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link href={`/gallery/${gallery.gallery_id}/edit`}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Settings
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="default" size="icon" asChild>
+                <Link href={`/sv/${gallery.gallery_id}`}>
+                  <Eye className="h-4 w-4" />
                 </Link>
-              </DropdownMenuItem>
-              {gallery.gallery_status === 'published' && (
-                <DropdownMenuItem asChild>
-                  <Link href={`/sv/${gallery.gallery_id}`}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View as User
-                  </Link>
-                </DropdownMenuItem>
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link href={`/gallery/${gallery.gallery_id}/edit`}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  {gallery.gallery_status === 'published' && (
+                    <DropdownMenuItem asChild>
+                      <Link href={`/sv/${gallery.gallery_id}`}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View as User
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setIsDeleteConfirmOpen(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Gallery
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Row 2: CollapsibleTrigger - Status Row */}
+          <CollapsibleTrigger asChild>
+            <div className="flex gap-8 items-start hover:bg-accent/50 cursor-pointer transition-colors rounded-md p-2 -mx-2">
+              {/* Status Badge */}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{t('status')}</span>
+                <Badge className={getStatusColor(gallery.gallery_status)}>
+                  {gallery.gallery_status}
+                </Badge>
+              </div>
+
+              {/* Visibility - Labeled Field */}
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{t('visibility')}</span>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <VisibilityIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="capitalize">{gallery.gallery_visibility}</span>
+                </div>
+              </div>
+
+              {/* Description */}
+              {gallery.gallery_description && (
+                <div className="flex-1">
+                  <p className="text-sm text-muted-foreground">
+                    {gallery.gallery_description}
+                  </p>
+                </div>
               )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setIsDeleteConfirmOpen(true)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Gallery
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+          </CollapsibleTrigger>
         </div>
       </div>
-    </div>
+
+      {/* CollapsibleContent: Hidden details (metadata and tags) */}
+      <CollapsibleContent className="space-y-4">
+        <div className="space-y-4 pt-2 border-t">
+          {/* First Row: Areas, Processors, Created By, Last Updated */}
+          <div className="flex gap-8 items-start">
+            {/* Areas Count */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">{t('areas')}</span>
+              <span className="text-sm">
+                {gallery.areas?.length ?? 0} {(gallery.areas?.length ?? 0) === 1 ? 'area' : 'areas'}
+              </span>
+            </div>
+
+            {/* Processors Count */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">{t('processors')}</span>
+              <span className="text-sm">
+                {gallery.areas?.reduce((sum, area) => sum + area.processors.length, 0) ?? 0}
+              </span>
+            </div>
+
+            {/* Created By */}
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-muted-foreground">{t('createdBy')}</span>
+              <span className="text-sm">{gallery.gallery_creator_name || 'Unknown'}</span>
+            </div>
+
+            {/* Last Updated */}
+            {gallery.gallery_updated_at && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{t('updated')}</span>
+                <span className="text-sm">
+                  {formatDistanceToNow(new Date(gallery.gallery_updated_at), { addSuffix: true })}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Tags */}
+          {gallery.gallery_tags && gallery.gallery_tags.length > 0 && (
+            <div className="flex gap-8 items-start pt-2 border-t">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">{t('tags')}</span>
+                <div className="flex flex-wrap gap-2">
+                  {gallery.gallery_tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-xs font-normal">
+                      {tag}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

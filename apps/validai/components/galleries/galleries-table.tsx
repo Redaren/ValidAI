@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Plus, MoreHorizontal, Eye, Pencil, Trash2, Copy, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, MoreHorizontal, Eye, Pencil, Trash2, Copy, ChevronLeft, ChevronRight, Lock, Users, LayoutGrid } from 'lucide-react'
 import {
   ColumnDef,
   SortingState,
@@ -12,10 +12,8 @@ import {
   getPaginationRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import * as LucideIcons from 'lucide-react'
 import { useRouter, Link } from '@/lib/i18n/navigation'
 import { useTranslations } from 'next-intl'
-import { formatDistanceToNow } from 'date-fns'
 
 import {
   Table,
@@ -32,20 +30,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Badge,
 } from '@playze/shared-ui'
 import { Gallery } from '@/app/queries/galleries'
-import { cn } from '@/lib/utils'
-
-// Get icon component by name
-function getIconComponent(iconName: string) {
-  if (!iconName) return null
-  const pascalName = iconName
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join('')
-  return (LucideIcons as any)[pascalName] || null
-}
+import { GalleryStatusBadge } from './gallery-status-badge'
 
 interface GalleriesTableProps {
   data: Gallery[]
@@ -59,31 +46,6 @@ interface GalleriesTableProps {
   isEmpty: boolean
   onCreateClick: () => void
   mode: 'client' | 'server'
-}
-
-function GalleryStatusBadge({ status }: { status: 'draft' | 'published' | 'archived' }) {
-  return (
-    <Badge
-      variant={status === 'published' ? 'default' : status === 'archived' ? 'secondary' : 'outline'}
-      className={cn(
-        'text-xs',
-        status === 'draft' && 'border-yellow-600/50 bg-yellow-50 text-yellow-700 dark:bg-yellow-950/50',
-        status === 'archived' && 'text-muted-foreground'
-      )}
-    >
-      {status === 'draft' && 'Draft'}
-      {status === 'published' && 'Published'}
-      {status === 'archived' && 'Archived'}
-    </Badge>
-  )
-}
-
-function GalleryVisibilityBadge({ visibility }: { visibility: 'personal' | 'organization' }) {
-  return (
-    <Badge variant="outline" className="text-xs">
-      {visibility === 'personal' ? 'Personal' : 'Organization'}
-    </Badge>
-  )
 }
 
 export function GalleriesTable({
@@ -108,57 +70,14 @@ export function GalleriesTable({
   const columns = React.useMemo<ColumnDef<Gallery>[]>(
     () => [
       {
-        accessorKey: 'icon',
-        header: '',
-        size: 50,
-        cell: ({ row }) => {
-          const iconName = row.getValue('icon') as string | null
-          const IconComponent = iconName ? getIconComponent(iconName) : null
-          return (
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-muted">
-              {IconComponent ? <IconComponent className="h-5 w-5" /> : <LucideIcons.LayoutGrid className="h-5 w-5" />}
-            </div>
-          )
-        },
-      },
-      {
         accessorKey: 'name',
         header: 'Name',
         enableGlobalFilter: true,
         cell: ({ row }) => (
-          <Link href={`/gallery/${row.original.id}`} className="font-medium hover:underline">
+          <Link href={`/gallery/${row.original.id}`} className="font-semibold hover:underline">
             {row.getValue('name')}
           </Link>
         ),
-      },
-      {
-        accessorKey: 'description',
-        header: 'Description',
-        enableGlobalFilter: true,
-        cell: ({ row }) => {
-          const description = row.getValue('description') as string | null
-          return (
-            <div className="max-w-[300px] truncate text-sm text-muted-foreground">
-              {description || <span className="italic">No description</span>}
-            </div>
-          )
-        },
-      },
-      {
-        accessorKey: 'area_count',
-        header: 'Areas',
-        cell: ({ row }) => {
-          const count = row.getValue('area_count') as number
-          return <div className="text-center">{count}</div>
-        },
-      },
-      {
-        accessorKey: 'processor_count',
-        header: 'Processors',
-        cell: ({ row }) => {
-          const count = row.getValue('processor_count') as number
-          return <div className="text-center">{count}</div>
-        },
       },
       {
         accessorKey: 'status',
@@ -166,26 +85,33 @@ export function GalleriesTable({
         cell: ({ row }) => <GalleryStatusBadge status={row.getValue('status')} />,
       },
       {
-        accessorKey: 'visibility',
-        header: 'Visibility',
-        cell: ({ row }) => <GalleryVisibilityBadge visibility={row.getValue('visibility')} />,
-      },
-      {
-        accessorKey: 'creator_name',
-        header: 'Created By',
+        accessorKey: 'description',
+        header: 'Description',
+        enableGlobalFilter: true,
         cell: ({ row }) => {
-          const name = row.getValue('creator_name') as string | null
-          return <div className="text-sm text-muted-foreground">{name || 'Unknown'}</div>
+          const description = row.getValue('description') as string | null
+          const truncated = description && description.length > 60
+            ? description.substring(0, 60) + '...'
+            : description
+          return (
+            <span className="text-muted-foreground">
+              {truncated || <span className="italic">No description</span>}
+            </span>
+          )
         },
       },
       {
-        accessorKey: 'updated_at',
-        header: 'Updated',
+        accessorKey: 'visibility',
+        header: 'Visibility',
         cell: ({ row }) => {
-          const date = row.getValue('updated_at') as string
+          const visibility = row.getValue('visibility') as string
+          const Icon = visibility === 'personal' ? Lock : Users
+          const label = visibility === 'personal' ? 'Personal' : 'Organization'
+
           return (
-            <div className="text-sm text-muted-foreground">
-              {formatDistanceToNow(new Date(date), { addSuffix: true })}
+            <div className="flex items-center gap-1.5">
+              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-sm">{label}</span>
             </div>
           )
         },
@@ -198,7 +124,11 @@ export function GalleriesTable({
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
+                <Button
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <span className="sr-only">Open menu</span>
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -295,7 +225,7 @@ export function GalleriesTable({
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center rounded-md border border-dashed p-8 text-center">
         <div className="mx-auto flex max-w-[420px] flex-col items-center justify-center text-center">
-          <LucideIcons.LayoutGrid className="h-10 w-10 text-muted-foreground" />
+          <LayoutGrid className="h-10 w-10 text-muted-foreground" />
           <h3 className="mt-4 text-lg font-semibold">No galleries yet</h3>
           <p className="mb-4 mt-2 text-sm text-muted-foreground">
             Create your first gallery to organize processors by areas like Sales, HR, or Compliance.
@@ -312,16 +242,13 @@ export function GalleriesTable({
   return (
     <div className="space-y-4">
       {/* Search */}
-      <div className="flex items-center justify-between">
+      <div>
         <Input
           placeholder="Search galleries..."
           value={mode === 'client' ? globalFilter : searchValue}
           onChange={(e) => handleSearchChange(e.target.value)}
           className="max-w-sm"
         />
-        <div className="text-sm text-muted-foreground">
-          {totalCount} {totalCount === 1 ? 'gallery' : 'galleries'}
-        </div>
       </div>
 
       {/* Table */}
@@ -349,7 +276,12 @@ export function GalleriesTable({
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                  onClick={() => router.push(`/gallery/${row.original.id}`)}
+                  className="cursor-pointer hover:bg-muted/50"
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -369,7 +301,7 @@ export function GalleriesTable({
       </div>
 
       {/* Pagination */}
-      {totalCount > 0 && (
+      {totalCount > 0 && (mode === 'client' ? table.getPageCount() > 1 : pageCount > 1) && (
         <div className="flex items-center justify-between">
           <div className="text-sm text-muted-foreground">
             Page {pageIndex + 1} of {mode === 'client' ? table.getPageCount() : pageCount}

@@ -28,7 +28,7 @@ interface GalleryUserViewPageProps {
  * - Delegates interactivity to GalleryUserViewClient (client component)
  *
  * **Access Control:**
- * - Only shows published galleries
+ * - Shows galleries in all statuses (draft, published, archived) for preview
  * - Only shows published processors
  * - Respects organization visibility settings
  *
@@ -55,17 +55,11 @@ export default async function GalleryUserViewPage({
           throw new Error('Gallery not found')
         }
 
-        // Check if gallery is published
-        const firstRow = data[0]
-        if (firstRow.gallery_status !== 'published') {
-          throw new Error('Gallery not published')
-        }
-
         return data
       },
     })
   } catch (error) {
-    // If prefetch fails, the gallery doesn't exist, isn't published, or user doesn't have access
+    // If prefetch fails, the gallery doesn't exist or user doesn't have access
     notFound()
   }
 

@@ -59,7 +59,7 @@ export function GalleryUserViewClient({
     )
   }
 
-  if (error || !gallery || gallery.gallery_status !== 'published') {
+  if (error || !gallery) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
         <div className="text-destructive">Gallery not available</div>
