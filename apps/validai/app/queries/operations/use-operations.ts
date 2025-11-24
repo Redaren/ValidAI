@@ -36,8 +36,18 @@ export function useCreateOperation() {
   const supabase = createBrowserClient()
 
   return useMutation({
-    mutationFn: async (payload: Omit<CreateOperationPayload, 'position'>) => {
-      // First, get the max position in the target area
+    mutationFn: async (payload: Omit<CreateOperationPayload, 'position' | 'organization_id'>) => {
+      // First, get the processor to get organization_id
+      const { data: processor, error: processorError } = await supabase
+        .from('validai_processors')
+        .select('organization_id')
+        .eq('id', payload.processor_id)
+        .single()
+
+      if (processorError) throw processorError
+      if (!processor) throw new Error('Processor not found')
+
+      // Then, get the max position in the target area
       const { data: existingOps, error: fetchError } = await supabase
         .from('validai_operations')
         .select('position')
@@ -57,6 +67,7 @@ export function useCreateOperation() {
         .from('validai_operations')
         .insert({
           ...payload,
+          organization_id: processor.organization_id,
           position: newPosition,
           required: payload.required ?? false,
           configuration: payload.configuration ?? null,

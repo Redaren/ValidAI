@@ -84,17 +84,20 @@ export function useBulkImportOperations() {
       let operationsCreated = 0
       let operationsUpdated = 0
 
-      // Step 1: Create new areas if needed
+      // Step 1: Fetch processor to get organization_id and area_configuration
+      const { data: processor, error: fetchProcessorError } = await supabase
+        .from('validai_processors')
+        .select('organization_id, area_configuration')
+        .eq('id', processorId)
+        .single()
+
+      if (fetchProcessorError) throw fetchProcessorError
+      if (!processor) throw new Error('Processor not found')
+
+      const organizationId = processor.organization_id
+
+      // Step 2: Create new areas if needed
       if (newAreas.length > 0) {
-        // Fetch current area configuration
-        const { data: processor, error: fetchError } = await supabase
-          .from('validai_processors')
-          .select('area_configuration')
-          .eq('id', processorId)
-          .single()
-
-        if (fetchError) throw fetchError
-
         const currentConfig = (processor?.area_configuration as ProcessorDetail['area_configuration']) || {
           areas: [],
         }
@@ -127,7 +130,7 @@ export function useBulkImportOperations() {
         areasCreated = newAreas.length
       }
 
-      // Step 2: Group operations by area and import
+      // Step 3: Group operations by area and import
       const operationsByArea = new Map<string, OperationToImport[]>()
       operations.forEach(opToImport => {
         const area = opToImport.operation.area
@@ -136,7 +139,7 @@ export function useBulkImportOperations() {
         operationsByArea.set(area, existing)
       })
 
-      // Step 3: Import operations for each area
+      // Step 4: Import operations for each area
       for (const [area, areaOperations] of operationsByArea.entries()) {
         // Get max position in this area for new operations
         const { data: existingOps, error: fetchError } = await supabase
@@ -161,6 +164,7 @@ export function useBulkImportOperations() {
             const { error: insertError } = await supabase
               .from('validai_operations')
               .insert({
+                organization_id: organizationId,
                 processor_id: processorId,
                 name: operation.name,
                 description: operation.description,

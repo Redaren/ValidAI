@@ -56,7 +56,8 @@ interface ComplianceViewProps {
  */
 function mergeOperationsWithResults(
   snapshotOperations: Array<{ id: string; name: string; area?: string | null; [key: string]: any }>,
-  operationResults: OperationResult[] | undefined
+  operationResults: OperationResult[] | undefined,
+  organizationId: string
 ): OperationResult[] {
   // Defensive check: ensure operationResults is an array
   const results = operationResults || []
@@ -80,6 +81,7 @@ function mergeOperationsWithResults(
         id: `pending-${snapOp.id}`,
         run_id: '',
         operation_id: snapOp.id,
+        organization_id: organizationId,
         execution_order: index,
         status: 'pending',
         operation_snapshot: snapOp,
@@ -280,11 +282,11 @@ export function ComplianceView({
     // If snapshot has operations, merge them with results
     const snapshot = run.snapshot as { operations?: Array<{ id: string; name: string; area?: string | null; [key: string]: any }> } | null
     if (snapshot?.operations && snapshot.operations.length > 0) {
-      return mergeOperationsWithResults(snapshot.operations, operationResults)
+      return mergeOperationsWithResults(snapshot.operations, operationResults, run.organization_id)
     }
     // Otherwise, fall back to just the results
     return operationResults || []
-  }, [run.snapshot, operationResults])
+  }, [run.snapshot, operationResults, run.organization_id])
 
   const groupedOperations = groupOperationsByArea(mergedOperations)
   const operationNumbering = useMemo(() => createOperationNumbering(groupedOperations), [groupedOperations])
