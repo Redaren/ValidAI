@@ -29,7 +29,7 @@ import { useRouter } from '@/lib/i18n/navigation'
 import { useMultipleRuns, useMultipleRunResults } from '@/app/queries/runs'
 import { useProcessorDetail } from '@/app/queries/processors/use-processor-detail'
 import { Button } from '@playze/shared-ui'
-import { ArrowLeft, Download, Copy } from 'lucide-react'
+import { ArrowLeft, Download, Copy, GitCompareArrows } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { CompareTable } from './compare-table'
 import type { Database } from '@playze/shared-types'
@@ -191,53 +191,27 @@ export function CompareView({ processorId, runIds }: CompareViewProps) {
   }
 
   return (
-    <div className="container max-w-screen-2xl py-8">
-      <div className="mb-8 space-y-6">
-        {/* Breadcrumbs */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <button
-            onClick={() => router.push(`/proc/${processorId}`)}
-            className="hover:text-foreground"
-          >
-            {processor?.name ? String(processor.name) : 'Processor'}
-          </button>
-          <span>/</span>
-          <button
-            onClick={() => router.push(`/proc/${processorId}/runs`)}
-            className="hover:text-foreground"
-          >
-            Runs
-          </button>
-          <span>/</span>
-          <span className="text-foreground">Compare</span>
-        </div>
-
-        {/* Header */}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">{t('title')}</h1>
-          <p className="text-muted-foreground">
-            {t('description', { count: runs.length })}
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleCopyToExcel} className="gap-2">
-            <Copy className="h-4 w-4" />
-            {t('copyToExcel')}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2">
-            <Download className="h-4 w-4" />
-            {t('exportToPDF')}
-          </Button>
-          <div className="ml-auto">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push(`/proc/${processorId}/runs`)}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              {t('backToHistory')}
+    <div className="container max-w-screen-2xl pb-8">
+      <div className="mb-8 space-y-4">
+        {/* Header with Actions */}
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <GitCompareArrows className="h-6 w-6" />
+              <h1 className="text-2xl font-bold">{t('title')}</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t('description', { count: runs.length })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleCopyToExcel} className="gap-2">
+              <Copy className="h-4 w-4" />
+              {t('copyToExcel')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF} className="gap-2">
+              <Download className="h-4 w-4" />
+              {t('exportToPDF')}
             </Button>
           </div>
         </div>
