@@ -7,7 +7,7 @@ import { Link } from "@/lib/i18n/navigation"
 import { useTranslations } from 'next-intl'
 import * as LucideIcons from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
-import { cn } from '@/lib/utils'
+import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 
 /**
  * Props for the GalleryUserViewClient component.
@@ -148,7 +148,7 @@ export function GalleryUserViewClient({
           </div>
         </div>
       ) : (
-        <div className="space-y-6">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {gallery.areas?.map((area) => {
             const AreaIconComponent = area.area_icon ? getIconComponent(area.area_icon) : null
             // Only show published processors
@@ -186,41 +186,46 @@ export function GalleryUserViewClient({
                   </div>
                 </div>
 
-                {/* Processors Grid */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {/* Processors List */}
+                <div className="space-y-3">
                   {publishedProcessors.map((processor) => (
-                    <Link
+                    <div
                       key={processor.processor_id}
-                      href={`/proc/${processor.processor_id}`}
-                      className="group relative flex flex-col rounded-lg border bg-card p-4 hover:bg-accent/50 hover:border-accent-foreground/20 transition-all"
+                      className="group relative flex flex-col rounded-lg bg-card p-4 hover:bg-accent/50 transition-all"
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-center gap-3">
                         {/* Run Icon Button */}
-                        <Button
-                          variant="default"
-                          size="icon"
-                          className="h-9 w-9 shrink-0"
-                          asChild
-                        >
-                          <span>
-                            <Play className="h-4 w-4" />
-                            <span className="sr-only">Run {processor.processor_name}</span>
-                          </span>
-                        </Button>
+                        <RunProcessorDialog
+                          processorId={processor.processor_id}
+                          processorName={processor.processor_name}
+                          defaultView="compliance"
+                          trigger={
+                            <Button
+                              variant="default"
+                              size="icon"
+                              className="h-9 w-9 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Play className="h-4 w-4" />
+                              <span className="sr-only">Run {processor.processor_name}</span>
+                            </Button>
+                          }
+                        />
 
                         {/* Processor Name and Description */}
-                        <div className="flex-1 min-w-0 space-y-2">
-                          <h3 className="font-medium group-hover:text-accent-foreground transition-colors">
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <Link
+                            href={`/proc/${processor.processor_id}`}
+                            className="font-medium hover:underline group-hover:text-accent-foreground transition-colors"
+                          >
                             {processor.processor_name}
-                          </h3>
-                          {processor.processor_usage_description && (
-                            <p className="text-sm text-muted-foreground line-clamp-2">
-                              {processor.processor_usage_description}
-                            </p>
-                          )}
+                          </Link>
+                          <p className="text-sm text-muted-foreground line-clamp-1">
+                            {processor.processor_usage_description || '\u00A0'}
+                          </p>
                         </div>
                       </div>
-                    </Link>
+                    </div>
                   ))}
                 </div>
               </div>
