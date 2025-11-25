@@ -122,43 +122,55 @@ export function GalleriesTable({
           const gallery = row.original
 
           return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 w-8 p-0"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => router.push(`/sv/${gallery.id}`)}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  View Gallery
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push(`/gallery/${gallery.id}`)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit Gallery
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    navigator.clipboard.writeText(gallery.id)
-                  }}
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy ID
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                title="Edit Gallery"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  router.push(`/gallery/${gallery.id}`)
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+                <span className="sr-only">Edit Gallery</span>
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-8 w-8 p-0"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuItem onClick={() => router.push(`/sv/${gallery.id}`)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Gallery
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      navigator.clipboard.writeText(gallery.id)
+                    }}
+                  >
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy ID
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive focus:text-destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           )
         },
       },
@@ -279,7 +291,7 @@ export function GalleriesTable({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && 'selected'}
-                  onClick={() => router.push(`/gallery/${row.original.id}`)}
+                  onClick={() => router.push(`/sv/${row.original.id}`)}
                   className="cursor-pointer hover:bg-muted/50"
                 >
                   {row.getVisibleCells().map((cell) => (
