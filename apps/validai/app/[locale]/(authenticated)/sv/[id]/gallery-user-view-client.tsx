@@ -76,19 +76,9 @@ export function GalleryUserViewClient({
   const IconComponent = gallery.gallery_icon ? getIconComponent(gallery.gallery_icon) : null
 
   return (
-    <div className="container mx-auto space-y-6 py-6">
+    <div className="space-y-6">
       {/* Gallery Header */}
       <div className="space-y-4 rounded-lg border bg-card p-6">
-        {/* Back button */}
-        <div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/gallery">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Galleries
-            </Link>
-          </Button>
-        </div>
-
         {/* Title and Icon */}
         <div className="flex items-start gap-4">
           {/* Icon */}
