@@ -204,28 +204,31 @@ export function GalleryUserViewClient({
                       href={`/proc/${processor.processor_id}`}
                       className="group relative flex flex-col rounded-lg border bg-card p-4 hover:bg-accent/50 hover:border-accent-foreground/20 transition-all"
                     >
-                      <div className="flex-1 min-w-0 space-y-2">
-                        <h3 className="font-medium group-hover:text-accent-foreground transition-colors">
-                          {processor.processor_name}
-                        </h3>
-                        {processor.processor_usage_description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">
-                            {processor.processor_usage_description}
-                          </p>
-                        )}
-                      </div>
-                      <div className="mt-3 flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        {/* Run Icon Button */}
                         <Button
-                          variant="outline"
-                          size="sm"
-                          className="group-hover:border-primary group-hover:text-primary transition-colors"
+                          variant="default"
+                          size="icon"
+                          className="h-9 w-9 shrink-0"
                           asChild
                         >
                           <span>
-                            <Play className="mr-2 h-3 w-3" />
-                            Run
+                            <Play className="h-4 w-4" />
+                            <span className="sr-only">Run {processor.processor_name}</span>
                           </span>
                         </Button>
+
+                        {/* Processor Name and Description */}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <h3 className="font-medium group-hover:text-accent-foreground transition-colors">
+                            {processor.processor_name}
+                          </h3>
+                          {processor.processor_usage_description && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {processor.processor_usage_description}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     </Link>
                   ))}
