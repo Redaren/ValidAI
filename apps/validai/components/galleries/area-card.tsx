@@ -2,6 +2,7 @@
 
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
+import { useDroppable } from "@dnd-kit/core"
 import { type GalleryArea } from "@/app/queries/galleries"
 import {
   Button,
@@ -49,19 +50,40 @@ export function AreaCard({
   onRemoveProcessor,
   isDragging,
 }: AreaCardProps) {
-  // Make the area sortable
+  // Make the area sortable (for reordering areas)
   const {
     attributes,
     listeners,
-    setNodeRef,
+    setNodeRef: setSortableRef,
     transform,
     transition,
-  } = useSortable({ id: `area-${area.area_id}` })
+    isDragging: isAreaDragging,
+  } = useSortable({
+    id: `area-${area.area_id}`,
+    data: {
+      type: 'area',
+      areaId: area.area_id,
+    }
+  })
+
+  // Make the area droppable (for receiving processors from other areas)
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: area.area_id,
+  })
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isAreaDragging ? 0.5 : 1,
+  }
+
+  /**
+   * Combines both refs (sortable + droppable) into a single ref callback.
+   * This allows the area to be BOTH draggable AND a drop target.
+   */
+  const setRefs = (node: HTMLDivElement | null) => {
+    setSortableRef(node)
+    setDroppableRef(node)
   }
 
   const IconComponent = area.area_icon ? getIconComponent(area.area_icon) : null
@@ -71,9 +93,11 @@ export function AreaCard({
 
   return (
     <div
-      ref={setNodeRef}
+      ref={setRefs}
       style={style}
-      className="rounded-lg border bg-card/50 p-4 space-y-3"
+      className={`rounded-lg border bg-card/50 p-4 space-y-3 transition-colors ${
+        isOver ? "ring-2 ring-primary" : ""
+      } ${isAreaDragging ? "z-50" : ""}`}
     >
       {/* Area Header */}
       <div className="flex items-start justify-between">
@@ -81,6 +105,7 @@ export function AreaCard({
           {/* Drag Handle */}
           <button
             className="mt-1 cursor-grab active:cursor-grabbing touch-none"
+            onClick={(e) => e.stopPropagation()}
             {...attributes}
             {...listeners}
           >
@@ -104,9 +129,6 @@ export function AreaCard({
                 {area.area_description}
               </p>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              {area.processors.length} {area.processors.length === 1 ? 'processor' : 'processors'}
-            </p>
           </div>
         </div>
 
@@ -114,11 +136,11 @@ export function AreaCard({
         <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
+            size="icon"
             onClick={onAddProcessors}
+            title="Add processors to this area"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Processors
+            <Plus className="h-4 w-4" />
           </Button>
 
           <DropdownMenu>
