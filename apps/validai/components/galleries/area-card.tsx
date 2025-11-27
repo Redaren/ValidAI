@@ -100,7 +100,7 @@ export function AreaCard({
       } ${isAreaDragging ? "z-50" : ""}`}
     >
       {/* Area Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between bg-area-header border-b -mx-4 -mt-4 px-4 py-3 rounded-t-lg">
         <div className="flex items-start gap-3 flex-1 min-w-0">
           {/* Drag Handle */}
           <button

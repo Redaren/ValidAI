@@ -149,7 +149,7 @@ export function CompareTable({ runs, resultsMap }: CompareTableProps) {
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-area-header">
               <TableHead className="sticky left-0 z-10 min-w-[200px] bg-background">
                 Operation
               </TableHead>

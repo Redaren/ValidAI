@@ -78,7 +78,7 @@ export function GalleryUserViewClient({
   return (
     <div className="space-y-6">
       {/* Gallery Header */}
-      <div className="space-y-4 rounded-lg border bg-card p-6">
+      <div className="space-y-4 rounded-lg border bg-area-header p-6">
         {/* Title and Icon */}
         <div className="flex items-start gap-4">
           {/* Icon */}
@@ -99,25 +99,6 @@ export function GalleryUserViewClient({
                 {gallery.gallery_description}
               </p>
             )}
-
-            {/* Metadata */}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-              <div>
-                {gallery.areas?.length ?? 0} {(gallery.areas?.length ?? 0) === 1 ? 'area' : 'areas'}
-              </div>
-              <div>•</div>
-              <div>
-                {gallery.areas?.reduce((sum, area) => sum + area.processors.length, 0) ?? 0} processors
-              </div>
-              {gallery.gallery_updated_at && (
-                <>
-                  <div>•</div>
-                  <div>
-                    Updated {formatDistanceToNow(new Date(gallery.gallery_updated_at), { addSuffix: true })}
-                  </div>
-                </>
-              )}
-            </div>
 
             {/* Tags */}
             {gallery.gallery_tags && gallery.gallery_tags.length > 0 && (
