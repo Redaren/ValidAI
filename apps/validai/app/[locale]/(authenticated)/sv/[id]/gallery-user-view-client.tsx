@@ -187,13 +187,13 @@ export function GalleryUserViewClient({
                 </div>
 
                 {/* Processors List */}
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {publishedProcessors.map((processor) => (
                     <div
                       key={processor.processor_id}
-                      className="group relative flex flex-col rounded-lg bg-card p-4 hover:bg-accent/50 transition-all"
+                      className="group relative flex flex-col rounded-lg bg-card p-1 hover:bg-accent/50 transition-all"
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         {/* Run Icon Button */}
                         <RunProcessorDialog
                           processorId={processor.processor_id}
