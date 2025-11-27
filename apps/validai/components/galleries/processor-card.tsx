@@ -64,7 +64,7 @@ export function ProcessorCard({
             {processor.processor_name}
           </Link>
           {processor.processor_usage_description && (
-            <p className="text-sm text-muted-foreground mt-1 truncate">
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
               {processor.processor_usage_description}
             </p>
           )}
