@@ -34,6 +34,7 @@ import {
 } from "@playze/shared-ui"
 import { ProcessorStatusBadge } from "./processor-status-badge"
 import { RunProcessorDialog } from "./run-processor-dialog"
+import { SortableHeader } from "./sortable-header"
 import { Processor } from "@/app/queries/processors/use-processors"
 import { useTranslations } from 'next-intl'
 
@@ -250,7 +251,10 @@ export function ProcessorsTable({
     () => [
       {
         accessorKey: "name",
-        header: () => tTable('name'),
+        header: ({ column }) => (
+          <SortableHeader column={column} title={tTable('name')} />
+        ),
+        enableSorting: true,
         enableGlobalFilter: true,
         cell: ({ row }) => {
           const processor = row.original
@@ -266,7 +270,10 @@ export function ProcessorsTable({
       },
       {
         accessorKey: "status",
-        header: () => tTable('status'),
+        header: ({ column }) => (
+          <SortableHeader column={column} title={tTable('status')} />
+        ),
+        enableSorting: true,
         enableGlobalFilter: false,
         cell: ({ row }) => {
           return <ProcessorStatusBadge status={row.getValue("status")} />
@@ -274,7 +281,10 @@ export function ProcessorsTable({
       },
       {
         accessorKey: "description",
-        header: () => tTable('description'),
+        header: ({ column }) => (
+          <SortableHeader column={column} title={tTable('description')} />
+        ),
+        enableSorting: true,
         enableGlobalFilter: true,
         cell: ({ row }) => {
           const description = row.getValue("description") as string | null
@@ -293,7 +303,10 @@ export function ProcessorsTable({
       },
       {
         accessorKey: "visibility",
-        header: () => tTable('visibility'),
+        header: ({ column }) => (
+          <SortableHeader column={column} title={tTable('visibility')} />
+        ),
+        enableSorting: true,
         enableGlobalFilter: false,
         cell: ({ row }) => {
           const visibility = row.getValue("visibility") as string
@@ -310,6 +323,7 @@ export function ProcessorsTable({
       },
       {
         id: "actions",
+        enableSorting: false,
         enableGlobalFilter: false,
         cell: ({ row }) => {
           const processor = row.original
