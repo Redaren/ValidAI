@@ -14,8 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { useQueryClient } from '@tanstack/react-query'
-import type { GalleryDetail } from '@/app/queries/galleries'
+import { useGalleryDetail } from '@/app/queries/galleries'
 
 export default function GalleriesLayout({
   children,
@@ -30,18 +29,9 @@ export default function GalleriesLayout({
   const galleryId = detailMatch?.[1] || null
   const isDetailPage = !!detailMatch
 
-  // Read cached gallery data (non-reactive, no fetch - prevents race condition)
-  const queryClient = useQueryClient()
-  const gallery = queryClient.getQueryData<GalleryDetail>(['gallery', galleryId])
-
-  console.log('[GalleryLayout] 📍 Layout render:', {
-    pathname,
-    galleryId,
-    isDetailPage,
-    hasCachedGallery: !!gallery,
-    galleryName: gallery?.gallery_name,
-    areasCount: gallery?.areas?.length,
-    timestamp: new Date().toISOString()
+  // Fetch gallery data reactively (auto-updates when data loads)
+  const { data: gallery } = useGalleryDetail(galleryId || '', {
+    enabled: !!galleryId,
   })
 
   return (

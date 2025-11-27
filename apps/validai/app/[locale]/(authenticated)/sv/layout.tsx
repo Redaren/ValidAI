@@ -14,8 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { useQueryClient } from '@tanstack/react-query'
-import type { GalleryDetail } from '@/app/queries/galleries'
+import { useGalleryDetail } from '@/app/queries/galleries'
 
 export default function SharedViewLayout({
   children,
@@ -30,9 +29,10 @@ export default function SharedViewLayout({
   const galleryId = sharedViewMatch?.[1] || null
   const isSharedViewPage = !!sharedViewMatch
 
-  // Read cached gallery data (non-reactive, no fetch - prevents race condition)
-  const queryClient = useQueryClient()
-  const gallery = queryClient.getQueryData<GalleryDetail>(['gallery', galleryId])
+  // Fetch gallery data reactively (auto-updates when data loads)
+  const { data: gallery } = useGalleryDetail(galleryId || '', {
+    enabled: !!galleryId,
+  })
 
   return (
     <div className="flex flex-col h-full">
