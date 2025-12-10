@@ -53,7 +53,7 @@ export function DeleteGalleryAreaDialog({
             Delete Area
           </DialogTitle>
           <DialogDescription>
-            Are you sure you want to delete the area "{area.area_name}"?
+            Are you sure you want to delete the area &quot;{area.area_name}&quot;?
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">

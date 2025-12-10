@@ -86,7 +86,7 @@ export function AreasWithProcessors({
    * This handler is called continuously as the user drags an item over potential
    * drop targets. It provides visual feedback and prepares the UI for drops.
    *
-   * Note: Gallery areas are always expanded (not collapsible), so we don't need
+   * Note: Gallery areas are always expanded (not collapsible), so we don&apos;t need
    * auto-expand logic like the processor reference implementation has.
    */
   const handleDragOver = (event: DragOverEvent) => {

@@ -304,7 +304,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
              * - form.setValue() - manually updates value with validation trigger
              * - { shouldValidate: true } - triggers Zod validation on change
              *
-             * Note: Select components don't support {...form.register()}
+             * Note: Select components don&apos;t support {...form.register()}
              * so we use setValue() with shouldValidate option instead
              */}
             <div className="space-y-2">

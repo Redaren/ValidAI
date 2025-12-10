@@ -27,8 +27,14 @@ export default getRequestConfig(async ({ requestLocale }) => {
   // Load app-specific messages
   const appMessages = (await import(`../messages/${locale}.json`)).default;
 
-  // Load shared UI component messages
-  const uiMessages = (await import(`@playze/shared-ui/messages/${locale}.json`)).default;
+  // Load shared UI component messages with static imports (webpack-compatible)
+  // Dynamic imports with template literals don't work in production builds
+  const uiMessagesModules = {
+    en: () => import('@playze/shared-ui/messages/en.json'),
+    sv: () => import('@playze/shared-ui/messages/sv.json'),
+  };
+
+  const uiMessages = (await uiMessagesModules[locale as keyof typeof uiMessagesModules]()).default;
 
   return {
     locale: locale,

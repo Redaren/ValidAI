@@ -148,7 +148,7 @@ export function EditGallerySheet({ gallery, open, onOpenChange }: EditGalleryShe
         <SheetHeader>
           <SheetTitle>Edit Gallery Settings</SheetTitle>
           <SheetDescription>
-            Update the gallery's name, description, visibility, status, and other settings
+            Update the gallery&apos;s name, description, visibility, status, and other settings
           </SheetDescription>
         </SheetHeader>
 

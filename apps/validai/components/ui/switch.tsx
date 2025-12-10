@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 /**
  * TECHNICAL DEBT: Local Switch component using direct @radix-ui/react-switch import
  *
- * Issue: Switch from @playze/shared-ui doesn't work when triggered.
+ * Issue: Switch from @playze/shared-ui doesn&apos;t work when triggered.
  * Cause: Unknown - likely Next.js/Turbopack bundling or workspace package resolution issue.
  * Workaround: Create local Switch component importing directly from @radix-ui/react-switch.
  *

@@ -29,7 +29,7 @@ import { fileToBase64 } from '@/lib/utils/file'
 /**
  * TECHNICAL DEBT: Using direct @radix-ui/react-dialog import
  *
- * Issue: Dialog from @playze/shared-ui doesn't open when triggered.
+ * Issue: Dialog from @playze/shared-ui doesn&apos;t open when triggered.
  * Cause: Unknown - likely Next.js/Turbopack bundling or workspace package resolution issue.
  * Workaround: Import Dialog directly from @radix-ui/react-dialog (works correctly).
  *

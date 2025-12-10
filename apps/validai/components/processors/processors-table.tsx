@@ -405,6 +405,40 @@ export function ProcessorsTable({
   )
 
   /**
+   * Extract table state to ensure React properly detects changes
+   *
+   * **FIX for search bug:**
+   * Previously, state was defined inside the conditional spread operator,
+   * which prevented React from properly detecting when globalFilter changed.
+   * By extracting it here with useMemo, React can track changes correctly
+   * and trigger re-renders when the user types in the search box.
+   *
+   * **Client Mode State:**
+   * - sorting: Current sort configuration
+   * - globalFilter: Search input value (triggers instant filtering)
+   *
+   * **Server Mode State:**
+   * - sorting: Current sort configuration
+   * - pagination: Current page index and size (from parent props)
+   */
+  const tableState = React.useMemo(() => {
+    if (isClientMode) {
+      return {
+        sorting,
+        globalFilter,
+      }
+    } else {
+      return {
+        sorting,
+        pagination: {
+          pageIndex,
+          pageSize: 10,
+        },
+      }
+    }
+  }, [isClientMode, sorting, globalFilter, pageIndex])
+
+  /**
    * TanStack Table instance with mode-specific configuration
    *
    * **Client Mode Configuration:**
@@ -432,6 +466,7 @@ export function ProcessorsTable({
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
+    state: tableState, // Use extracted state (fixes search bug)
 
     // Conditional configuration based on mode
     ...(isClientMode ? {
@@ -440,10 +475,6 @@ export function ProcessorsTable({
       // ========================================
       getFilteredRowModel: getFilteredRowModel(),
       getPaginationRowModel: getPaginationRowModel(),
-      state: {
-        sorting,
-        globalFilter,
-      },
       onGlobalFilterChange: setGlobalFilter,
       /**
        * Custom global filter function for client-side search
@@ -469,13 +500,6 @@ export function ProcessorsTable({
       manualPagination: true,
       manualFiltering: true,
       pageCount: pageCount,
-      state: {
-        sorting,
-        pagination: {
-          pageIndex,
-          pageSize: 10,
-        },
-      },
     }),
   })
 
@@ -525,7 +549,7 @@ export function ProcessorsTable({
           />
         </div>
         {hasActiveSearch ? (
-          // No search results - don't show create button
+          // No search results - don&apos;t show create button
           <div className="flex flex-col items-center justify-center py-12 text-center rounded-md border">
             <h2 className="text-xl font-semibold mb-2">{t('noResults.title')}</h2>
             <p className="text-muted-foreground max-w-md">

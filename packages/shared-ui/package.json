@@ -9,7 +9,8 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./messages/*.json": "./messages/*.json"
+    "./messages/en.json": "./messages/en.json",
+    "./messages/sv.json": "./messages/sv.json"
   },
   "scripts": {},
   "dependencies": {

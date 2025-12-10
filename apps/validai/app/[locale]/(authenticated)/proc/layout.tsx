@@ -44,7 +44,7 @@ export default function ProcessorsLayout({
 
   // Fetch run data for run detail page
   const { data: run, isLoading: isLoadingRun } = useRun(runId || "", {
-    realtime: false, // Layout doesn't need realtime updates
+    realtime: false, // Layout doesn&apos;t need realtime updates
   })
 
   const isDetailPage = !!detailMatch

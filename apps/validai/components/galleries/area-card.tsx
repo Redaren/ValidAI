@@ -170,7 +170,7 @@ export function AreaCard({
       {/* Processors List */}
       {area.processors.length === 0 ? (
         <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-          No processors yet. Click "Add Processors" to add some.
+          No processors yet. Click &quot;Add Processors&quot; to add some.
         </div>
       ) : (
         <SortableContext items={processorIds} strategy={verticalListSortingStrategy}>

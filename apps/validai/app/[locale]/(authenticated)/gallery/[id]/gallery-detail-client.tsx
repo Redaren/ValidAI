@@ -78,20 +78,6 @@ export function GalleryDetailClient({
   const t = useTranslations('galleries')
   const tCommon = useTranslations('common')
   const { data: gallery, isLoading, error } = useGalleryDetail(galleryId)
-  console.log('[GalleryDetailClient] 🎨 Component render:', {
-    galleryId,
-    isLoading,
-    hasError: !!error,
-    hasGallery: !!gallery,
-    galleryName: gallery?.gallery_name,
-    areasCount: gallery?.areas?.length,
-    areas: gallery?.areas?.map(a => ({
-      areaId: a.area_id,
-      areaName: a.area_name,
-      processorsCount: a.processors.length
-    })),
-    timestamp: new Date().toISOString()
-  })
 
   // Mutation hooks
   const createArea = useCreateGalleryArea()

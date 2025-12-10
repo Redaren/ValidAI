@@ -161,8 +161,7 @@ export function sanitizeHTML(html: string): string {
     const clean = DOMPurify.sanitize(html, SANITIZE_CONFIG)
     return clean
   } catch (error) {
-    // If sanitization fails, log error and return empty string (fail safe)
-    console.error('HTML sanitization failed:', error)
+    // If sanitization fails, return empty string (fail safe)
     return ''
   }
 }

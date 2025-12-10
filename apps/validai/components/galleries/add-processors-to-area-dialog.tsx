@@ -123,7 +123,7 @@ export function AddProcessorsToAreaDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Add Processors to "{area.area_name}"</DialogTitle>
+          <DialogTitle>Add Processors to &quot;{area.area_name}&quot;</DialogTitle>
           <DialogDescription>
             Select processors to add to this area. Only published processors are shown.
           </DialogDescription>

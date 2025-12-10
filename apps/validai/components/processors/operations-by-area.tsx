@@ -252,7 +252,7 @@ export function OperationsByArea({ processor }: OperationsByAreaProps) {
    * This improves UX by allowing users to see the drop target contents.
    *
    * **Logic:**
-   * 1. Skip if dragging an area (area reordering doesn't need auto-expand)
+   * 1. Skip if dragging an area (area reordering doesn&apos;t need auto-expand)
    * 2. Detect which area is being hovered over (supports multiple ID formats)
    * 3. Auto-expand the target area if it's currently collapsed
    *

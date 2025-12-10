@@ -121,21 +121,21 @@ export function CompareTable({ runs, resultsMap }: CompareTableProps) {
   const [selectedResult, setSelectedResult] = React.useState<OperationResult | null>(null)
   const [modalOpen, setModalOpen] = React.useState(false)
 
-  // Early return if no runs available
-  if (!runs || runs.length === 0) {
-    return null
-  }
-
   // Get operations from first run's snapshot (all runs have same processor)
-  const firstRun = runs[0]
+  const firstRun = runs?.[0]
   const snapshot = firstRun?.snapshot as unknown as ProcessorSnapshot
   const allOperations = snapshot?.operations
 
-  // Group operations by area
+  // Group operations by area (must be called before any returns)
   const groupedOperations = React.useMemo(
     () => groupOperationsByArea(allOperations),
     [allOperations]
   )
+
+  // Early return if no runs available
+  if (!runs || runs.length === 0) {
+    return null
+  }
 
   const handleCellClick = (result: OperationResult | null) => {
     if (result) {

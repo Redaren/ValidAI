@@ -40,43 +40,21 @@ export function useGalleryDetail(galleryId: string, options?: { enabled?: boolea
   return useQuery({
     queryKey: ['gallery', galleryId],
     queryFn: async () => {
-      console.log('[useGalleryDetail] 🔄 Fetching gallery:', galleryId, new Date().toISOString())
-
       const { data, error } = await supabase.rpc('get_gallery_detail', {
         p_gallery_id: galleryId,
       })
 
-      console.log('[useGalleryDetail] 📦 RPC returned:', {
-        galleryId,
-        rowCount: data?.length || 0,
-        hasError: !!error,
-        timestamp: new Date().toISOString()
-      })
-
       if (error) {
-        console.error('[useGalleryDetail] ❌ Error:', error)
         logger.error('Error fetching gallery:', extractErrorDetails(error))
         throw new Error(error.message || 'Failed to fetch gallery')
       }
 
       if (!data || data.length === 0) {
-        console.error('[useGalleryDetail] ❌ No data returned')
         throw new Error('Gallery not found')
       }
 
       // Transform flat rows to nested structure
       const transformed = transformGalleryData(data as any)
-      console.log('[useGalleryDetail] ✅ Transformed gallery:', {
-        galleryId: transformed.gallery_id,
-        galleryName: transformed.gallery_name,
-        areasCount: transformed.areas.length,
-        areas: transformed.areas.map(a => ({
-          areaId: a.area_id,
-          areaName: a.area_name,
-          processorsCount: a.processors.length
-        })),
-        timestamp: new Date().toISOString()
-      })
 
       return transformed
     },

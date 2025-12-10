@@ -124,7 +124,7 @@ export function GalleryUserViewClient({
             <LucideIcons.FolderOpen className="h-10 w-10 text-muted-foreground" />
             <h3 className="mt-4 text-lg font-semibold">No processors available</h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              This gallery doesn't have any processors yet.
+              This gallery doesn&apos;t have any processors yet.
             </p>
           </div>
         </div>

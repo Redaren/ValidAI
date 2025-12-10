@@ -34,7 +34,7 @@ interface ProcessorDetailPageProps {
  * 4. No loading state flicker on initial render
  *
  * **Error Handling:**
- * - Returns 404 if processor doesn't exist
+ * - Returns 404 if processor doesn&apos;t exist
  * - Returns 404 if user lacks access permissions
  *
  * @param params - Route parameters containing processor ID
@@ -65,7 +65,7 @@ export default async function ProcessorDetailPage({
       },
     })
   } catch (error) {
-    // If prefetch fails, the processor doesn't exist or user doesn't have access
+    // If prefetch fails, the processor doesn&apos;t exist or user doesn&apos;t have access
     notFound()
   }
 

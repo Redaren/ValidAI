@@ -48,7 +48,7 @@ interface WorkbenchInputProps {
  * @type {Record<string, string>}
  * @description
  * Fallback mapping for model display names when organization
- * config doesn't provide a custom display_name.
+ * config doesn&apos;t provide a custom display_name.
  * Used by getModelDisplay() helper function to provide user-friendly names.
  */
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
@@ -384,7 +384,7 @@ export function WorkbenchInput({ processor }: WorkbenchInputProps) {
           tokensUsed: result.tokensUsed  // Keep for backward compatibility
         })
       } else {
-        // Stateless mode: Still show output but don't add to conversation
+        // Stateless mode: Still show output but don&apos;t add to conversation
         // Output will be cleared on next message (line 171)
         // For now, we could optionally add messages that will be cleared
         // This allows viewing the result before the next test

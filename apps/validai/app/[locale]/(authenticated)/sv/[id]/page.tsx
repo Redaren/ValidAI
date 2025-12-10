@@ -61,7 +61,7 @@ export default async function GalleryUserViewPage({
       },
     })
   } catch (error) {
-    // If prefetch fails, the gallery doesn't exist or user doesn't have access
+    // If prefetch fails, the gallery doesn&apos;t exist or user doesn&apos;t have access
     notFound()
   }
 
