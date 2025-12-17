@@ -1,0 +1,34 @@
+{
+  "platform": {
+    "orgSwitcher": {
+      "loading": "Завантаження...",
+      "selectOrganization": "Вибрати організацію",
+      "switchOrganization": "Перемкнути організацію",
+      "failedToSwitch": "Не вдалося перемкнути організацію. Будь ласка, спробуйте ще раз.",
+      "role": "Роль: {role}"
+    },
+    "appSwitcher": {
+      "selectApp": "Вибрати програму",
+      "switchApp": "Перемкнути програму",
+      "noAccess": "(Немає доступу)"
+    },
+    "authGate": {
+      "accessRestricted": "Доступ обмежено",
+      "proFeature": "Функція Pro",
+      "permissionRequired": "Необхідний дозвіл",
+      "adminAccessRequired": "Необхідний доступ адміністратора",
+      "featureAvailableInHigherTier": "Ця функція доступна на вищих рівнях підписки. Поточний рівень: {tier}.",
+      "noPermissionForAction": "У вас немає дозволу на виконання цієї дії. Поточна роль: {role}.",
+      "requiresRoleAccess": "Ця функція вимагає доступ {requiredRole}. Поточна роль: {currentRole}.",
+      "requiresMultiple": "Ця функція вимагає ",
+      "higherTier": "вищий рівень підписки",
+      "specificPermissions": "конкретні дозволи",
+      "roleRequirement": "роль {role}",
+      "and": " та ",
+      "contactForAccess": "Зв'яжіться з нами для отримання доступу"
+    }
+  },
+  "common": {
+    "loading": "Завантаження..."
+  }
+}

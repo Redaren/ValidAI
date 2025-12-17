@@ -1,0 +1,539 @@
+{
+  "common": {
+    "save": "Зберегти",
+    "cancel": "Скасувати",
+    "delete": "Видалити",
+    "edit": "Редагувати",
+    "loading": "Завантаження...",
+    "error": {
+      "default": "Сталася помилка",
+      "loadingData": "Помилка завантаження даних"
+    },
+    "success": "Успішно",
+    "confirm": "Підтвердити",
+    "close": "Закрити",
+    "search": "Пошук",
+    "filter": "Фільтр",
+    "create": "Створити",
+    "update": "Оновити",
+    "actions": "Дії",
+    "yes": "Так",
+    "no": "Ні",
+    "notSet": "Не встановлено",
+    "never": "Ніколи",
+    "back": "Назад",
+    "new": "Новий",
+    "toggle": "Перемкнути",
+    "openMenu": "Відкрити меню",
+    "moreOptions": "Більше опцій"
+  },
+  "nav": {
+    "dashboard": "Панель управління",
+    "processors": "Шаблони",
+    "galleries": "Галереї",
+    "operations": "Перевірки",
+    "runs": "Запуски",
+    "documents": "Документи",
+    "settings": "Налаштування",
+    "platform": "Платформа",
+    "support": "Підтримка",
+    "feedback": "Зворотний зв'язок",
+    "account": "Обліковий запис",
+    "billing": "Виставлення рахунків",
+    "notifications": "Сповіщення",
+    "logout": "Вийти",
+    "upgradeToPro": "Оновитися до Pro",
+    "projects": "Проєкти",
+    "viewProject": "Переглянути проєкт",
+    "shareProject": "Поділитися проєктом",
+    "deleteProject": "Видалити проєкт",
+    "more": "Більше"
+  },
+  "breadcrumb": {
+    "processors": "Шаблони",
+    "galleries": "Галереї",
+    "workbench": "Робоче місце",
+    "history": "Історія",
+    "runDetail": "Деталі запуску",
+    "loading": "Завантаження...",
+    "inProgress": "В процесі",
+    "account": "Обліковий запис"
+  },
+  "dashboard": {
+    "title": "Панель управління",
+    "welcome": "Ласкаво просимо",
+    "ready": "Ваша панель управління готова до використання",
+    "card1": "Картка панелі 1",
+    "card2": "Картка панелі 2",
+    "card3": "Картка панелі 3",
+    "sessionInfo": {
+      "title": "Інформація про сеанс",
+      "loadingData": "Завантаження даних сеансу...",
+      "noActiveSession": "Немає активного сеансу",
+      "signInPrompt": "Будь ласка, увійдіть, щоб переглянути інформацію про сеанс.",
+      "completeData": "Повні дані сеансу та користувача",
+      "userIdentity": "Ідентифікація користувача",
+      "id": "ID:",
+      "email": "Email:",
+      "phone": "Телефон:",
+      "role": "Роль:",
+      "anonymous": "Анонімний:",
+      "sessionDetails": "Деталі сеансу",
+      "sessionId": "ID сеансу:",
+      "tokenType": "Тип токена:",
+      "expires": "Закінчується:",
+      "authLevel": "AAL (Рівень аутентифікації):",
+      "timestamps": "Часові мітки",
+      "created": "Створено:",
+      "lastUpdated": "Останнє оновлення:",
+      "emailConfirmed": "Email підтверджено:",
+      "phoneConfirmed": "Телефон підтверджено:",
+      "lastSignIn": "Останній вхід:",
+      "confirmedAt": "Підтверджено:",
+      "currentOrg": "Поточна організація",
+      "plan": "План:",
+      "slug": "Slug:",
+      "authMethods": "Методи аутентифікації",
+      "identityProviders": "Провайдери ідентифікації",
+      "noIdentities": "Ідентифікації не знайдено",
+      "appMetadata": "Метадані програми",
+      "userMetadata": "Метадані користувача",
+      "noMetadata": "Немає {type}"
+    }
+  },
+  "processors": {
+    "title": "Шаблони документів",
+    "description": "Створюйте та керуйте шаблонами аналізу документів на основі ШІ",
+    "breadcrumb": "Шаблони",
+    "loading": "Завантаження шаблону...",
+    "loadingProcessors": "Завантаження шаблонів...",
+    "failed": "Не вдалося завантажити шаблон",
+    "failedList": "Не вдалося завантажити шаблони",
+    "unknownError": "Сталася невідома помилка",
+    "backToList": "Назад до шаблонів",
+    "backToProcessor": "Назад до процесора",
+    "new": "Новий",
+    "filterPlaceholder": "Фільтр...",
+    "empty": {
+      "title": "Поки немає шаблонів",
+      "description": "Почніть зі створення свого першого шаблону для аналізу контрактів, рахунків або інших документів.",
+      "createFirst": "Створити перший шаблон"
+    },
+    "noResults": {
+      "title": "Шаблони не знайдено",
+      "description": "Жоден шаблон не відповідає вашому пошуку. Спробуйте змінити пошукові терміни."
+    },
+    "detail": {
+      "operations": "Перевірки",
+      "settings": "Налаштування",
+      "workbench": "Робоче місце",
+      "newArea": "Нова область",
+      "bulkImportExport": "Масовий імпорт/експорт"
+    },
+    "form": {
+      "description": "Опис",
+      "usageDescription": "Опис використання",
+      "tags": "Теги"
+    },
+    "table": {
+      "name": "Назва",
+      "status": "Статус",
+      "description": "Опис",
+      "visibility": "Видимість"
+    },
+    "header": {
+      "status": "Статус",
+      "visibility": "Видимість",
+      "tags": "Теги",
+      "run": "Запустити"
+    },
+    "actions": "Дії",
+    "bulkImport": {
+      "row": "Рядок",
+      "errors": "Помилки",
+      "mode": "Режим",
+      "area": "Область",
+      "name": "Назва",
+      "type": "Тип",
+      "new": "Новий"
+    }
+  },
+  "galleries": {
+    "title": "Галереї",
+    "description": "Організуйте процесори в тематичні колекції для легкого доступу",
+    "loading": "Завантаження галерей...",
+    "loadingGallery": "Завантаження галереї...",
+    "failed": "Не вдалося завантажити галереї",
+    "failedGallery": "Не вдалося завантажити галерею",
+    "new": "Нова",
+    "backToList": "Назад до галерей",
+    "empty": {
+      "title": "Поки немає галерей",
+      "description": "Створюйте галереї для організації процесорів за темами, такими як Продажі, HR або Compliance.",
+      "createFirst": "Створити першу галерею"
+    },
+    "noResults": {
+      "title": "Галереї не знайдено",
+      "description": "Жодна галерея не відповідає вашому пошуку. Спробуйте змінити пошукові терміни."
+    },
+    "table": {
+      "name": "Назва",
+      "status": "Статус",
+      "description": "Опис",
+      "areas": "Області",
+      "processors": "Процесори",
+      "searchPlaceholder": "Пошук галерей...",
+      "filterPlaceholder": "Фільтрувати за статусом..."
+    },
+    "form": {
+      "name": "Назва галереї",
+      "namePlaceholder": "Введіть назву галереї",
+      "description": "Опис",
+      "descriptionPlaceholder": "Опишіть цю галерею",
+      "icon": "Іконка",
+      "iconPlaceholder": "Пошук іконок...",
+      "status": "Статус",
+      "draft": "Чернетка",
+      "published": "Опубліковано",
+      "archived": "Архівовано",
+      "creating": "Створення...",
+      "create": "Створити галерею",
+      "updating": "Оновлення...",
+      "update": "Оновити галерею",
+      "areaName": "Назва області",
+      "areaNamePlaceholder": "Введіть назву області",
+      "areaDescription": "Опис області",
+      "areaDescriptionPlaceholder": "Опишіть цю область",
+      "areaIcon": "Іконка області",
+      "addProcessors": "Додати процесори",
+      "selectProcessors": "Виберіть процесори для додавання до цієї області",
+      "onlyPublishedShown": "Показані лише опубліковані процесори"
+    },
+    "header": {
+      "status": "Статус",
+      "visibility": "Видимість",
+      "areas": "Області",
+      "processors": "Процесори",
+      "createdBy": "Створив",
+      "updated": "Оновлено",
+      "tags": "Теги",
+      "edit": "Редагувати галерею",
+      "delete": "Видалити галерею",
+      "areasAndProcessors": "Області та процесори"
+    },
+    "area": {
+      "createArea": "Створити область",
+      "editArea": "Редагувати область",
+      "deleteArea": "Видалити область",
+      "addProcessors": "Додати процесори",
+      "noAreas": "Поки немає областей",
+      "noAreasDescription": "Створюйте області для організації процесорів за темами, такими як Продажі, HR або Compliance.",
+      "noProcessors": "Поки немає процесорів. Натисніть \"Додати процесори\", щоб додати.",
+      "processorCount": "{count} процесор",
+      "processorCount_plural": "{count} процесорів",
+      "deleting": "Видалення...",
+      "confirmDelete": "Ви впевнені, що хочете видалити цю область?",
+      "confirmDeleteDescription": "Це видалить область і від'єднає всі процесори. Процесори не будуть видалені."
+    },
+    "user": {
+      "title": "Галерея",
+      "backToGalleries": "Назад до галерей",
+      "noAreas": "У цій галереї поки немає областей",
+      "run": "Запустити"
+    }
+  },
+  "runs": {
+    "title": "Історія",
+    "loading": "Завантаження історії...",
+    "failed": "Не вдалося завантажити історію",
+    "description": "Перегляд виконань та їх результатів",
+    "processor": "Процесор",
+    "status": {
+      "failed": "Невдало",
+      "pending": "Очікування",
+      "completed": "Завершено",
+      "completedWithErrors": "Завершено з помилками",
+      "cancelled": "Скасовано",
+      "processing": "Обробка"
+    },
+    "table": {
+      "operation": "Тест",
+      "status": "Статус",
+      "time": "Час",
+      "tokens": "Токени",
+      "document": "Документ",
+      "started": "Розпочато",
+      "duration": "Тривалість",
+      "progress": "Прогрес",
+      "searchPlaceholder": "Пошук за назвою документа...",
+      "noResults": "Не знайдено запусків, що відповідають вашим фільтрам",
+      "showingInfo": "Показано {from}-{to} з {total} запусків",
+      "pageInfo": "Сторінка {current} з {total}",
+      "previous": "Попередня",
+      "next": "Наступна",
+      "noRuns": "Поки немає запусків",
+      "noRunsDescription": "Натисніть \"Запустити процесор\", щоб виконати цей процесор на документі"
+    },
+    "detail": {
+      "model": "Модель",
+      "cache": "Кеш",
+      "cacheMiss": "Промах",
+      "response": "Відповідь",
+      "thinking": "Міркування",
+      "error": "Помилка",
+      "triggerType": "Тип тригера",
+      "manual": "Ручний"
+    },
+    "compliance": {
+      "progress": "Прогрес",
+      "validations": "Тести",
+      "document": "Документ",
+      "date": "Дата",
+      "trafficLights": "Світлофори",
+      "green": "Зелений",
+      "yellow": "Жовтий",
+      "red": "Червоний",
+      "passed": "Пройдено",
+      "failed": "Не пройдено",
+      "passedOf": "пройдено з",
+      "of": "з",
+      "tests": "# Тести і т.д.",
+      "unknownProcessor": "Невідомий процесор",
+      "unknownDocument": "Невідомий документ",
+      "notAvailable": "Н/Д",
+      "aiCountdown": "Зворотний відлік ШІ",
+      "aiThinkingExtra": "ШІ думає додатково",
+      "perArea": {
+        "title": "За областями",
+        "area": "Область",
+        "total": "Всього",
+        "noAreas": "Області не визначені"
+      }
+    },
+    "compare": {
+      "title": "Порівняти запуски",
+      "description": "Порівняння {count} запусків поруч",
+      "selectRuns": "Виберіть 2-5 завершених запусків для порівняння",
+      "compareSelected": "Порівняти вибране ({count})",
+      "clearSelection": "Очистити вибір",
+      "backToHistory": "Назад до історії запусків",
+      "copyToExcel": "Копіювати в Excel",
+      "exportToPDF": "Експортувати в PDF",
+      "copiedToClipboard": "Порівняння скопійовано в буфер обміну",
+      "invalidRunIds": "Невірний вибір запуску. Будь ласка, поверніться до історії запусків.",
+      "differentProcessors": "Неможливо порівняти запуски з різних процесорів",
+      "onlyCompletedRuns": "Можна порівнювати лише завершені запуски",
+      "loadingComparison": "Завантаження порівняння..."
+    },
+    "search": {
+      "title": "Пошук та фільтри",
+      "searchPlaceholder": "Пошук",
+      "clearSearch": "Очистити пошук",
+      "filters": {
+        "type": "Тип",
+        "area": "Область",
+        "result": "Результат",
+        "all": "Всі",
+        "selected": "вибрано {count}",
+        "clearAll": "Очистити всі фільтри"
+      },
+      "columns": {
+        "number": "№",
+        "area": "Область",
+        "name": "Назва",
+        "type": "Тип",
+        "result": "Результат"
+      },
+      "operationTypes": {
+        "validation": "Валідація",
+        "extraction": "Вилучення",
+        "rating": "Оцінка",
+        "classification": "Класифікація",
+        "analysis": "Аналіз",
+        "traffic_light": "Світлофор",
+        "generic": "Загальний"
+      },
+      "resultFilters": {
+        "true": "Так",
+        "false": "Ні",
+        "any": "Будь-який",
+        "green": "Зелений",
+        "yellow": "Жовтий",
+        "red": "Червоний",
+        "range": "Діапазон: {min} - {max}"
+      },
+      "resultDisplay": {
+        "true": "Так",
+        "false": "Ні",
+        "itemsExtracted": "вилучено елементів: {count}",
+        "green": "Зелений",
+        "yellow": "Жовтий",
+        "red": "Червоний"
+      },
+      "showing": "Показано {count} з {total} операцій",
+      "noResults": "Операції не знайдено",
+      "noResultsDescription": "Спробуйте налаштувати пошук або фільтри",
+      "sort": {
+        "ascending": "Сортувати за зростанням",
+        "descending": "Сортувати за спаданням",
+        "unsorted": "Натисніть для сортування"
+      },
+      "expandRow": "Натисніть, щоб розгорнути деталі",
+      "collapseRow": "Натисніть, щоб згорнути",
+      "operationDetails": "Деталі операції",
+      "result": "Результат",
+      "thinking": "Міркування",
+      "howAiThought": "Як думав ШІ"
+    },
+    "technical": {
+      "prompt": "Промпт",
+      "response": "Відповідь",
+      "structuredOutput": "Структурований вихід",
+      "thinking": "Блоки міркування",
+      "metrics": "Метрики продуктивності"
+    }
+  },
+  "auth": {
+    "appName": "SanityCheck",
+    "login": {
+      "title": "SanityCheck",
+      "description": "Увійдіть за допомогою вашого email, щоб отримати доступ до SanityCheck",
+      "emailLabel": "Адреса електронної пошти",
+      "emailPlaceholder": "you@example.com",
+      "inviteNotice": "Ви повинні бути запрошені в організацію для доступу до SanityCheck",
+      "sendMagicLink": "Надіслати магічне посилання",
+      "sendingMagicLink": "Надсилання магічного посилання...",
+      "magicLinkInfo": "Магічне посилання буде надіслано на вашу електронну пошту. Натисніть на посилання, щоб увійти.",
+      "checkEmail": "Перевірте вашу електронну пошту",
+      "linkSent": "Ми надіслали вам посилання для входу. Не забудьте перевірити папку зі спамом.",
+      "sentTo": "Ми надіслали посилання для входу на:",
+      "nextSteps": "Наступні кроки:",
+      "step1": "Перевірте вашу поштову скриньку (і папку зі спамом)",
+      "step2": "Натисніть на магічне посилання в email",
+      "step3": "Ви автоматично увійдете в систему",
+      "sendAnotherLink": "Надіслати інше посилання",
+      "linkExpiry": "Посилання дійсне протягом 60 хвилин з міркувань безпеки.",
+      "errorSending": "Помилка надсилання посилання для входу",
+      "unexpectedError": "Сталася неочікувана помилка"
+    },
+    "signUp": {
+      "title": "Реєстрація",
+      "description": "Створити новий обліковий запис",
+      "emailLabel": "Email",
+      "emailPlaceholder": "m@example.com",
+      "passwordLabel": "Пароль",
+      "repeatPasswordLabel": "Повторіть пароль",
+      "passwordsDoNotMatch": "Паролі не збігаються",
+      "errorOccurred": "Сталася помилка",
+      "creatingAccount": "Створення облікового запису...",
+      "signUpButton": "Зареєструватися",
+      "alreadyHaveAccount": "Вже є обліковий запис?",
+      "login": "Увійти"
+    },
+    "forgotPassword": {
+      "title": "Скинути пароль",
+      "description": "Введіть ваш email, і ми надішлемо вам посилання для скидання пароля",
+      "emailLabel": "Email",
+      "emailPlaceholder": "m@example.com",
+      "errorOccurred": "Сталася помилка",
+      "sending": "Надсилання...",
+      "sendResetEmail": "Надіслати email для скидання",
+      "alreadyHaveAccount": "Вже є обліковий запис?",
+      "login": "Увійти",
+      "checkYourEmail": "Перевірте вашу електронну пошту",
+      "instructionsSent": "Інструкції зі скидання пароля надіслані",
+      "checkEmailMessage": "Якщо ви зареєструвалися за допомогою email та пароля, ви отримаєте email для скидання пароля."
+    },
+    "updatePassword": {
+      "title": "Скинути пароль",
+      "description": "Будь ласка, введіть ваш новий пароль нижче.",
+      "newPasswordLabel": "Новий пароль",
+      "newPasswordPlaceholder": "Новий пароль",
+      "errorOccurred": "Сталася помилка",
+      "saving": "Збереження...",
+      "saveNewPassword": "Зберегти новий пароль"
+    }
+  },
+  "noAccess": {
+    "title": "Немає доступу до SanityCheck",
+    "description": "Ваша організація не має активної підписки на SanityCheck.",
+    "explanation": "SanityCheck доступний на планах Pro та Enterprise. Зверніться до адміністратора вашої організації або служби підтримки платформи для оновлення підписки.",
+    "contactSupport": "Зв'язатися з підтримкою",
+    "backHome": "Назад на головну"
+  },
+  "account": {
+    "title": "Налаштування облікового запису",
+    "description": "Керуйте вашими особистими налаштуваннями та інформацією облікового запису",
+    "profile": {
+      "title": "Профіль",
+      "description": "Ваша особиста інформація від провайдера аутентифікації",
+      "name": "Ім'я",
+      "email": "Email"
+    },
+    "appearance": {
+      "title": "Зовнішній вигляд",
+      "description": "Налаштуйте, як програма виглядає для вас",
+      "theme": "Тема",
+      "selectTheme": "Виберіть тему",
+      "themeLight": "Світла за замовчуванням",
+      "themeDark": "Темна за замовчуванням",
+      "themeClaudeLight": "Claude світла",
+      "themeClaudeDark": "Claude темна",
+      "themeDescription": "Виберіть, як програма виглядає. Теми Claude використовують теплу, барвисту палітру."
+    },
+    "organization": {
+      "title": "Контекст організації",
+      "description": "Ваша роль та рівень доступу в поточній організації",
+      "currentOrg": "Поточна організація",
+      "noOrgSelected": "Організація не вибрана"
+    }
+  },
+  "workbench": {
+    "title": "Робоче місце",
+    "output": "Вихід",
+    "error": "Помилка",
+    "status": {
+      "pending": "⏳ Очікування",
+      "processing": "⚡ Обробка",
+      "completed": "✓ Завершено",
+      "failed": "✗ Невдало"
+    },
+    "roles": {
+      "you": "Ви",
+      "assistant": "Асистент"
+    },
+    "input": {
+      "settings": "Налаштування",
+      "mode": "Режим",
+      "citations": "Цитати",
+      "prompt": "Промпт",
+      "document": "Документ"
+    },
+    "tabs": {
+      "markdown": "Markdown",
+      "annotations": "Анотації"
+    },
+    "structured": {
+      "rating": "Оцінка",
+      "classification": "Класифікація",
+      "conclusion": "Висновок",
+      "analysis": "Аналіз"
+    }
+  },
+  "upload": {
+    "validating": "Перевірка файлу...",
+    "converting": "Конвертація файлу...",
+    "creating": "Обробка провайдером ШІ...",
+    "uploading": "Завантаження до провайдера ШІ...",
+    "preparing": "Підготовка ваших результатів...",
+    "complete": "Завантаження завершено",
+    "dragAndDrop": "Перетягніть ваш документ сюди",
+    "dropToProcess": "Відпустіть для початку обробки",
+    "clickToBrowse": "або натисніть для вибору",
+    "fileTypes": "{types} (макс {size} МБ)",
+    "errors": {
+      "fileSize": "Розмір файлу перевищує ліміт {size} МБ",
+      "invalidType": "Тип файлу не підтримується. Прийнятні формати: {formats}"
+    }
+  }
+}
