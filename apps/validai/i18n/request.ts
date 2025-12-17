@@ -32,6 +32,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
   const uiMessagesModules = {
     en: () => import('@playze/shared-ui/messages/en.json'),
     sv: () => import('@playze/shared-ui/messages/sv.json'),
+    uk: () => import('@playze/shared-ui/messages/uk.json'),
   };
 
   const uiMessages = (await uiMessagesModules[locale as keyof typeof uiMessagesModules]()).default;
