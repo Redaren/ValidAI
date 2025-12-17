@@ -10,7 +10,8 @@
       "default": "./src/index.ts"
     },
     "./messages/en.json": "./messages/en.json",
-    "./messages/sv.json": "./messages/sv.json"
+    "./messages/sv.json": "./messages/sv.json",
+    "./messages/uk.json": "./messages/uk.json"
   },
   "scripts": {},
   "dependencies": {
