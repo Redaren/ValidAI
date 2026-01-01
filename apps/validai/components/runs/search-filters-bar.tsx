@@ -90,7 +90,8 @@ export function SearchFiltersBar({
   // Extract unique areas from results
   const uniqueAreas = useMemo(() => {
     const areas = new Set<string>()
-    totalResults.forEach((result) => {
+    const results = Array.isArray(totalResults) ? totalResults : []
+    results.forEach((result) => {
       const snapshot = result.operation_snapshot as any
       const area = snapshot?.area || 'Default'
       areas.add(area)

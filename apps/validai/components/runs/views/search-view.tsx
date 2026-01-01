@@ -131,7 +131,8 @@ export function SearchView({ run, operationResults, isLoadingResults }: SearchVi
 
   // Filter results
   const filteredResults = useMemo(() => {
-    return operationResults.filter((result) => {
+    const results = Array.isArray(operationResults) ? operationResults : []
+    return results.filter((result) => {
       // Search term filter
       if (!matchesSearchTerm(result, filters.searchTerm)) return false
 
