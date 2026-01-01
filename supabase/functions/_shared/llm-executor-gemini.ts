@@ -32,7 +32,7 @@
  */
 
 import { Buffer } from 'node:buffer'
-import { GoogleGenAI } from 'npm:@google/genai@1.29.0'
+import { GoogleGenAI } from 'npm:@google/genai@1.34.0'
 import { z } from 'npm:zod'
 import type {
   LLMExecutionParams,
@@ -59,7 +59,8 @@ export interface GeminiCacheRef {
  */
 export interface GeminiExecutionParams extends LLMExecutionParams {
   settings: LLMExecutionParams['settings'] & {
-    thinking_budget?: number      // -1 (dynamic), 0 (disabled), or 512-32768 (fixed)
+    thinking_budget?: number      // Gemini 2.5: -1 (dynamic), 0 (disabled), or 512-32768 (fixed)
+    thinking_level?: 'low' | 'medium' | 'high' | 'minimal'  // Gemini 3: thinking depth control
     include_thoughts?: boolean    // Include thought summaries in response
   }
 }
@@ -518,13 +519,23 @@ export async function executeLLMOperationGemini(
     generationConfig.topK = settings.top_k
   }
 
-  // Add thinking configuration if specified
-  if (settings.thinking_budget !== undefined) {
+  // Add thinking configuration based on model version
+  const isGemini3 = modelToUse.startsWith('gemini-3')
+
+  if (isGemini3 && settings.thinking_level) {
+    // Gemini 3: Use thinking_level (enum)
+    generationConfig.thinkingConfig = {
+      thinkingLevel: settings.thinking_level,
+      includeThoughts: settings.include_thoughts ?? false
+    }
+    console.log(`[Gemini 3] Thinking level: ${settings.thinking_level}, includeThoughts: ${settings.include_thoughts ?? false}`)
+  } else if (!isGemini3 && settings.thinking_budget !== undefined) {
+    // Gemini 2.5: Use thinkingBudget (numeric)
     generationConfig.thinkingConfig = {
       thinkingBudget: settings.thinking_budget,
       includeThoughts: settings.include_thoughts ?? false
     }
-    console.log(`Thinking configured: budget=${settings.thinking_budget}, includeThoughts=${settings.include_thoughts ?? false}`)
+    console.log(`[Gemini 2.5] Thinking budget: ${settings.thinking_budget}, includeThoughts: ${settings.include_thoughts ?? false}`)
   }
 
   const startTime = Date.now()
