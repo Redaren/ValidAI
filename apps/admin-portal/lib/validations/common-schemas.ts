@@ -36,3 +36,36 @@ export const organizationDescriptionSchema = z
   .trim()
   .optional()
   .nullable()
+
+/**
+ * Optional text field schema
+ * Used for organization extended fields that are optional strings
+ */
+export const optionalTextSchema = z
+  .string()
+  .max(255, 'Text must be at most 255 characters')
+  .trim()
+  .optional()
+  .nullable()
+
+/**
+ * Phone number schema
+ * Validates phone numbers with reasonable length limit
+ */
+export const phoneSchema = z
+  .string()
+  .max(30, 'Phone number must be at most 30 characters')
+  .trim()
+  .optional()
+  .nullable()
+
+/**
+ * Country code schema
+ * ISO 3166-1 alpha-2 country code (2 uppercase letters)
+ */
+export const countryCodeSchema = z
+  .string()
+  .length(2, 'Country code must be 2 characters')
+  .toUpperCase()
+  .optional()
+  .nullable()

@@ -72,7 +72,7 @@ function LoginForm() {
             {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Playze Admin Portal
+                ValidAI Admin Portal
               </h1>
               <p className="text-muted-foreground">
                 Sign in with your admin email to access the portal

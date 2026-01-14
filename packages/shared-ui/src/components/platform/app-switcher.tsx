@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { useUserAppsWithAdmin } from '@playze/shared-auth'
+import { useUserAppsWithAdmin, type UserApp } from '@playze/shared-auth'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,23 +10,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu'
-import { Button } from '../ui/button'
+import { Button, type ButtonProps } from '../ui/button'
 import { ChevronDown, Loader2 } from 'lucide-react'
+import { cn } from '../../lib/utils'
 
 interface AppSwitcherProps {
   currentApp: string
-}
-
-/**
- * Map app IDs to URLs (temporary until app_url added to database)
- */
-function getAppUrl(appId: string): string {
-  const urlMap: Record<string, string> = {
-    'admin': 'http://localhost:3001',
-    'validai': 'http://localhost:3000',
-    'testapp': 'http://localhost:3002',
-  }
-  return urlMap[appId] || '#'
+  variant?: ButtonProps['variant']
+  className?: string
+  dropdownClassName?: string
+  mode?: 'default' | 'sidebar'
 }
 
 /**
@@ -42,46 +35,105 @@ function getAppUrl(appId: string): string {
  * - Admin Portal: Verified via admin_users table (cannot be faked)
  *
  * @example
- * <AppSwitcher currentApp="validai" />
+ * <AppSwitcher currentApp="roadcloud" />
  */
-export function AppSwitcher({ currentApp }: AppSwitcherProps) {
+export function AppSwitcher({
+  currentApp,
+  variant = 'outline',
+  className,
+  dropdownClassName,
+  mode = 'default',
+}: AppSwitcherProps) {
   const { data: userApps, isLoading } = useUserAppsWithAdmin()
 
-  const apps = (userApps || []).map(app => ({
+  const apps = (userApps || []).map((app) => ({
     id: app.app_id,
     name: app.app_name,
-    url: getAppUrl(app.app_id),
+    url: app.app_url || '#',  // Use app_url from database, fallback to # if null
     hasAccess: app.status === 'active',
     isPlatformApp: app.is_platform_app,
   }))
 
-  const currentAppData = apps.find(app => app.id === currentApp)
+  const currentAppData = apps.find((app) => app.id === currentApp)
 
   const handleAppSwitch = (appId: string) => {
-    const app = apps.find(a => a.id === appId)
+    const app = apps.find((a) => a.id === appId)
     if (app?.hasAccess && app.url) {
       window.location.href = app.url
     }
   }
 
   if (isLoading) {
+    if (mode === 'sidebar') {
+      return (
+        <span className={cn('font-semibold opacity-50', className)}>
+          <Loader2 className="h-4 w-4 animate-spin inline" />
+        </span>
+      )
+    }
     return (
-      <Button variant="outline" className="w-[200px] justify-between" disabled>
+      <Button variant={variant} className={`w-[200px] justify-between ${className || ''}`} disabled>
         <Loader2 className="h-4 w-4 animate-spin" />
         <ChevronDown className="ml-2 h-4 w-4" />
       </Button>
     )
   }
 
+  // Sidebar mode: compact display for sidebar navigation
+  if (mode === 'sidebar') {
+    const hasOtherApps = apps.filter((a) => a.hasAccess && a.id !== currentApp).length > 0
+    const currentAppName = currentAppData?.name || currentApp
+
+    // If only one app (or no other accessible apps), render as plain text
+    if (!hasOtherApps) {
+      return <span className={cn('font-semibold', className)}>{currentAppName}</span>
+    }
+
+    // Multiple apps: render as dropdown
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            className={cn(
+              'h-auto p-0 font-semibold hover:bg-transparent focus-visible:ring-0',
+              className
+            )}
+          >
+            {currentAppName}
+            <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent className={dropdownClassName} align="start">
+          <DropdownMenuLabel>Switch App</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {apps.map((app) => (
+            <DropdownMenuItem
+              key={app.id}
+              onClick={() => handleAppSwitch(app.id)}
+              disabled={!app.hasAccess}
+              className={app.id === currentApp ? 'bg-accent' : ''}
+            >
+              {app.name}
+              {!app.hasAccess && ' (No Access)'}
+              {app.id === currentApp && ' ✓'}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  // Default mode: full button with "Switch App" label
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-[200px] justify-between">
-          {currentAppData?.name || 'Select App'}
+        <Button variant={variant} className={`w-[200px] justify-between ${className || ''}`}>
+          Switch App
           <ChevronDown className="ml-2 h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[200px]">
+      <DropdownMenuContent className={`w-[200px] ${dropdownClassName || ''}`}>
         <DropdownMenuLabel>Switch App</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {apps.map((app) => (

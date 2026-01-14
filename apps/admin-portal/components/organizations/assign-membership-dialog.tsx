@@ -50,7 +50,8 @@ export function AssignMembershipDialog({
   const [selectedRole, setSelectedRole] = useState<'owner' | 'admin' | 'member' | 'viewer'>('member')
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
 
-  const { data: users, isLoading: loadingUsers } = useUsers()
+  const { data, isLoading: loadingUsers } = useUsers()
+  const users = data?.users || []
   const assignMember = useAssignMember()
   const addToast = useToastStore((state) => state.addToast)
 

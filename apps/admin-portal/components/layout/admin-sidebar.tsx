@@ -25,6 +25,11 @@ const navItems: NavItem[] = [
     title: "Subscriptions",
     href: "/subscriptions",
     description: "Manage app subscriptions"
+  },
+  {
+    title: "Tiers",
+    href: "/tiers",
+    description: "View tier configurations"
   }
 ]
 
@@ -61,7 +66,7 @@ export function AdminSidebar() {
 
       <div className="border-t p-4">
         <p className="text-xs text-muted-foreground">
-          Playze Admin Portal v0.0.0
+          ValidAI Admin Portal v0.0.0
         </p>
       </div>
     </aside>

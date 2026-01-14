@@ -99,7 +99,7 @@ export default function OrganizationDetailsPage() {
         </TabsContent>
 
         <TabsContent value="members">
-          <OrgMembersTab organizationId={organizationId} />
+          <OrgMembersTab organizationId={organizationId} organizationName={organization.name} />
         </TabsContent>
 
         <TabsContent value="subscriptions">

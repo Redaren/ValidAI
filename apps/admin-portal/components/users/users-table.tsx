@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import { DataTable, type ColumnDef } from '@playze/shared-ui'
 import { Badge, Avatar, AvatarImage, AvatarFallback, Input } from '@playze/shared-ui'
 import { useUsers } from '@/lib/queries'
+import { useDebounce } from '@/hooks'
 import { Search } from 'lucide-react'
 
 interface UserWithCount {
@@ -17,12 +18,31 @@ interface UserWithCount {
   organization_count: number
 }
 
+const PAGE_SIZE = 10
+
 export function UsersTable() {
-  const [search, setSearch] = useState('')
-  const { data: users, isLoading } = useUsers({ search, limit: 50 }) as {
-    data: UserWithCount[] | undefined
-    isLoading: boolean
-  }
+  // Search with debounce to avoid excessive API calls
+  const [searchInput, setSearchInput] = useState('')
+  const debouncedSearch = useDebounce(searchInput, 300)
+
+  // Pagination state
+  const [page, setPage] = useState(0)
+
+  // Query with server-side params
+  const { data, isLoading } = useUsers({
+    search: debouncedSearch || undefined,
+    limit: PAGE_SIZE,
+    offset: page * PAGE_SIZE,
+  })
+
+  const users = data?.users || []
+  const totalCount = data?.totalCount || 0
+  const pageCount = Math.ceil(totalCount / PAGE_SIZE) || 1
+
+  // Reset to page 0 when search changes
+  useEffect(() => {
+    setPage(0)
+  }, [debouncedSearch])
 
   const columns: ColumnDef<UserWithCount>[] = useMemo(
     () => [
@@ -85,17 +105,23 @@ export function UsersTable() {
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           placeholder="Search users by name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="pl-10"
         />
       </div>
 
-      {/* Data table */}
+      {/* Data table with server-side pagination */}
       <DataTable
         columns={columns}
-        data={users || []}
+        data={users}
         isLoading={isLoading}
+        manualPagination
+        pageCount={pageCount}
+        pageIndex={page}
+        onPageChange={setPage}
+        pageSize={PAGE_SIZE}
+        totalCount={totalCount}
       />
     </div>
   )

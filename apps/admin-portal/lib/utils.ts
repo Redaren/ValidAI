@@ -1,4 +1,4 @@
-import { format } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
 
 /**
  * Format a date string or Date object to a readable format
@@ -25,4 +25,21 @@ export function formatDate(date: string | Date | null, formatStr = 'MMM d, yyyy'
  */
 export function formatDateTime(date: string | Date): string {
   return formatDate(date, 'MMM d, yyyy HH:mm')
+}
+
+/**
+ * Format a date as relative time (e.g., "2 days ago", "in 5 hours")
+ * @param date - Date string or Date object
+ * @returns Relative time string
+ */
+export function formatRelativeTime(date: string | Date | null): string {
+  if (!date) return 'N/A'
+
+  try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date
+    return formatDistanceToNow(dateObj, { addSuffix: true })
+  } catch (error) {
+    console.error('Error formatting relative time:', error)
+    return 'Invalid date'
+  }
 }

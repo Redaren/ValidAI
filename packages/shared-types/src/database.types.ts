@@ -432,6 +432,7 @@ export type Database = {
       organization_members: {
         Row: {
           invited_by: string | null
+          is_active: boolean
           joined_at: string | null
           organization_id: string
           role: string
@@ -439,6 +440,7 @@ export type Database = {
         }
         Insert: {
           invited_by?: string | null
+          is_active?: boolean
           joined_at?: string | null
           organization_id: string
           role: string
@@ -446,6 +448,7 @@ export type Database = {
         }
         Update: {
           invited_by?: string | null
+          is_active?: boolean
           joined_at?: string | null
           organization_id?: string
           role?: string
@@ -1252,6 +1255,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_activate_subscription: {
+        Args: { p_subscription_id: string }
+        Returns: {
+          activated: boolean
+          status: string
+          subscription_id: string
+        }[]
+      }
       admin_assign_member: {
         Args: { p_organization_id: string; p_role: string; p_user_id: string }
         Returns: {
@@ -1457,6 +1468,40 @@ export type Database = {
           role: string
         }[]
       }
+      admin_list_users_paginated: {
+        Args: { p_limit?: number; p_offset?: number; p_search?: string }
+        Returns: {
+          avatar_url: string
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          organization_count: number
+          total_count: number
+          updated_at: string
+        }[]
+      }
+      admin_remove_user_membership: {
+        Args: { p_organization_id: string; p_user_id: string }
+        Returns: {
+          organization_id: string
+          removed: boolean
+          user_id: string
+        }[]
+      }
+      admin_toggle_user_membership_active: {
+        Args: {
+          p_is_active: boolean
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: {
+          is_active: boolean
+          organization_id: string
+          updated: boolean
+          user_id: string
+        }[]
+      }
       admin_update_organization: {
         Args: {
           org_description: string
@@ -1488,6 +1533,39 @@ export type Database = {
           status: string
           tier_id: string
           tier_name: string
+          updated_at: string
+        }[]
+      }
+      admin_update_user_membership_role: {
+        Args: { p_organization_id: string; p_role: string; p_user_id: string }
+        Returns: {
+          organization_id: string
+          role: string
+          updated: boolean
+          user_id: string
+        }[]
+      }
+      admin_update_user_preferences: {
+        Args: {
+          p_email_notifications?: boolean
+          p_language?: string
+          p_theme?: string
+          p_user_id: string
+        }
+        Returns: {
+          email_notifications: boolean
+          language: string
+          theme: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      admin_update_user_profile: {
+        Args: { p_avatar_url?: string; p_full_name?: string; p_user_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          id: string
           updated_at: string
         }[]
       }
@@ -1591,11 +1669,11 @@ export type Database = {
         }[]
       }
       get_llm_config_for_run:
+        | { Args: { p_processor_id?: string }; Returns: Json }
         | {
             Args: { p_processor_id?: string; p_user_id?: string }
             Returns: Json
           }
-        | { Args: { p_processor_id?: string }; Returns: Json }
       get_ordered_operations: {
         Args: { p_processor_id: string }
         Returns: {
@@ -1736,6 +1814,17 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_user_organizations_with_apps: {
+        Args: { p_user_id: string }
+        Returns: {
+          accessible_apps: string[]
+          default_app_url: string
+          is_active: boolean
+          organization_id: string
+          organization_name: string
+          user_role: string
+        }[]
+      }
       get_user_processors: {
         Args: {
           p_include_archived?: boolean
@@ -1850,8 +1939,100 @@ export type Database = {
         Args: { org_id: string; user_uuid: string }
         Returns: boolean
       }
+      user_cancel_invitation: {
+        Args: { p_app_id?: string; p_invitation_id: string }
+        Returns: {
+          out_email: string
+          out_id: string
+          out_status: string
+        }[]
+      }
+      user_get_org_invitations: {
+        Args: { p_organization_id: string }
+        Returns: {
+          expires_at: string
+          id: string
+          invited_at: string
+          invited_by_name: string
+          out_email: string
+          out_role: string
+          out_status: string
+        }[]
+      }
+      user_get_org_members: {
+        Args: { p_app_id?: string; p_organization_id: string }
+        Returns: {
+          avatar_url: string
+          email: string
+          full_name: string
+          is_active: boolean
+          joined_at: string
+          role: string
+          user_id: string
+        }[]
+      }
+      user_get_org_members_paginated: {
+        Args: {
+          p_app_id?: string
+          p_limit?: number
+          p_offset?: number
+          p_organization_id: string
+          p_search?: string
+        }
+        Returns: {
+          avatar_url: string
+          email: string
+          full_name: string
+          invited_by_name: string
+          is_active: boolean
+          joined_at: string
+          role: string
+          total_count: number
+          user_id: string
+        }[]
+      }
+      user_invite_member: {
+        Args: {
+          p_app_id?: string
+          p_email: string
+          p_organization_id: string
+          p_role?: string
+        }
+        Returns: {
+          email: string
+          invitation_id: string
+          is_already_member: boolean
+          role: string
+          status: string
+          user_exists: boolean
+        }[]
+      }
       user_organization_id: { Args: never; Returns: string }
       user_role_in_org: { Args: { org_id: string }; Returns: string }
+      user_toggle_member_active: {
+        Args: {
+          p_app_id?: string
+          p_is_active: boolean
+          p_org_id: string
+          p_user_id: string
+        }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
+      user_update_member_role: {
+        Args: {
+          p_app_id?: string
+          p_new_role: string
+          p_org_id: string
+          p_user_id: string
+        }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
       validate_processor_ownership: {
         Args: { p_processor_id: string; p_require_owner?: boolean }
         Returns: boolean

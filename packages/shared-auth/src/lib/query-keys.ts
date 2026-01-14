@@ -15,6 +15,12 @@ export const queryKeys = {
     session: () => [...queryKeys.auth.all(), 'session'] as const,
   },
 
+  // User queries
+  user: {
+    all: () => ['user'] as const,
+    appsWithAdmin: () => [...queryKeys.user.all(), 'appsWithAdmin'] as const,
+  },
+
   // Organization queries
   organizations: {
     all: () => ['organizations'] as const,
@@ -23,6 +29,9 @@ export const queryKeys = {
     detail: (id: string) => [...queryKeys.organizations.all(), 'detail', id] as const,
     apps: (orgId: string) => [...queryKeys.organizations.all(), 'apps', orgId] as const,
     members: (orgId: string) => [...queryKeys.organizations.all(), 'members', orgId] as const,
+    membersPaginated: (orgId: string, params?: { search?: string; limit?: number; offset?: number }) =>
+      [...queryKeys.organizations.all(), 'members', orgId, 'paginated', params] as const,
+    invitations: (orgId: string) => [...queryKeys.organizations.all(), 'invitations', orgId] as const,
   },
 
   // Feature access queries
@@ -37,11 +46,5 @@ export const queryKeys = {
     all: () => ['authorization'] as const,
     context: (appId: string) =>
       [...queryKeys.authorization.all(), 'context', appId] as const,
-  },
-
-  // User queries
-  user: {
-    all: () => ['user'] as const,
-    appsWithAdmin: () => [...queryKeys.user.all(), 'apps-with-admin'] as const,
   },
 } as const

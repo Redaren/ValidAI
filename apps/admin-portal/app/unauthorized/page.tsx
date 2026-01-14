@@ -14,7 +14,7 @@ export default function UnauthorizedPage() {
 
         <div className="space-y-4 max-w-md mx-auto">
           <p className="text-sm text-muted-foreground">
-            The Playze Admin Portal is restricted to authorized administrators only.
+            The ValidAI Admin Portal is restricted to authorized administrators only.
             If you believe you should have access, please contact your system administrator.
           </p>
 

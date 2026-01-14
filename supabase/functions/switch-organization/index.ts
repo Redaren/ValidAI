@@ -1,8 +1,8 @@
-import { createAdminClient } from '@shared/supabaseAdmin.ts'
-import { handleCors } from '@shared/cors.ts'
-import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse } from '@shared/response.ts'
-import { getUserFromRequest } from '@shared/auth.ts'
-import { validateRequired, validateUuid } from '@shared/validation.ts'
+import { createAdminClient } from '../_shared/supabaseAdmin.ts'
+import { handleCors } from '../_shared/cors.ts'
+import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse } from '../_shared/response.ts'
+import { getUserFromRequest, validateOrgMembership } from '../_shared/auth.ts'
+import { validateRequired, validateUuid } from '../_shared/validation.ts'
 
 /**
  * Edge Function: auth/switch-organization
@@ -22,6 +22,7 @@ import { validateRequired, validateUuid } from '@shared/validation.ts'
  *   "success": true,
  *   "data": {
  *     "organizationId": "uuid",
+ *     "defaultAppUrl": "https://app.example.com" | null,
  *     "message": "Organization switched successfully..."
  *   }
  * }
@@ -67,53 +68,56 @@ Deno.serve(async (req) => {
       return errorResponse('Invalid organization ID format (must be valid UUID)')
     }
 
-    // Fetch organization details AND user's role in single query
-    const { data: orgWithRole, error: orgError } = await supabase
-      .from('organization_members')
-      .select(`
-        role,
-        organizations (
-          id,
-          name
-        )
-      `)
-      .eq('organization_id', organizationId)
-      .eq('user_id', user.id)
-      .single()
-
-    if (orgError || !orgWithRole || !orgWithRole.organizations) {
-      console.error('Error fetching organization:', orgError)
+    // Verify user is member of target organization
+    const membership = await validateOrgMembership(supabase, user.id, organizationId)
+    if (!membership) {
       return forbiddenResponse('You are not a member of this organization')
     }
 
-    const organization = orgWithRole.organizations
+    // Verify organization is active and get default app URL
+    const { data: org, error: orgError } = await supabase
+      .from('organizations')
+      .select(`
+        is_active,
+        default_app_id,
+        default_app:apps!organizations_default_app_id_fkey(app_url)
+      `)
+      .eq('id', organizationId)
+      .single()
 
-    // Fetch organization's active app subscriptions
-    const { data: subscriptions, error: subscriptionError } = await supabase
-      .from('organization_app_subscriptions')
-      .select('app_id')
-      .eq('organization_id', organizationId)
-      .eq('status', 'active')
-
-    if (subscriptionError) {
-      console.error('Error fetching subscriptions:', subscriptionError)
-      // Don't fail the org switch if subscription query fails
-      // Fall back to empty array
+    if (orgError || !org) {
+      console.error('Error fetching organization:', orgError)
+      return errorResponse('Organization not found', 404)
     }
 
-    // Extract app IDs into array (e.g., ['validai', 'futureapp'])
-    const appSubscriptions = subscriptions?.map(sub => sub.app_id) || []
+    if (!org.is_active) {
+      return forbiddenResponse('Organization is inactive')
+    }
 
-    // Update user's JWT metadata with organization context
-    // IMPORTANT: Replace entire app_metadata to remove old fields
+    // Extract default app URL (handle both object and null cases)
+    const defaultAppUrl = org.default_app?.app_url || null
+
+    // Get accessible apps for this organization (also validates at least one exists)
+    const { data: accessibleApps, error: appsError } = await supabase
+      .rpc('get_org_accessible_apps', { org_id: organizationId })
+
+    if (appsError) {
+      console.error('Error fetching accessible apps:', appsError)
+      return errorResponse('Failed to verify subscription status', 500)
+    }
+
+    if (!accessibleApps || accessibleApps.length === 0) {
+      return forbiddenResponse('Organization has no active subscriptions')
+    }
+
+    // Update user's JWT metadata with new organization_id and accessible_apps
     const { error: updateError } = await supabase.auth.admin.updateUserById(
       user.id,
       {
         app_metadata: {
+          ...user.app_metadata,
           organization_id: organizationId,
-          organization_name: organization.name,
-          organization_role: orgWithRole.role,
-          app_subscriptions: appSubscriptions,
+          accessible_apps: accessibleApps,
         }
       }
     )
@@ -127,6 +131,7 @@ Deno.serve(async (req) => {
 
     return successResponse({
       organizationId,
+      defaultAppUrl,
       message: 'Organization switched successfully. Please refresh your session to apply changes.'
     })
 

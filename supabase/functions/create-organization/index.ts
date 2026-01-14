@@ -1,13 +1,13 @@
-import { createAdminClient } from '../../_shared/supabaseAdmin.ts'
-import { handleCors } from '../../_shared/cors.ts'
-import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse, conflictResponse } from '../../_shared/response.ts'
-import { getUserFromRequest, isPlayzeAdmin } from '../../_shared/auth.ts'
-import { validateRequired, validateEmail, validateSlug } from '../../_shared/validation.ts'
+import { createAdminClient } from '../_shared/supabaseAdmin.ts'
+import { handleCors } from '../_shared/cors.ts'
+import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse, conflictResponse } from '../_shared/response.ts'
+import { getUserFromRequest, isPlayzeAdmin } from '../_shared/auth.ts'
+import { validateRequired } from '../_shared/validation.ts'
 
 /**
- * Edge Function: admin/create-organization
+ * Edge Function: create-organization
  *
- * Purpose: Create organization with optional initial owner invitation (Playze admin only)
+ * Purpose: Create organization (Playze admin only)
  *
  * Method: POST
  * Auth: Requires Playze admin user
@@ -16,10 +16,23 @@ import { validateRequired, validateEmail, validateSlug } from '../../_shared/val
  * {
  *   "name": "Acme Corp",
  *   "description": "Optional description",      // Optional
- *   "initialOwnerEmail": "owner@acme.com",     // Optional
  *   "appSubscriptions": [                       // Optional
  *     { "appId": "roadcloud", "tierName": "pro" }
- *   ]
+ *   ],
+ *   // Extended fields (all optional):
+ *   "org_number": "556123-4567",
+ *   "vat_number": "SE556123456701",
+ *   "street_address": "Storgatan 1",
+ *   "postal_code": "111 22",
+ *   "city": "Stockholm",
+ *   "country": "SE",
+ *   "contact_person": "Johan Svensson",
+ *   "contact_role": "CTO",
+ *   "contact_email": "johan@acme.com",
+ *   "contact_phone": "+46701234567",
+ *   "referral": "Partner X",
+ *   "lead_source": "Conference",
+ *   "kam": "Anna Karlsson"
  * }
  *
  * Output:
@@ -27,7 +40,6 @@ import { validateRequired, validateEmail, validateSlug } from '../../_shared/val
  *   "success": true,
  *   "data": {
  *     "organization": { ... },
- *     "invitation": { ... },      // If initialOwnerEmail provided
  *     "subscriptions": [ ... ]    // If appSubscriptions provided
  *   }
  * }
@@ -37,7 +49,6 @@ import { validateRequired, validateEmail, validateSlug } from '../../_shared/val
  *   body: {
  *     name: 'Acme Corp',
  *     description: 'Optional description',
- *     initialOwnerEmail: 'owner@acme.com',  // Optional
  *     appSubscriptions: [
  *       { appId: 'roadcloud', tierName: 'pro' }
  *     ]
@@ -85,8 +96,22 @@ Deno.serve(async (req) => {
     const {
       name,
       description,
-      initialOwnerEmail,
-      appSubscriptions
+      default_app_id,
+      appSubscriptions,
+      // Extended fields
+      org_number,
+      vat_number,
+      street_address,
+      postal_code,
+      city,
+      country,
+      contact_person,
+      contact_role,
+      contact_email,
+      contact_phone,
+      referral,
+      lead_source,
+      kam
     } = await req.json()
 
     const validationError = validateRequired({ name }, ['name'])
@@ -94,20 +119,32 @@ Deno.serve(async (req) => {
       return errorResponse(validationError)
     }
 
-    // Validate initial owner email if provided
-    if (initialOwnerEmail && !validateEmail(initialOwnerEmail)) {
-      return errorResponse('Invalid email format for initial owner')
-    }
-
     console.log(`Admin ${user.email} creating organization: ${name}`)
 
-    // Step 1: Create organization
+    // Step 1: Create organization with all fields
     const { data: organization, error: orgError } = await supabase
       .from('organizations')
       .insert({
         name,
         description: description || null,
-        is_active: true
+        default_app_id: default_app_id || null,
+        is_active: true,
+        // Extended fields
+        org_number: org_number || null,
+        vat_number: vat_number || null,
+        street_address: street_address || null,
+        postal_code: postal_code || null,
+        city: city || null,
+        country: country || null,
+        contact_person: contact_person || null,
+        contact_role: contact_role || null,
+        contact_email: contact_email || null,
+        contact_phone: contact_phone || null,
+        referral: referral || null,
+        lead_source: lead_source || null,
+        kam: kam || null,
+        // Auto-set created_by to the current admin user
+        created_by: user.id
       })
       .select()
       .single()
@@ -129,67 +166,7 @@ Deno.serve(async (req) => {
       organization
     }
 
-    // Step 2: Invite initial owner if email provided
-    if (initialOwnerEmail) {
-      try {
-        console.log(`Inviting initial owner: ${initialOwnerEmail}`)
-
-        // Create invitation record first
-        const { error: inviteRecordError } = await supabase
-          .from('organization_invitations')
-          .insert({
-            organization_id: organization.id,
-            email: initialOwnerEmail,
-            role: 'owner',
-            status: 'pending',
-            invited_by: user.id
-          })
-
-        if (inviteRecordError) {
-          console.error('Error creating invitation record:', inviteRecordError)
-          // Continue - org created successfully, just log the error
-        }
-
-        // Send invitation email via Supabase Auth
-        // Supabase will automatically send the email
-        const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
-          initialOwnerEmail,
-          {
-            data: {
-              organization_id: organization.id,
-              organization_name: organization.name,
-              role: 'owner'
-            },
-            redirectTo: `${Deno.env.get('SITE_URL')}/auth/accept-invite`
-          }
-        )
-
-        if (inviteError) {
-          console.error('Error sending invitation email:', inviteError)
-          result.invitation = {
-            email: initialOwnerEmail,
-            status: 'failed',
-            message: 'Organization created but invitation email failed to send. You can retry invitation later.'
-          }
-        } else {
-          console.log(`Invitation email sent to ${initialOwnerEmail}`)
-          result.invitation = {
-            email: initialOwnerEmail,
-            status: 'sent',
-            message: 'Invitation email sent successfully'
-          }
-        }
-      } catch (inviteException) {
-        console.error('Exception during invitation:', inviteException)
-        result.invitation = {
-          email: initialOwnerEmail,
-          status: 'error',
-          message: 'Organization created but invitation process encountered an error'
-        }
-      }
-    }
-
-    // Step 3: Assign app subscriptions if provided
+    // Assign app subscriptions if provided
     if (appSubscriptions && appSubscriptions.length > 0) {
       try {
         console.log(`Assigning ${appSubscriptions.length} app subscription(s)`)

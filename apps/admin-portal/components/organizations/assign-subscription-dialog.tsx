@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import {
@@ -21,30 +21,44 @@ import {
   Alert,
 } from '@playze/shared-ui'
 import { Loader2 } from 'lucide-react'
-import { createBrowserClient } from '@playze/shared-auth/client'
 import { assignSubscriptionSchema, type AssignSubscriptionInput } from '@/lib/validations'
 import { useAssignSubscription } from '@/lib/queries'
+import { useApps } from '@/lib/queries/tiers'
+import { useAppTiers } from '@/lib/queries/subscriptions'
 import { useToastStore } from '@/stores'
 
 interface AssignSubscriptionDialogProps {
   organizationId: string
+  existingAppIds: string[]
   isOpen: boolean
   onClose: () => void
 }
 
+interface AppTier {
+  id: string
+  tier_name: string
+  display_name: string
+}
+
 export function AssignSubscriptionDialog({
   organizationId,
+  existingAppIds,
   isOpen,
   onClose,
 }: AssignSubscriptionDialogProps) {
-  const [apps, setApps] = useState<Array<{ id: string; name: string; description?: string }>>([])
-  const [tiers, setTiers] = useState<Array<{ id: string; tier_name: string; display_name: string }>>([])
   const [selectedAppId, setSelectedAppId] = useState('')
-  const [loadingApps, setLoadingApps] = useState(true)
-  const [loadingTiers, setLoadingTiers] = useState(false)
 
   const assignSub = useAssignSubscription()
   const addToast = useToastStore((state) => state.addToast)
+
+  // Use TanStack Query hooks instead of manual useEffect + useState
+  const { data: apps = [], isLoading: loadingApps } = useApps()
+  const { data: tiersData = [], isLoading: loadingTiers } = useAppTiers(selectedAppId)
+  const tiers = tiersData as AppTier[]
+
+  // Filter out apps that already have subscriptions (regardless of status)
+  const availableApps = apps.filter((app) => !existingAppIds.includes(app.id))
+  const allAppsSubscribed = !loadingApps && availableApps.length === 0
 
   const {
     register,
@@ -55,77 +69,6 @@ export function AssignSubscriptionDialog({
   } = useForm<Omit<AssignSubscriptionInput, 'organizationId'>>({
     resolver: zodResolver(assignSubscriptionSchema.omit({ organizationId: true })),
   })
-
-  // Load apps on mount
-  useEffect(() => {
-    async function loadApps() {
-      try {
-        const supabase = createBrowserClient()
-        const { data, error } = await supabase
-          .from('apps')
-          .select('*')
-          .eq('is_active', true)
-          .order('name')
-
-        if (error) throw error
-        setApps(
-          (data || []).map((app) => ({
-            id: app.id,
-            name: app.name,
-            description: app.description ?? undefined,
-          }))
-        )
-      } catch (error) {
-        console.error('Error loading apps:', error)
-        addToast({
-          title: 'Error loading apps',
-          description: 'Failed to load available apps',
-          variant: 'destructive',
-        })
-      } finally {
-        setLoadingApps(false)
-      }
-    }
-
-    if (isOpen) {
-      loadApps()
-    }
-  }, [isOpen, addToast])
-
-  // Load tiers when app is selected
-  useEffect(() => {
-    async function loadTiers() {
-      if (!selectedAppId) {
-        setTiers([])
-        return
-      }
-
-      setLoadingTiers(true)
-      try {
-        const supabase = createBrowserClient()
-        const { data, error } = await supabase
-          .from('app_tiers')
-          .select('*')
-          .eq('app_id', selectedAppId)
-          .eq('is_active', true)
-          .order('tier_name')
-
-        if (error) throw error
-        setTiers(data || [])
-      } catch (error) {
-        console.error('Error loading tiers:', error)
-        addToast({
-          title: 'Error loading tiers',
-          description: 'Failed to load tiers for selected app',
-          variant: 'destructive',
-        })
-      } finally {
-        setLoadingTiers(false)
-      }
-    }
-
-    loadTiers()
-  }, [selectedAppId, addToast])
 
   const onSubmit = async (data: Omit<AssignSubscriptionInput, 'organizationId'>) => {
     try {
@@ -175,27 +118,36 @@ export function AssignSubscriptionDialog({
             <Label htmlFor="appId">
               App <span className="text-destructive">*</span>
             </Label>
-            <Select
-              value={selectedAppId}
-              onValueChange={(value) => {
-                setSelectedAppId(value)
-                setValue('appId', value)
-                setValue('tierId', '')
-                setValue('tierName', '' as 'free' | 'pro' | 'enterprise')
-              }}
-              disabled={loadingApps || isSubmitting}
-            >
-              <SelectTrigger id="appId">
-                <SelectValue placeholder={loadingApps ? 'Loading...' : 'Select an app'} />
-              </SelectTrigger>
-              <SelectContent>
-                {apps.map((app) => (
-                  <SelectItem key={app.id} value={app.id}>
-                    {app.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {allAppsSubscribed ? (
+              <Alert>
+                <p className="text-sm">
+                  This organization already has subscriptions for all available apps. Use
+                  &quot;Update Tier&quot; or &quot;Activate&quot; to manage existing subscriptions.
+                </p>
+              </Alert>
+            ) : (
+              <Select
+                value={selectedAppId}
+                onValueChange={(value) => {
+                  setSelectedAppId(value)
+                  setValue('appId', value)
+                  setValue('tierId', '')
+                  setValue('tierName', '' as 'free' | 'pro' | 'enterprise')
+                }}
+                disabled={loadingApps || isSubmitting}
+              >
+                <SelectTrigger id="appId">
+                  <SelectValue placeholder={loadingApps ? 'Loading...' : 'Select an app'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableApps.map((app) => (
+                    <SelectItem key={app.id} value={app.id}>
+                      {app.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             {errors.appId && (
               <p className="text-sm text-destructive">{errors.appId.message}</p>
             )}
@@ -272,7 +224,7 @@ export function AssignSubscriptionDialog({
             <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || !selectedAppId}>
+            <Button type="submit" disabled={isSubmitting || !selectedAppId || allAppsSubscribed}>
               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {isSubmitting ? 'Assigning...' : 'Assign Subscription'}
             </Button>

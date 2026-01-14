@@ -3,7 +3,9 @@ import { createBrowserClient } from '@playze/shared-auth/client'
 import type {
   UpdateSubscriptionTierInput,
   CancelSubscriptionInput,
+  ActivateSubscriptionInput,
 } from '@/lib/validations'
+import { orgKeys } from './organizations'
 
 /**
  * Query keys factory for subscriptions
@@ -129,9 +131,13 @@ export function useUpdateSubscriptionTier() {
       if (error) throw error
       return data?.[0] // RPC returns array
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       // Invalidate subscriptions list
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.lists() })
+      // Also invalidate org-specific subscriptions cache if we have the org ID
+      if (data?.organization_id) {
+        queryClient.invalidateQueries({ queryKey: orgKeys.subscriptions(data.organization_id) })
+      }
     },
   })
 }
@@ -157,8 +163,43 @@ export function useCancelSubscription() {
       if (error) throw error
       return data?.[0] // RPC returns array
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.lists() })
+      // Also invalidate org-specific subscriptions cache if we have the org ID
+      if (data?.organization_id) {
+        queryClient.invalidateQueries({ queryKey: orgKeys.subscriptions(data.organization_id) })
+      }
+    },
+  })
+}
+
+/**
+ * Mutation: Activate subscription
+ * Uses admin RPC function to reactivate a canceled subscription
+ */
+export function useActivateSubscription() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: ActivateSubscriptionInput) => {
+      const supabase = createBrowserClient()
+
+      // Call admin function (bypasses RLS, no UPDATE policy exists)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('admin_activate_subscription', {
+        subscription_id: input.subscriptionId,
+        activation_reason: input.reason,
+      })
+
+      if (error) throw error
+      return data?.[0] // RPC returns array
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.lists() })
+      // Also invalidate org-specific subscriptions cache if we have the org ID
+      if (data?.organization_id) {
+        queryClient.invalidateQueries({ queryKey: orgKeys.subscriptions(data.organization_id) })
+      }
     },
   })
 }

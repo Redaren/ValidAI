@@ -13,7 +13,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table"
-import { ChevronDown } from "lucide-react"
+import { ChevronDown, Search } from "lucide-react"
 
 import { Button } from "./ui/button"
 import { Input } from "./ui/input"
@@ -35,10 +35,25 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
+  /** Column key for client-side filtering (use searchValue/onSearchChange for server-side) */
   searchKey?: string
+  /** Placeholder text for search input */
   searchPlaceholder?: string
   isLoading?: boolean
   pageSize?: number
+  // Server-side pagination props
+  manualPagination?: boolean
+  pageCount?: number
+  pageIndex?: number
+  onPageChange?: (page: number) => void
+  totalCount?: number
+  // Controlled search for server-side filtering
+  /** Controlled search value (for server-side search) */
+  searchValue?: string
+  /** Callback when search value changes (for server-side search) */
+  onSearchChange?: (value: string) => void
+  /** Initial column visibility state (e.g., { invitedBy: false }) */
+  initialColumnVisibility?: VisibilityState
 }
 
 export function DataTable<TData, TValue>({
@@ -48,29 +63,55 @@ export function DataTable<TData, TValue>({
   searchPlaceholder = "Search...",
   isLoading = false,
   pageSize = 10,
+  // Server-side pagination props
+  manualPagination = false,
+  pageCount: controlledPageCount,
+  pageIndex: controlledPageIndex,
+  onPageChange,
+  totalCount,
+  // Controlled search props
+  searchValue,
+  onSearchChange,
+  initialColumnVisibility,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = React.useState<SortingState>([])
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>(initialColumnVisibility ?? {})
   const [rowSelection, setRowSelection] = React.useState({})
 
   const table = useReactTable({
     data,
     columns,
-    pageCount: -1,
+    pageCount: manualPagination ? controlledPageCount : -1,
     state: {
       sorting,
       columnFilters,
       columnVisibility,
       rowSelection,
+      // Controlled pagination for server-side mode
+      ...(manualPagination && {
+        pagination: {
+          pageIndex: controlledPageIndex ?? 0,
+          pageSize,
+        },
+      }),
     },
+    manualPagination,
+    onPaginationChange: manualPagination
+      ? (updater) => {
+          const newState = typeof updater === 'function'
+            ? updater({ pageIndex: controlledPageIndex ?? 0, pageSize })
+            : updater
+          onPageChange?.(newState.pageIndex)
+        }
+      : undefined,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    getFilteredRowModel: manualPagination ? undefined : getFilteredRowModel(),
+    getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     initialState: {
       pagination: {
@@ -79,11 +120,29 @@ export function DataTable<TData, TValue>({
     },
   })
 
+  // Determine if we should show any search UI
+  const showControlledSearch = !!onSearchChange
+  const showClientSearch = !!searchKey && !onSearchChange
+
   return (
     <div className="w-full space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between">
-        {searchKey && (
+      <div className="flex items-center justify-between gap-4">
+        {/* Controlled search for server-side filtering */}
+        {showControlledSearch && (
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder={searchPlaceholder}
+              value={searchValue ?? ""}
+              onChange={(e) => onSearchChange(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        )}
+
+        {/* Client-side search (when searchKey is provided and no controlled search) */}
+        {showClientSearch && (
           <Input
             placeholder={searchPlaceholder}
             value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
@@ -184,16 +243,27 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-end space-x-2 py-4">
+      <div className="flex items-center justify-between py-4">
         <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length > 0 && (
-            <>
-              {table.getFilteredSelectedRowModel().rows.length} of{" "}
-              {table.getFilteredRowModel().rows.length} row(s) selected.
-            </>
+          {manualPagination && totalCount !== undefined ? (
+            totalCount > 0 ? (
+              <>
+                Showing {(controlledPageIndex ?? 0) * pageSize + 1}-
+                {Math.min(((controlledPageIndex ?? 0) + 1) * pageSize, totalCount)} of {totalCount} results
+              </>
+            ) : (
+              <>No results</>
+            )
+          ) : (
+            table.getFilteredSelectedRowModel().rows.length > 0 && (
+              <>
+                {table.getFilteredSelectedRowModel().rows.length} of{" "}
+                {table.getFilteredRowModel().rows.length} row(s) selected.
+              </>
+            )
           )}
         </div>
-        <div className="space-x-2">
+        <div className="flex items-center space-x-2">
           <Button
             variant="outline"
             size="sm"
@@ -202,6 +272,11 @@ export function DataTable<TData, TValue>({
           >
             Previous
           </Button>
+          {manualPagination && controlledPageCount !== undefined && (
+            <span className="text-sm text-muted-foreground">
+              Page {(controlledPageIndex ?? 0) + 1} of {controlledPageCount}
+            </span>
+          )}
           <Button
             variant="outline"
             size="sm"

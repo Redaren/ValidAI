@@ -23,11 +23,12 @@ export function successResponse(data: any): Response {
  *
  * @param {string} message - Error message
  * @param {number} status - HTTP status code (default 400)
+ * @param {Record<string, any>} extra - Additional data to include in response
  * @returns {Response} Error response with specified status
  */
-export function errorResponse(message: string, status = 400): Response {
+export function errorResponse(message: string, status = 400, extra?: Record<string, any>): Response {
   return new Response(
-    JSON.stringify({ success: false, error: message }),
+    JSON.stringify({ success: false, error: message, ...extra }),
     {
       status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }

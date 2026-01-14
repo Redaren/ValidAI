@@ -1,30 +1,70 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Button, Input, Label, Textarea, Alert } from '@playze/shared-ui'
+import {
+  Button,
+  Input,
+  Label,
+  Textarea,
+  Alert,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@playze/shared-ui'
 import { Loader2 } from 'lucide-react'
 import { createOrganizationSchema, type CreateOrganizationInput } from '@/lib/validations'
-import { useCreateOrganization } from '@/lib/queries'
+import { useCreateOrganization, useApps } from '@/lib/queries'
+import { useAppTiers } from '@/lib/queries/subscriptions'
 import { useToastStore } from '@/stores'
+
+interface AppTier {
+  id: string
+  tier_name: string
+  display_name: string
+}
 
 export function CreateOrganizationForm() {
   const router = useRouter()
   const createOrg = useCreateOrganization()
   const addToast = useToastStore((state) => state.addToast)
+  const { data: apps, isLoading: appsLoading } = useApps()
+
+  // Track selected app to load its tiers
+  const [selectedAppId, setSelectedAppId] = useState('')
+  const { data: tiersData = [], isLoading: tiersLoading } = useAppTiers(selectedAppId)
+  const tiers = tiersData as AppTier[]
 
   const {
     register,
     handleSubmit,
+    control,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<CreateOrganizationInput>({
     resolver: zodResolver(createOrganizationSchema),
+    defaultValues: {
+      tier_name: 'free',
+    },
   })
 
   const onSubmit = async (data: CreateOrganizationInput) => {
     try {
-      const result = await createOrg.mutateAsync(data)
+      // Construct the appSubscriptions array from the selected app and tier
+      const submitData = {
+        ...data,
+        appSubscriptions: [
+          {
+            appId: data.default_app_id,
+            tierName: data.tier_name,
+          },
+        ],
+      }
+      const result = await createOrg.mutateAsync(submitData)
 
       addToast({
         title: 'Organization created',
@@ -81,23 +121,91 @@ export function CreateOrganizationForm() {
         )}
       </div>
 
-      {/* Initial Owner Email */}
+      {/* Default App */}
       <div className="space-y-2">
-        <Label htmlFor="initialOwnerEmail">Initial Owner Email (Optional)</Label>
-        <Input
-          id="initialOwnerEmail"
-          type="email"
-          {...register('initialOwnerEmail')}
-          placeholder="owner@example.com"
-          disabled={isSubmitting}
-        />
+        <Label htmlFor="default_app_id">
+          Default App <span className="text-destructive">*</span>
+        </Label>
         <p className="text-sm text-muted-foreground">
-          If provided, an invitation email will be sent to this address.
+          The app where invited users will be redirected after accepting their invitation.
+          A subscription will be created for this app.
         </p>
-        {errors.initialOwnerEmail && (
-          <p className="text-sm text-destructive">{errors.initialOwnerEmail.message}</p>
+        <Controller
+          name="default_app_id"
+          control={control}
+          render={({ field }) => (
+            <Select
+              value={field.value ?? ''}
+              onValueChange={(value) => {
+                field.onChange(value)
+                setSelectedAppId(value)
+                // Reset tier selection when app changes
+                setValue('tier_name', 'free')
+              }}
+              disabled={isSubmitting || appsLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select default app..." />
+              </SelectTrigger>
+              <SelectContent>
+                {apps?.filter(app => app.id !== 'admin').map((app) => (
+                  <SelectItem key={app.id} value={app.id}>
+                    {app.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+        {errors.default_app_id && (
+          <p className="text-sm text-destructive">{errors.default_app_id.message}</p>
         )}
       </div>
+
+      {/* Subscription Tier - shown after app is selected */}
+      {selectedAppId && (
+        <div className="space-y-2">
+          <Label htmlFor="tier_name">
+            Subscription Tier <span className="text-destructive">*</span>
+          </Label>
+          <p className="text-sm text-muted-foreground">
+            The subscription tier for this organization.
+          </p>
+          <Controller
+            name="tier_name"
+            control={control}
+            render={({ field }) => (
+              <Select
+                value={field.value ?? 'free'}
+                onValueChange={(value) => field.onChange(value as 'free' | 'pro' | 'enterprise')}
+                disabled={isSubmitting || tiersLoading || tiers.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      tiersLoading
+                        ? 'Loading tiers...'
+                        : tiers.length === 0
+                          ? 'No tiers available'
+                          : 'Select tier...'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {tiers.map((tier) => (
+                    <SelectItem key={tier.id} value={tier.tier_name}>
+                      {tier.display_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.tier_name && (
+            <p className="text-sm text-destructive">{errors.tier_name.message}</p>
+          )}
+        </div>
+      )}
 
       {/* Error Alert */}
       {createOrg.error && (

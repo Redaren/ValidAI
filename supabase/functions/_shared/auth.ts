@@ -72,13 +72,13 @@ export async function getUserFromRequest(
 }
 
 /**
- * Validate user is member of organization
- * Returns membership record if valid, null otherwise
+ * Validate user is an active member of organization
+ * Returns membership record if valid and active, null otherwise
  *
  * @param {SupabaseClient} supabase - Supabase client (service-role)
  * @param {string} userId - User ID to check
  * @param {string} orgId - Organization ID to check
- * @returns {Promise<any | null>} Membership record or null if not member
+ * @returns {Promise<any | null>} Membership record or null if not an active member
  */
 export async function validateOrgMembership(
   supabase: SupabaseClient,
@@ -90,6 +90,7 @@ export async function validateOrgMembership(
     .select('*')
     .eq('organization_id', orgId)
     .eq('user_id', userId)
+    .eq('is_active', true)
     .single()
 
   if (error || !data) {

@@ -25,8 +25,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <title>Playze Admin Portal</title>
-        <meta name="description" content="Admin portal for managing Playze platform organizations, users, and subscriptions" />
+        <title>ValidAI Admin Portal</title>
+        <meta name="description" content="Admin portal for managing ValidAI platform organizations, users, and subscriptions" />
       </head>
       <body className="antialiased">
         <QueryClientProvider client={queryClient}>

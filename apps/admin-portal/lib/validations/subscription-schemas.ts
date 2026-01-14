@@ -30,6 +30,18 @@ export const cancelSubscriptionSchema = z.object({
 export type CancelSubscriptionInput = z.infer<typeof cancelSubscriptionSchema>
 
 /**
+ * Schema: Activate Subscription
+ * Used by: ActivateSubscriptionDialog component
+ * Database Function: admin_activate_subscription()
+ */
+export const activateSubscriptionSchema = z.object({
+  subscriptionId: uuidSchema,
+  reason: z.string().max(500, 'Reason must be at most 500 characters').optional(),
+})
+
+export type ActivateSubscriptionInput = z.infer<typeof activateSubscriptionSchema>
+
+/**
  * Schema: Subscription Filters
  * Used by: SubscriptionsTable component for client-side filtering
  */

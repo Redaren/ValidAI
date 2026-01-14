@@ -12,6 +12,7 @@ export interface UserApp {
   app_id: string
   app_name: string
   app_description: string
+  app_url: string  // Full URL for navigation (e.g., http://localhost:3002)
   tier_name: string
   tier_display_name: string
   status: string

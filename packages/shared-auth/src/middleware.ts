@@ -1,5 +1,143 @@
-import { createServerClient as createSupabaseServerClient } from "@supabase/ssr"
+import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
+
+/**
+ * Configuration options for createAppMiddleware.
+ */
+export interface AppMiddlewareOptions {
+  /**
+   * The app ID to check in accessible_apps (e.g., 'validai', 'testapp').
+   * Must match the app_id in the apps table and JWT accessible_apps array.
+   */
+  appId: string
+
+  /**
+   * Additional public routes beyond the defaults.
+   * Default public routes: ['/login', '/auth/callback', '/unauthorized']
+   *
+   * Use this for app-specific public pages like:
+   * - '/auth/accept-invite' (for implicit flow invitation handling)
+   */
+  additionalPublicRoutes?: string[]
+
+  /**
+   * Where to redirect authenticated users who visit /login.
+   * @default '/'
+   */
+  authenticatedRedirect?: string
+}
+
+/**
+ * Creates middleware for a ValidAI user app.
+ *
+ * Handles:
+ * 1. Session refresh on each request
+ * 2. Public route bypass
+ * 3. Unauthenticated redirect to /login
+ * 4. App access check via JWT accessible_apps
+ * 5. Cookie preservation on redirects
+ *
+ * @example
+ * ```typescript
+ * // apps/validai/middleware.ts
+ * import { createAppMiddleware } from '@playze/shared-auth/middleware'
+ *
+ * export const middleware = createAppMiddleware({
+ *   appId: 'validai',
+ *   additionalPublicRoutes: ['/auth/accept-invite'],
+ * })
+ *
+ * export const config = {
+ *   matcher: ['/((?!_next/static|_next/image|favicon.ico|public).*)'],
+ * }
+ * ```
+ */
+export function createAppMiddleware(options: AppMiddlewareOptions) {
+  const {
+    appId,
+    additionalPublicRoutes = [],
+    authenticatedRedirect = '/'
+  } = options
+
+  // Default public routes that all apps need + any app-specific ones
+  const publicRoutes = [
+    '/login',
+    '/auth/callback',
+    '/unauthorized',
+    ...additionalPublicRoutes
+  ]
+
+  return async function middleware(request: NextRequest) {
+    // Create response object that will be returned
+    const response = NextResponse.next({ request })
+
+    // Create Supabase client with proper cookie handling
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll()
+          },
+          setAll(cookiesToSet) {
+            // Set cookies on both request and response
+            cookiesToSet.forEach(({ name, value, options }) => {
+              request.cookies.set(name, value)
+              response.cookies.set(name, value, options)
+            })
+          },
+        },
+      },
+    )
+
+    // Check if public route - use startsWith for path matching
+    const isPublicRoute = publicRoutes.some(route =>
+      request.nextUrl.pathname.startsWith(route)
+    )
+
+    // Skip auth checks for public routes to avoid race condition
+    // (Callback route needs to complete auth exchange BEFORE middleware checks session)
+    if (isPublicRoute) {
+      return response
+    }
+
+    // Refresh session and get authenticated user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    // Helper to create redirect with preserved cookies
+    const redirectWithCookies = (path: string) => {
+      const redirectResponse = NextResponse.redirect(new URL(path, request.url))
+      // Copy cookies from the response to preserve any session updates
+      response.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie.name, cookie.value, cookie)
+      })
+      return redirectResponse
+    }
+
+    // If not authenticated, redirect to login
+    if (authError || !user) {
+      return redirectWithCookies('/login')
+    }
+
+    // If authenticated user visits login page, redirect to main page
+    if (request.nextUrl.pathname === '/login') {
+      return redirectWithCookies(authenticatedRedirect)
+    }
+
+    // Check if user has access to this app via JWT app_metadata.accessible_apps
+    // This is populated by Edge Functions (switch-organization, accept-invitation) on login/org-switch
+    const accessibleApps = user.app_metadata?.accessible_apps as string[] | undefined
+
+    if (!accessibleApps || !accessibleApps.includes(appId)) {
+      // User doesn't have app access - redirect to unauthorized page
+      return redirectWithCookies('/unauthorized')
+    }
+
+    // Allow access with updated cookies
+    return response
+  }
+}
 
 /**
  * Helper to strip locale prefix from pathname for multi-language apps.
@@ -25,7 +163,7 @@ function extractLocale(pathname: string): string {
 }
 
 /**
- * Updates the user session in middleware.
+ * Updates the user session in middleware with locale support.
  *
  * This function should be called in your Next.js middleware to:
  * 1. Refresh the user's session
@@ -42,7 +180,7 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const supabase = createSupabaseServerClient(
+  const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {

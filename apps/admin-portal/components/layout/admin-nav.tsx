@@ -21,7 +21,7 @@ export function AdminNav() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="font-bold">Playze Admin</span>
+            <span className="font-bold">ValidAI Admin</span>
           </Link>
         </div>
 
