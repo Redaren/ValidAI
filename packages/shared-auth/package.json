@@ -20,6 +20,10 @@
     "./middleware": {
       "types": "./src/middleware.ts",
       "default": "./src/middleware.ts"
+    },
+    "./lib": {
+      "types": "./src/lib/index.ts",
+      "default": "./src/lib/index.ts"
     }
   },
   "scripts": {},
