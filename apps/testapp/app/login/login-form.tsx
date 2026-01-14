@@ -3,7 +3,17 @@
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { Button, Input, Label, Card } from '@playze/shared-ui'
-import { Loader2, Mail, CheckCircle2 } from 'lucide-react'
+import { Loader2, Mail, CheckCircle2, AlertCircle, Building2 } from 'lucide-react'
+
+/**
+ * Error messages for specific error codes from the callback
+ */
+const ERROR_MESSAGES: Record<string, { title: string; description: string }> = {
+  no_organization: {
+    title: 'No Organization Access',
+    description: 'You are not a member of any organization. Please contact your administrator to be invited to an organization.',
+  },
+}
 
 /**
  * Login Form Component
@@ -13,7 +23,7 @@ import { Loader2, Mail, CheckCircle2 } from 'lucide-react'
  *
  * Features:
  * - Magic link email authentication
- * - Error display from URL parameters
+ * - Error display from URL parameters (including no_organization)
  * - Success state with instructions
  * - Resend functionality
  */
@@ -22,6 +32,7 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
   const [error, setError] = useState('')
+  const [errorCode, setErrorCode] = useState<string | null>(null)
 
   // Read error from URL params (client-side only)
   useEffect(() => {
@@ -30,7 +41,14 @@ export default function LoginForm() {
     const params = new URLSearchParams(window.location.search)
     const errorParam = params.get('error')
     if (errorParam) {
-      setError(decodeURIComponent(errorParam))
+      const decodedError = decodeURIComponent(errorParam)
+      setErrorCode(decodedError)
+      // Check if it's a known error code
+      if (ERROR_MESSAGES[decodedError]) {
+        setError(ERROR_MESSAGES[decodedError].description)
+      } else {
+        setError(decodedError)
+      }
     }
   }, [])
 
@@ -38,6 +56,7 @@ export default function LoginForm() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setErrorCode(null)
 
     try {
       const supabase = createBrowserClient()
@@ -62,6 +81,43 @@ export default function LoginForm() {
     setEmailSent(false)
     setEmail('')
     setError('')
+    setErrorCode(null)
+  }
+
+  // Get the appropriate error display
+  const getErrorDisplay = () => {
+    const knownError = errorCode ? ERROR_MESSAGES[errorCode] : null
+
+    if (knownError) {
+      return (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Building2 className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                {knownError.title}
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                {knownError.description}
+              </p>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    if (error) {
+      return (
+        <div className="mb-6 p-4 bg-destructive/10 border border-destructive rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        </div>
+      )
+    }
+
+    return null
   }
 
   return (
@@ -80,11 +136,7 @@ export default function LoginForm() {
             </div>
 
             {/* Error Display */}
-            {error && (
-              <div className="mb-6 p-4 bg-destructive/10 border border-destructive rounded-lg">
-                <p className="text-sm text-destructive">{error}</p>
-              </div>
-            )}
+            {getErrorDisplay()}
 
             {/* Login Form */}
             <form onSubmit={handleLogin} className="space-y-6">

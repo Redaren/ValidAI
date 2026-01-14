@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@playze/shared-auth/client'
-import { useCurrentOrganization, useUserOrganizations, useOrganizationApps } from '@playze/shared-auth'
+import { useCurrentOrganization, useUserOrganizations, useAuthorization } from '@playze/shared-auth'
 import { Button, Card, AppSwitcher, OrgSwitcher, AuthGate } from '@playze/shared-ui'
 import { LogOut, User, Loader2, Building2, Grid3x3, Crown, Shield, Edit3 } from 'lucide-react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -19,6 +19,7 @@ import type { User as SupabaseUser } from '@supabase/supabase-js'
  * - Sign-out functionality
  * - Protected content display
  * - Session management
+ * - Authorization context via useAuthorization hook
  */
 export default function DashboardContent() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
@@ -29,15 +30,9 @@ export default function DashboardContent() {
   // Organization context from shared-auth hooks
   const { data: currentOrg } = useCurrentOrganization()
   const { data: userOrgs } = useUserOrganizations()
-  const { data: orgApps } = useOrganizationApps() // Uses current org from JWT
 
-  // Extract user's role in current organization
-  const currentOrgRole = userOrgs?.find(
-    org => org.organization_id === currentOrg?.id
-  )?.user_role
-
-  // Find TestApp subscription for current organization
-  const testAppSubscription = orgApps?.find(app => app.app_id === 'testapp')
+  // Use the new useAuthorization hook for complete auth context in one query
+  const { data: auth } = useAuthorization('testapp')
 
   useEffect(() => {
     const supabase = createBrowserClient()
@@ -91,7 +86,7 @@ export default function DashboardContent() {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-foreground">TestApp</h1>
             <span className="text-sm text-muted-foreground">
-              Phase 1 - Minimal Reference
+              Phase 2 - New Auth Flows
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -166,37 +161,37 @@ export default function DashboardContent() {
                   Organization Context
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  Multi-tenancy is a core feature of Playze Core. You can switch between organizations using the switcher in the header.
+                  Multi-tenancy is a core feature of ValidAI Core. You can switch between organizations using the switcher in the header.
                 </p>
                 <div className="bg-muted rounded-lg p-4 space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-foreground">Current Organization:</span>
                     <span className="text-sm text-muted-foreground">
-                      {currentOrg?.name || 'Loading...'}
+                      {auth?.organization_name || currentOrg?.name || 'Loading...'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-foreground">Organization ID:</span>
                     <span className="text-sm text-muted-foreground font-mono text-xs">
-                      {currentOrg?.id || 'Loading...'}
+                      {auth?.organization_id || currentOrg?.id || 'Loading...'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-foreground">Your Role:</span>
                     <span className="text-sm text-muted-foreground capitalize">
-                      {currentOrgRole || 'Loading...'}
+                      {auth?.user_role || 'Loading...'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-foreground">Current App:</span>
                     <span className="text-sm text-muted-foreground">
-                      {testAppSubscription ? testAppSubscription.app_name : 'No subscription'}
+                      {auth?.app_name || 'Loading...'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-foreground">Subscription Tier:</span>
                     <span className="text-sm text-muted-foreground capitalize">
-                      {testAppSubscription ? testAppSubscription.tier_display_name : 'N/A'}
+                      {auth?.tier_display_name || 'N/A'}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -221,14 +216,14 @@ export default function DashboardContent() {
                   App Switcher Demo
                 </h2>
                 <p className="text-muted-foreground mb-4">
-                  The app switcher in the header shows all apps in the Playze ecosystem. In a real deployment, it would check your organization&apos;s app subscriptions.
+                  The app switcher in the header shows all apps your organization has access to. It reads from your JWT accessible_apps claim.
                 </p>
                 <div className="bg-muted rounded-lg p-4 space-y-2 text-sm text-muted-foreground">
-                  <p><strong className="text-foreground">TestApp:</strong> You are here (minimal reference app)</p>
-                  <p><strong className="text-foreground">RoadCloud:</strong> Infrastructure management app (Phase 6)</p>
-                  <p><strong className="text-foreground">ProjectX:</strong> Project management app (Phase 6)</p>
+                  <p><strong className="text-foreground">TestApp:</strong> You are here (reference implementation)</p>
+                  <p><strong className="text-foreground">ValidAI:</strong> Document processing and AI validation</p>
+                  <p><strong className="text-foreground">Admin Portal:</strong> Platform administration (admins only)</p>
                   <p className="text-xs pt-2 italic">
-                    Note: App switching requires the respective apps to be running on their configured ports.
+                    Note: App switching navigates to the app&apos;s configured URL from the database.
                   </p>
                 </div>
               </div>
@@ -251,14 +246,14 @@ export default function DashboardContent() {
                   </p>
                   <div className="bg-amber-100/50 dark:bg-amber-900/30 rounded-lg p-4 space-y-2">
                     <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                      🎉 Feature Gating Demo
+                      Feature Gating Demo
                     </p>
                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                      This card demonstrates the Playze Core feature gating system in action:
+                      This card demonstrates the ValidAI Core feature gating system in action:
                     </p>
                     <ul className="list-disc list-inside space-y-1 ml-2 text-sm text-amber-800 dark:text-amber-200">
-                      <li>Uses <code className="bg-amber-200/50 dark:bg-amber-800/50 px-1 rounded">FeatureGate</code> component from @playze/shared-ui</li>
-                      <li>Checks <code className="bg-amber-200/50 dark:bg-amber-800/50 px-1 rounded">professional_demo</code> feature via database function</li>
+                      <li>Uses <code className="bg-amber-200/50 dark:bg-amber-800/50 px-1 rounded">AuthGate</code> component from @playze/shared-ui</li>
+                      <li>Checks <code className="bg-amber-200/50 dark:bg-amber-800/50 px-1 rounded">professional_demo</code> feature via get_user_authorization()</li>
                       <li>Free tier users see an upgrade prompt instead</li>
                       <li>Switch organizations to test different tier behaviors</li>
                     </ul>
@@ -283,11 +278,11 @@ export default function DashboardContent() {
                     Edit Permission Feature
                   </h2>
                   <p className="text-muted-foreground mb-4">
-                    This is a feature you see because you have edit permissions (your role: {currentOrgRole}).
+                    This is a feature you see because you have edit permissions (your role: {auth?.user_role}).
                   </p>
                   <div className="bg-green-100/50 dark:bg-green-900/30 rounded-lg p-4 space-y-2">
                     <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                      🔒 Role-Based Permission Demo
+                      Role-Based Permission Demo
                     </p>
                     <p className="text-sm text-green-800 dark:text-green-200">
                       This demonstrates role-based permissions:
@@ -325,7 +320,7 @@ export default function DashboardContent() {
                   </p>
                   <div className="bg-purple-100/50 dark:bg-purple-900/30 rounded-lg p-4 space-y-2">
                     <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
-                      🔐 Combined Authorization Demo
+                      Combined Authorization Demo
                     </p>
                     <p className="text-sm text-purple-800 dark:text-purple-200">
                       This demonstrates combined tier + role authorization:
@@ -340,7 +335,7 @@ export default function DashboardContent() {
                       <p><strong>Requirements:</strong></p>
                       <p>• Tier: Professional (has professional_demo feature)</p>
                       <p>• Role: Owner/Admin (has can_export permission)</p>
-                      <p>• Current: {testAppSubscription?.tier_display_name} + {currentOrgRole}</p>
+                      <p>• Current: {auth?.tier_display_name} + {auth?.user_role}</p>
                     </div>
                   </div>
                 </div>
@@ -351,20 +346,21 @@ export default function DashboardContent() {
           {/* Info Card */}
           <Card className="p-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
             <h3 className="text-lg font-semibold text-blue-900 dark:text-blue-100 mb-3">
-              TestApp Phase 1 - Complete ✅
+              TestApp - New Auth Flows Complete
             </h3>
             <div className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
               <p className="font-medium">What&apos;s working:</p>
               <ul className="list-disc list-inside space-y-1 ml-2">
                 <li>Magic link authentication via Supabase</li>
-                <li>Session management through middleware</li>
-                <li>Protected routes (redirects to /login when not authenticated)</li>
-                <li>Sign out functionality</li>
-                <li>Organization context display (current org from JWT metadata)</li>
-                <li>Organization switcher (requires Edge Function deployment)</li>
-                <li>App switcher (demo - shows available apps in ecosystem)</li>
-                <li>Uses Playze Core shared packages (@playze/shared-auth, @playze/shared-ui)</li>
-                <li>TanStack Query integration for data fetching</li>
+                <li>Shared middleware factory (createAppMiddleware)</li>
+                <li>Shared callback handler (handleAuthCallback)</li>
+                <li>Multi-org login flow with org picker</li>
+                <li>Invitation processing via Edge Functions</li>
+                <li>App access check via JWT accessible_apps</li>
+                <li>Organization switcher with default app navigation</li>
+                <li>App switcher with real app URLs</li>
+                <li>useAuthorization hook for complete auth context</li>
+                <li>Feature and permission gating via AuthGate</li>
               </ul>
             </div>
           </Card>
@@ -372,19 +368,23 @@ export default function DashboardContent() {
           {/* Architecture Note */}
           <Card className="p-6 bg-muted/50">
             <h3 className="text-sm font-semibold text-foreground mb-3">
-              📚 Architecture Pattern
+              Architecture Pattern
             </h3>
             <div className="space-y-2 text-xs text-muted-foreground">
               <p>
-                <strong className="text-foreground">Pattern:</strong> Regular User Access (PostgREST + RLS)
+                <strong className="text-foreground">Pattern:</strong> Shared Auth Infrastructure
               </p>
               <p>
-                <strong className="text-foreground">NOT using:</strong> Admin pattern (SECURITY DEFINER functions)
+                <strong className="text-foreground">Middleware:</strong> createAppMiddleware from @playze/shared-auth/middleware
               </p>
               <p>
-                This app demonstrates standard user authentication and session management
-                that will be extended in Phase 2 with organization switching, feature gates,
-                and app-specific data operations.
+                <strong className="text-foreground">Callback:</strong> handleAuthCallback from @playze/shared-auth/lib
+              </p>
+              <p>
+                <strong className="text-foreground">Authorization:</strong> useAuthorization hook (single RPC call)
+              </p>
+              <p className="pt-2">
+                This app demonstrates the recommended patterns for apps built on ValidAI Core Framework.
               </p>
             </div>
           </Card>

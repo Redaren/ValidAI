@@ -1,21 +1,20 @@
 'use client'
 
 import dynamic from 'next/dynamic'
+import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { Loader2 } from 'lucide-react'
+import { OrgPickerLogin } from '@playze/shared-ui'
 
 /**
  * Login Page
  *
- * This page uses dynamic import with ssr:false to prevent hydration issues.
- * The LoginForm component is only rendered on the client side.
+ * This page handles two scenarios:
+ * 1. Normal login - shows the LoginForm for email/magic link entry
+ * 2. Org selection - shows OrgPickerLogin when ?select-org=true
  *
- * Why no SSR?
- * - This is a reference app to help developers understand Playze Core
- * - SSR adds complexity without benefit for a login page
- * - Client-only rendering prevents hydration mismatches
- * - Icons (lucide-react) render consistently
- *
- * The loading state shows a spinner while the client-side JavaScript loads.
+ * The OrgPickerLogin is shown when a user with multiple organizations
+ * completes authentication and needs to select which org to use.
  */
 const LoginForm = dynamic(() => import('./login-form'), {
   ssr: false,
@@ -26,6 +25,30 @@ const LoginForm = dynamic(() => import('./login-form'), {
   ),
 })
 
-export default function LoginPage() {
+function LoginContent() {
+  const searchParams = useSearchParams()
+  const showOrgPicker = searchParams.get('select-org') === 'true'
+
+  if (showOrgPicker) {
+    return (
+      <OrgPickerLogin
+        appName="TestApp"
+        fallbackUrl="/dashboard"
+      />
+    )
+  }
+
   return <LoginForm />
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
+  )
 }
