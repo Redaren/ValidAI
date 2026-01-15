@@ -52,6 +52,19 @@ export default function LoginForm() {
     }
   }, [])
 
+  // Store return URL in cookie for post-login redirect
+  // This preserves the redirect destination across the magic link flow
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const params = new URLSearchParams(window.location.search)
+    const next = params.get('next')
+    if (next) {
+      // Set cookie that expires in 10 minutes (enough time to complete login)
+      document.cookie = `auth_redirect_url=${encodeURIComponent(next)}; path=/; max-age=600; SameSite=Lax`
+    }
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)

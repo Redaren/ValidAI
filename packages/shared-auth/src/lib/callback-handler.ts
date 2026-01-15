@@ -178,6 +178,15 @@ export async function handleAuthCallback(
       await supabase.auth.refreshSession()
     }
 
+    // Check for stored redirect URL from login flow (e.g., invitation acceptance)
+    const storedRedirectCookie = cookieStore.get('auth_redirect_url')?.value
+    if (storedRedirectCookie) {
+      const storedPath = decodeURIComponent(storedRedirectCookie)
+      console.log(`Found stored redirect URL: ${storedPath}`)
+      cookieStore.delete('auth_redirect_url')
+      return createRedirect(new URL(storedPath, request.url))
+    }
+
     return createRedirect(new URL(paths.success, request.url))
   }
 

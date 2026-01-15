@@ -2,6 +2,7 @@ import { createAdminClient, createUserClient } from '../_shared/supabaseAdmin.ts
 import { handleCors } from '../_shared/cors.ts'
 import { successResponse, errorResponse, unauthorizedResponse } from '../_shared/response.ts'
 import { validateRequired, validateEmail, validateUuid } from '../_shared/validation.ts'
+import { sendEmail, existingUserInviteEmail } from '../_shared/email.ts'
 
 /**
  * Edge Function: user-invite-member
@@ -208,26 +209,25 @@ Deno.serve(async (req) => {
         // If user already exists, they need to accept the invitation
         // For new users, send signup invitation email
         if (invitation.user_exists) {
-          // User exists - send them a magic link to accept the invitation
+          // User exists - send them a custom invitation email via Brevo
+          // (NOT signInWithOtp which sends a generic "magic link" email)
           const acceptUrl = `${redirectAppUrl}/auth/accept-invite?invitation_id=${invitation.invitation_id}`
 
-          // Use admin client for auth operations (service-role required for OTP)
-          const { error: otpError } = await adminClient.auth.signInWithOtp({
-            email: normalizedEmail,
-            options: {
-              emailRedirectTo: acceptUrl,
-              data: {
-                organization_id: organizationId,
-                organization_name: organization.name,
-                app_name: appName,
-                invitation_id: invitation.invitation_id,
-                role: role
-              }
-            }
+          const emailContent = existingUserInviteEmail({
+            organizationName: organization.name,
+            role: role,
+            appName: appName,
+            acceptUrl: acceptUrl
           })
 
-          if (otpError) {
-            console.error(`Error sending OTP email to ${normalizedEmail}:`, otpError)
+          const emailResult = await sendEmail({
+            to: normalizedEmail,
+            subject: emailContent.subject,
+            html: emailContent.html
+          })
+
+          if (!emailResult.success) {
+            console.error(`Error sending invitation email to ${normalizedEmail}:`, emailResult.error)
             results.push({
               email: normalizedEmail,
               status: 'pending',
@@ -237,6 +237,7 @@ Deno.serve(async (req) => {
               error: 'Invitation created but email failed to send'
             })
           } else {
+            console.log(`Invitation email sent to existing user ${normalizedEmail}, messageId: ${emailResult.messageId}`)
             results.push({
               email: normalizedEmail,
               status: 'pending',

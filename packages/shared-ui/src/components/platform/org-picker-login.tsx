@@ -133,9 +133,21 @@ export function OrgPickerLogin({
       // Refresh session to get updated JWT
       await supabase.auth.refreshSession()
 
-      // Determine redirect URL based on stayOnCurrentApp setting
+      // Determine redirect URL - check for stored redirect first (e.g., invitation acceptance)
       let redirectUrl: string
-      if (stayOnCurrentApp) {
+
+      // Check for stored redirect URL cookie (from invitation flow)
+      const storedRedirect = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('auth_redirect_url='))
+        ?.split('=')[1]
+
+      if (storedRedirect) {
+        redirectUrl = decodeURIComponent(storedRedirect)
+        // Clear the cookie
+        document.cookie = 'auth_redirect_url=; path=/; max-age=0'
+        console.log(`Found stored redirect URL: ${redirectUrl}`)
+      } else if (stayOnCurrentApp) {
         // Stay on current app - use fallbackUrl (relative path)
         redirectUrl = fallbackUrl
       } else {
