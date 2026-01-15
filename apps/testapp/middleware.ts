@@ -13,6 +13,7 @@ import { createAppMiddleware } from '@playze/shared-auth/middleware'
 export const middleware = createAppMiddleware({
   appId: 'testapp',
   authenticatedRedirect: '/dashboard',
+  additionalPublicRoutes: ['/auth/accept-invite'],
 })
 
 export const config = {
