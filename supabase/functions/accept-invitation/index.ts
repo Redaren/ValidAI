@@ -126,13 +126,13 @@ Deno.serve(async (req) => {
     }
 
     const invitation = result[0]
-    console.log(`Invitation accepted: org=${invitation.result_organization_id}, role=${invitation.result_role}`)
+    console.log(`Invitation accepted: org=${invitation.organization_id}, role=${invitation.role}`)
 
     // Verify organization is active before completing acceptance
     const { data: org, error: orgError } = await supabase
       .from('organizations')
       .select('is_active')
-      .eq('id', invitation.result_organization_id)
+      .eq('id', invitation.organization_id)
       .single()
 
     if (orgError || !org) {
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
     // Get accessible apps for this organization (also validates at least one exists)
     const { data: accessibleApps, error: appsError } = await supabase
-      .rpc('get_org_accessible_apps', { org_id: invitation.result_organization_id })
+      .rpc('get_org_accessible_apps', { org_id: invitation.organization_id })
 
     if (appsError) {
       console.error('Error fetching accessible apps:', appsError)
@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
       {
         app_metadata: {
           ...user.app_metadata,
-          organization_id: invitation.result_organization_id,
+          organization_id: invitation.organization_id,
           accessible_apps: accessibleApps,
         },
         // Clear invitation-related user_metadata to prevent accept-invitation being called on normal logins
@@ -187,14 +187,14 @@ Deno.serve(async (req) => {
       // They just might need to manually switch organizations
     }
 
-    console.log(`User ${user.email} successfully joined ${invitation.result_organization_name}`)
+    console.log(`User ${user.email} successfully joined ${invitation.organization_name}`)
 
     return successResponse({
-      organizationId: invitation.result_organization_id,
-      organizationName: invitation.result_organization_name,
-      role: invitation.result_role,
-      defaultAppUrl: invitation.result_default_app_url || null,
-      message: `Welcome to ${invitation.result_organization_name}!`
+      organizationId: invitation.organization_id,
+      organizationName: invitation.organization_name,
+      role: invitation.role,
+      defaultAppUrl: invitation.default_app_url || null,
+      message: `Welcome to ${invitation.organization_name}!`
     })
 
   } catch (error) {
