@@ -153,3 +153,53 @@ export const organizationSearchSchema = z.object({
 })
 
 export type OrganizationSearchInput = z.infer<typeof organizationSearchSchema>
+
+// =====================================================
+// MEMBER MANAGEMENT SCHEMAS
+// =====================================================
+
+/**
+ * Schema: Toggle Member Active Status
+ * Used by: OrgMembersTab toggle action
+ * Database function: admin_toggle_user_membership_active
+ *
+ * Validates input for activating/deactivating a member's organization membership.
+ */
+export const toggleMemberActiveSchema = z.object({
+  organizationId: uuidSchema,
+  userId: uuidSchema,
+  isActive: z.boolean(),
+})
+
+export type ToggleMemberActiveInput = z.infer<typeof toggleMemberActiveSchema>
+
+/**
+ * Schema: Update Member Role
+ * Used by: EditMemberRoleDialog component
+ * Database function: admin_update_user_membership_role
+ *
+ * Validates input for changing a member's role in an organization.
+ */
+export const updateMemberRoleSchema = z.object({
+  organizationId: uuidSchema,
+  userId: uuidSchema,
+  role: z.enum(['owner', 'admin', 'member', 'viewer'], {
+    message: 'Role must be owner, admin, member, or viewer',
+  }),
+})
+
+export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>
+
+/**
+ * Schema: Remove Member
+ * Used by: RemoveMemberDialog component
+ * Database function: admin_remove_user_membership
+ *
+ * Validates input for removing a member from an organization.
+ */
+export const removeMemberSchema = z.object({
+  organizationId: uuidSchema,
+  userId: uuidSchema,
+})
+
+export type RemoveMemberInput = z.infer<typeof removeMemberSchema>

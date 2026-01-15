@@ -431,6 +431,7 @@ export interface MemberOrInvitation {
   invited_at: string | null
   expires_at: string | null
   invited_by_name: string | null
+  member_is_active: boolean | null  // Actual membership active status (null for invitations)
 }
 
 /**
@@ -682,6 +683,133 @@ export function useResendInvitation() {
       })
       queryClient.invalidateQueries({
         queryKey: orgKeys.invitations(variables.organizationId),
+      })
+    },
+  })
+}
+
+// =====================================================
+// MEMBER MANAGEMENT HOOKS
+// =====================================================
+
+/**
+ * Hook: Toggle member active status
+ * Activates or deactivates a member's membership in an organization
+ * Reuses existing admin_toggle_user_membership_active function
+ */
+export function useToggleMemberActive() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      organizationId,
+      userId,
+      isActive,
+    }: {
+      organizationId: string
+      userId: string
+      isActive: boolean
+    }) => {
+      const supabase = createBrowserClient()
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('admin_toggle_user_membership_active', {
+        p_user_id: userId,
+        p_organization_id: organizationId,
+        p_is_active: isActive,
+      })
+
+      if (error) {
+        console.error('admin_toggle_user_membership_active error:', JSON.stringify(error, null, 2))
+        throw new Error(error.message || error.details || error.hint || 'Failed to toggle membership status')
+      }
+      return data?.[0] || null
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: orgKeys.membersAndInvitations(variables.organizationId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: orgKeys.detail(variables.organizationId),
+      })
+    },
+  })
+}
+
+/**
+ * Hook: Update member role
+ * Changes a member's role in an organization
+ * Reuses existing admin_update_user_membership_role function
+ */
+export function useUpdateMemberRole() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      organizationId,
+      userId,
+      role,
+    }: {
+      organizationId: string
+      userId: string
+      role: 'owner' | 'admin' | 'member' | 'viewer'
+    }) => {
+      const supabase = createBrowserClient()
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('admin_update_user_membership_role', {
+        p_user_id: userId,
+        p_organization_id: organizationId,
+        p_role: role,
+      })
+
+      if (error) throw error
+      return data?.[0] || null
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: orgKeys.membersAndInvitations(variables.organizationId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: orgKeys.detail(variables.organizationId),
+      })
+    },
+  })
+}
+
+/**
+ * Hook: Remove member from organization
+ * Removes a member's membership from an organization
+ * Reuses existing admin_remove_user_membership function
+ */
+export function useRemoveMember() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      organizationId,
+      userId,
+    }: {
+      organizationId: string
+      userId: string
+    }) => {
+      const supabase = createBrowserClient()
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc('admin_remove_user_membership', {
+        p_user_id: userId,
+        p_organization_id: organizationId,
+      })
+
+      if (error) throw error
+      return data?.[0] || null
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: orgKeys.membersAndInvitations(variables.organizationId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: orgKeys.detail(variables.organizationId),
       })
     },
   })

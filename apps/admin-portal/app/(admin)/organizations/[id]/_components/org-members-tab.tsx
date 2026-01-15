@@ -22,16 +22,39 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
   DataTable,
   Input,
 } from '@playze/shared-ui'
 import type { ColumnDef } from '@playze/shared-ui'
-import { Loader2, User, MoreHorizontal, Mail, Clock, XCircle, Edit, UserPlus, Link, Search } from 'lucide-react'
+import {
+  Loader2,
+  User,
+  MoreHorizontal,
+  Mail,
+  Clock,
+  XCircle,
+  Edit,
+  UserPlus,
+  Link,
+  Search,
+  UserCheck,
+  UserX,
+  UserMinus,
+} from 'lucide-react'
 import {
   useOrganizationMembersAndInvitations,
   useCancelInvitation,
   useResendInvitation,
   useUpdateInvitationRole,
+  useToggleMemberActive,
   ResendInvitationError,
   type MemberOrInvitation,
 } from '@/lib/queries'
@@ -39,6 +62,8 @@ import { useDebounce } from '@/hooks'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
 import { AssignMembershipDialog } from '@/components/organizations/assign-membership-dialog'
 import { InviteMemberDialog } from '@/components/organizations/invite-member-dialog'
+import { EditMemberRoleDialog } from '@/components/organizations/edit-member-role-dialog'
+import { RemoveMemberDialog } from '@/components/organizations/remove-member-dialog'
 import { useToastStore } from '@/stores'
 
 interface OrgMembersTabProps {
@@ -54,6 +79,11 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
   const [pendingRole, setPendingRole] = useState<string | null>(null)
 
+  // Member action state
+  const [editingMember, setEditingMember] = useState<MemberOrInvitation | null>(null)
+  const [removingMember, setRemovingMember] = useState<MemberOrInvitation | null>(null)
+  const [togglingMember, setTogglingMember] = useState<MemberOrInvitation | null>(null)
+
   // Search and pagination state (client-side filtering)
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebounce(searchInput, 300)
@@ -68,6 +98,7 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
   const cancelInvitation = useCancelInvitation()
   const resendInvitation = useResendInvitation()
   const updateInvitationRole = useUpdateInvitationRole()
+  const toggleMemberActive = useToggleMemberActive()
   const addToast = useToastStore((state) => state.addToast)
 
   // Client-side filtering
@@ -207,6 +238,32 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
     setPendingRole(null)
   }
 
+  // Handler for toggling member active status
+  const handleToggleConfirm = async () => {
+    if (!togglingMember) return
+
+    try {
+      await toggleMemberActive.mutateAsync({
+        organizationId,
+        userId: togglingMember.id,
+        isActive: !togglingMember.member_is_active,
+      })
+      addToast({
+        title: togglingMember.member_is_active ? 'Membership deactivated' : 'Membership activated',
+        description: `${togglingMember.full_name || togglingMember.email}'s membership has been ${togglingMember.member_is_active ? 'deactivated' : 'activated'}.`,
+        variant: 'success',
+      })
+    } catch (error) {
+      addToast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to toggle membership status',
+        variant: 'destructive',
+      })
+    } finally {
+      setTogglingMember(null)
+    }
+  }
+
   // Define columns for DataTable
   const columns: ColumnDef<MemberOrInvitation>[] = useMemo(
     () => [
@@ -273,8 +330,8 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
           const item = row.original
           if (item.entry_type === 'member') {
             return (
-              <span className="text-sm text-muted-foreground">
-                Joined {formatDate(item.joined_at)}
+              <span className={item.member_is_active ? 'text-foreground' : 'text-muted-foreground'}>
+                {item.member_is_active ? 'Active' : 'Inactive'}
               </span>
             )
           }
@@ -285,6 +342,21 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
               <span className="text-xs">Expires {formatRelativeTime(item.expires_at)}</span>
             </span>
           )
+        },
+      },
+      {
+        id: 'joined',
+        header: 'Joined',
+        cell: ({ row }) => {
+          const item = row.original
+          if (item.entry_type === 'member') {
+            return (
+              <span className={`text-sm text-muted-foreground ${!item.member_is_active ? 'opacity-60' : ''}`}>
+                {formatDate(item.joined_at)}
+              </span>
+            )
+          }
+          return <span className="text-muted-foreground">—</span>
         },
       },
       {
@@ -301,13 +373,52 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
         header: '',
         cell: ({ row }) => {
           const item = row.original
-          // Only show actions for invitations
-          if (item.entry_type !== 'invitation') return null
 
+          // Actions for members
+          if (item.entry_type === 'member') {
+            return (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setTogglingMember(item)}>
+                    {item.member_is_active ? (
+                      <>
+                        <UserX className="mr-2 h-4 w-4" />
+                        Deactivate
+                      </>
+                    ) : (
+                      <>
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        Activate
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setEditingMember(item)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Change Role
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => setRemovingMember(item)}
+                    className="text-destructive"
+                  >
+                    <UserMinus className="mr-2 h-4 w-4" />
+                    Remove from Organization
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )
+          }
+
+          // Actions for invitations
           return (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -345,7 +456,7 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [resendInvitation.isPending, cancelInvitation.isPending]
+    [resendInvitation.isPending, cancelInvitation.isPending, toggleMemberActive.isPending]
   )
 
   if (isLoading) {
@@ -492,6 +603,60 @@ export function OrgMembersTab({ organizationId, organizationName }: OrgMembersTa
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Member Management Dialogs */}
+      <EditMemberRoleDialog
+        organizationId={organizationId}
+        organizationName={organizationName}
+        member={editingMember}
+        isOpen={!!editingMember}
+        onClose={() => setEditingMember(null)}
+      />
+
+      <RemoveMemberDialog
+        organizationId={organizationId}
+        organizationName={organizationName}
+        member={removingMember}
+        isOpen={!!removingMember}
+        onClose={() => setRemovingMember(null)}
+      />
+
+      {/* Toggle Active Confirmation Dialog */}
+      <AlertDialog
+        open={!!togglingMember}
+        onOpenChange={(open) => !open && setTogglingMember(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {togglingMember?.member_is_active ? 'Deactivate Membership' : 'Activate Membership'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {togglingMember?.member_is_active ? (
+                <>
+                  Are you sure you want to deactivate{' '}
+                  <strong>{togglingMember?.full_name || togglingMember?.email}</strong>&apos;s
+                  membership in <strong>{organizationName}</strong>? They will lose access to the
+                  organization until reactivated.
+                </>
+              ) : (
+                <>
+                  Are you sure you want to activate{' '}
+                  <strong>{togglingMember?.full_name || togglingMember?.email}</strong>&apos;s
+                  membership in <strong>{organizationName}</strong>? They will regain access to the
+                  organization.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleToggleConfirm} disabled={toggleMemberActive.isPending}>
+              {toggleMemberActive.isPending ? 'Processing...' : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   )
 }
