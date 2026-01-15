@@ -21,25 +21,30 @@ interface OrgPickerLoginProps {
   appName: string
   /** App icon component (optional) */
   appIcon?: React.ReactNode
-  /** Fallback URL if org has no default app (defaults to /dashboard) */
+  /** URL to redirect to after org selection (defaults to /dashboard) */
   fallbackUrl?: string
   /** Custom class name for the container */
   className?: string
+  /**
+   * If true (default), stays on current app using fallbackUrl after org selection.
+   * If false, redirects to the organization's default app URL.
+   */
+  stayOnCurrentApp?: boolean
 }
 
 /**
  * OrgPickerLogin - Organization picker for the login flow
  *
  * A simplified organization selector that shows only organization names.
- * Users can click any organization to switch to it and be redirected to
- * that organization's default app.
+ * Users can click any organization to switch to it.
  *
  * This component:
  * - Fetches user's organizations via get_user_organizations_with_apps()
  * - Shows only org names (no roles, no app access badges)
  * - All orgs are clickable (only valid orgs are returned by the function)
  * - Calls switch-organization Edge Function on selection
- * - Redirects to the org's default app URL (or fallback)
+ * - By default, stays on current app (using fallbackUrl)
+ * - Set stayOnCurrentApp={false} to redirect to org's default app
  *
  * @example
  * ```tsx
@@ -60,6 +65,7 @@ export function OrgPickerLogin({
   appIcon,
   fallbackUrl = '/dashboard',
   className,
+  stayOnCurrentApp = true,
 }: OrgPickerLoginProps) {
   const [organizations, setOrganizations] = useState<OrgPickerLoginOrganization[]>([])
   const [loading, setLoading] = useState(true)
@@ -127,12 +133,19 @@ export function OrgPickerLogin({
       // Refresh session to get updated JWT
       await supabase.auth.refreshSession()
 
-      // Determine redirect URL: use response defaultAppUrl, then org's stored URL, then fallback
-      const redirectUrl = data?.defaultAppUrl || org.default_app_url || fallbackUrl
+      // Determine redirect URL based on stayOnCurrentApp setting
+      let redirectUrl: string
+      if (stayOnCurrentApp) {
+        // Stay on current app - use fallbackUrl (relative path)
+        redirectUrl = fallbackUrl
+      } else {
+        // Redirect to org's default app if available
+        redirectUrl = data?.defaultAppUrl || org.default_app_url || fallbackUrl
+      }
 
-      // Redirect to the default app
+      // Perform redirect
       if (redirectUrl.startsWith('http')) {
-        // External URL - use full redirect
+        // External URL - use full redirect with /dashboard path
         window.location.href = `${redirectUrl}/dashboard`
       } else {
         // Relative URL - stay on same domain
