@@ -3,13 +3,23 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Card, Button, Badge } from '@playze/shared-ui'
+import { Card } from '../ui/card'
+import { Button } from '../ui/button'
+import { Badge } from '../ui/badge'
 import { Building2, CheckCircle, Loader2, AlertCircle } from 'lucide-react'
 import { createBrowserClient } from '@playze/shared-auth/client'
 
-interface AcceptInviteClientProps {
-  invitationIdFromUrl?: string
-  errorFromUrl?: string
+export interface AcceptInvitePageProps {
+  /** The invitation ID from URL search params */
+  invitationId?: string
+  /** Error message from URL search params */
+  error?: string
+  /** Path to login page (default: '/login') */
+  loginPath?: string
+  /** Path to dashboard (default: '/dashboard') */
+  dashboardPath?: string
+  /** Additional CSS classes */
+  className?: string
 }
 
 interface InvitationData {
@@ -32,7 +42,7 @@ type PageState =
   | { type: 'success' }
 
 /**
- * Accept Invite Client Component
+ * Accept Invite Page Component
  *
  * Handles the complete invitation acceptance flow client-side.
  * This is necessary because magic links from signInWithOtp() include tokens
@@ -44,10 +54,13 @@ type PageState =
  * 3. Show invitation UI
  * 4. Process acceptance on user action
  */
-export function AcceptInviteClient({
-  invitationIdFromUrl,
-  errorFromUrl,
-}: AcceptInviteClientProps) {
+export function AcceptInvitePage({
+  invitationId,
+  error: errorFromUrl,
+  loginPath = '/login',
+  dashboardPath = '/dashboard',
+  className,
+}: AcceptInvitePageProps) {
   const [pageState, setPageState] = useState<PageState>({ type: 'initializing' })
   const [sessionWarning, setSessionWarning] = useState(false)
   const router = useRouter()
@@ -70,7 +83,7 @@ export function AcceptInviteClient({
       }
 
       // Check for invitation ID
-      if (!invitationIdFromUrl) {
+      if (!invitationId) {
         setPageState({
           type: 'error',
           title: 'Missing Invitation',
@@ -99,7 +112,7 @@ export function AcceptInviteClient({
 
         if (!session) {
           console.log('No session found, redirecting to login')
-          router.push(`/login?next=${encodeURIComponent(`/auth/accept-invite?invitation_id=${invitationIdFromUrl}`)}`)
+          router.push(`${loginPath}?next=${encodeURIComponent(`/auth/accept-invite?invitation_id=${invitationId}`)}`)
           return
         }
 
@@ -110,7 +123,7 @@ export function AcceptInviteClient({
         /* eslint-disable @typescript-eslint/no-explicit-any */
         const { data: invitation, error: invError } = await (supabase.rpc as any)(
           'get_invitation_details',
-          { p_invitation_id: invitationIdFromUrl }
+          { p_invitation_id: invitationId }
         ) as { data: InvitationData[] | null; error: any }
         /* eslint-enable @typescript-eslint/no-explicit-any */
 
@@ -171,7 +184,7 @@ export function AcceptInviteClient({
     }
 
     initialize()
-  }, [supabase, router, invitationIdFromUrl, errorFromUrl])
+  }, [supabase, router, invitationId, errorFromUrl, loginPath])
 
   const handleAccept = async () => {
     if (pageState.type !== 'ready') return
@@ -202,7 +215,7 @@ export function AcceptInviteClient({
 
       // Call Edge Function to process the invitation
       const { data, error: fnError } = await supabase.functions.invoke('accept-invitation', {
-        body: { invitationId: invitationIdFromUrl }
+        body: { invitationId }
       })
 
       if (fnError) {
@@ -229,7 +242,7 @@ export function AcceptInviteClient({
         if (invitation.default_app_url && !invitation.default_app_url.includes(window.location.origin)) {
           window.location.href = `${invitation.default_app_url}/?welcome=true`
         } else {
-          router.push('/dashboard?welcome=true')
+          router.push(`${dashboardPath}?welcome=true`)
         }
       }, 1500)
 
@@ -261,7 +274,7 @@ export function AcceptInviteClient({
   // Loading state
   if (pageState.type === 'initializing') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className={`min-h-screen flex items-center justify-center bg-muted/30 p-4 ${className || ''}`}>
         <Card className="max-w-md w-full p-8 text-center">
           <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
@@ -276,7 +289,7 @@ export function AcceptInviteClient({
   // Error state
   if (pageState.type === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className={`min-h-screen flex items-center justify-center bg-muted/30 p-4 ${className || ''}`}>
         <Card className="max-w-md w-full p-8 text-center">
           <div className="mx-auto w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
             <AlertCircle className="h-8 w-8 text-destructive" />
@@ -284,11 +297,11 @@ export function AcceptInviteClient({
           <h1 className="text-2xl font-bold text-destructive mb-4">{pageState.title}</h1>
           <p className="text-muted-foreground mb-6">{pageState.message}</p>
           {pageState.showLogin ? (
-            <Link href="/login" className="text-primary hover:underline">
+            <Link href={loginPath} className="text-primary hover:underline">
               Go to login
             </Link>
           ) : (
-            <Link href="/dashboard" className="text-primary hover:underline">
+            <Link href={dashboardPath} className="text-primary hover:underline">
               Go to dashboard
             </Link>
           )}
@@ -300,7 +313,7 @@ export function AcceptInviteClient({
   // Accepting state
   if (pageState.type === 'accepting') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className={`min-h-screen flex items-center justify-center bg-muted/30 p-4 ${className || ''}`}>
         <Card className="max-w-md w-full p-8 text-center">
           <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
             <Loader2 className="h-8 w-8 text-primary animate-spin" />
@@ -315,7 +328,7 @@ export function AcceptInviteClient({
   // Success state
   if (pageState.type === 'success') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className={`min-h-screen flex items-center justify-center bg-muted/30 p-4 ${className || ''}`}>
         <Card className="max-w-md w-full p-8 text-center">
           <div className="mx-auto w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-6">
             <CheckCircle className="h-8 w-8 text-green-600" />
@@ -337,7 +350,7 @@ export function AcceptInviteClient({
   const { invitation } = pageState
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+    <div className={`min-h-screen flex items-center justify-center bg-muted/30 p-4 ${className || ''}`}>
       <Card className="max-w-md w-full p-8 text-center">
         {/* Organization Icon */}
         <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-6">
@@ -391,7 +404,7 @@ export function AcceptInviteClient({
         {/* Decline Option */}
         <div className="mt-6 pt-4 border-t">
           <Link
-            href="/dashboard"
+            href={dashboardPath}
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Not now? Return to dashboard

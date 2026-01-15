@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { createBrowserClient } from '@playze/shared-auth/client'
-import { Button, Input, Label, Card } from '@playze/shared-ui'
+import { Button } from '../ui/button'
+import { Input } from '../ui/input'
+import { Label } from '../ui/label'
+import { Card } from '../ui/card'
 import { Loader2, Mail, CheckCircle2, AlertCircle, Building2 } from 'lucide-react'
 
 /**
@@ -15,19 +18,39 @@ const ERROR_MESSAGES: Record<string, { title: string; description: string }> = {
   },
 }
 
+export interface MagicLinkLoginFormProps {
+  /** Application name displayed in the header */
+  appName: string
+  /** Optional icon component for the app */
+  appIcon?: React.ReactNode
+  /** Path for the auth callback (default: '/auth/callback') */
+  callbackPath?: string
+  /** Subtitle text below the app name */
+  subtitle?: string
+  /** Additional CSS classes */
+  className?: string
+}
+
 /**
- * Login Form Component
+ * Magic Link Login Form
  *
- * This component handles magic link authentication for TestApp.
- * It is dynamically imported with ssr:false to prevent hydration issues.
+ * A reusable login form component for magic link authentication.
+ * Handles email input, sending magic links, success states, and error display.
  *
  * Features:
- * - Magic link email authentication
+ * - Magic link email authentication via Supabase
  * - Error display from URL parameters (including no_organization)
  * - Success state with instructions
  * - Resend functionality
+ * - Redirect URL preservation via cookie
  */
-export default function LoginForm() {
+export function MagicLinkLoginForm({
+  appName,
+  appIcon,
+  callbackPath = '/auth/callback',
+  subtitle = 'Sign in to access your dashboard',
+  className,
+}: MagicLinkLoginFormProps) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [emailSent, setEmailSent] = useState(false)
@@ -76,7 +99,7 @@ export default function LoginForm() {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.toLowerCase().trim(),
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}${callbackPath}`,
         },
       })
 
@@ -134,17 +157,18 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className={`flex min-h-screen items-center justify-center bg-background px-4 ${className || ''}`}>
       <Card className="w-full max-w-md p-8">
         {!emailSent ? (
           <>
             {/* Header */}
             <div className="text-center mb-8">
+              {appIcon && <div className="flex justify-center mb-4">{appIcon}</div>}
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                TestApp
+                {appName}
               </h1>
               <p className="text-muted-foreground">
-                Sign in to access your dashboard
+                {subtitle}
               </p>
             </div>
 

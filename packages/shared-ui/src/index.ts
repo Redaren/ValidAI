@@ -34,6 +34,10 @@ export * from './components/platform/invite-members-dialog'
 export * from './components/platform/invite-members-button'
 export * from './components/platform/org-invitations-table'
 export * from './components/platform/org-members-table'
+export * from './components/platform/magic-link-login-form'
+export * from './components/platform/accept-invite-page'
+export * from './components/platform/unauthorized-page'
+export * from './components/platform/login-page'
 
 // Export utilities
 export * from './lib/utils'

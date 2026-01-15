@@ -1,4 +1,4 @@
-import { AcceptInviteClient } from './accept-invite-client'
+import { AcceptInvitePage } from '@playze/shared-ui'
 
 interface PageProps {
   searchParams: Promise<{
@@ -8,30 +8,23 @@ interface PageProps {
 }
 
 /**
- * Accept Invite Page (Minimal Server Component)
+ * Accept Invite Page
  *
- * This page handles the invitation acceptance flow for existing users.
+ * Uses the shared AcceptInvitePage component which handles the invitation
+ * acceptance flow for users.
  *
- * IMPORTANT: This is a minimal server component that immediately renders
- * the client component. All auth logic MUST happen client-side because:
+ * IMPORTANT: The shared component is a client component because:
  * - Magic links from signInWithOtp() include tokens in the URL hash (#access_token=xxx)
  * - URL hash fragments are client-side only - the server cannot see them
- * - If we check auth server-side, we'll redirect to login before the client
- *   has a chance to process the hash tokens
- *
- * The client component handles:
- * 1. Detecting and processing URL hash tokens
- * 2. Establishing the session
- * 3. Fetching and validating the invitation
- * 4. Processing the acceptance
+ * - The client component handles token detection and session establishment
  */
-export default async function AcceptInvitePage({ searchParams }: PageProps) {
+export default async function Page({ searchParams }: PageProps) {
   const params = await searchParams
 
   return (
-    <AcceptInviteClient
-      invitationIdFromUrl={params.invitation_id}
-      errorFromUrl={params.error}
+    <AcceptInvitePage
+      invitationId={params.invitation_id}
+      error={params.error}
     />
   )
 }
