@@ -3,12 +3,13 @@ import { handleCors } from '../_shared/cors.ts'
 import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse } from '../_shared/response.ts'
 import { getUserFromRequest, isPlayzeAdmin } from '../_shared/auth.ts'
 import { validateRequired, validateEmail, validateUuid } from '../_shared/validation.ts'
+import { sendEmail, organizationAssignedEmail } from '../_shared/email.ts'
 
 /**
  * Edge Function: organizations/invite-member
  *
  * Purpose: Add a user to an organization (Playze admin only)
- * - Existing users: Added directly to organization (no email, no invitation)
+ * - Existing users: Added directly to organization + magic link notification email
  * - New users: Creates pending invitation and sends signup email
  *
  * Method: POST
@@ -21,7 +22,7 @@ import { validateRequired, validateEmail, validateUuid } from '../_shared/valida
  *   "role": "member" // owner, admin, member, viewer (default: member)
  * }
  *
- * Output for EXISTING users (direct assignment):
+ * Output for EXISTING users (direct assignment with notification):
  * {
  *   "success": true,
  *   "data": {
@@ -29,8 +30,8 @@ import { validateRequired, validateEmail, validateUuid } from '../_shared/valida
  *     "role": "member",
  *     "status": "assigned",
  *     "userExists": true,
- *     "emailSent": false,
- *     "message": "User has been assigned to the organization"
+ *     "emailSent": true,
+ *     "message": "User has been assigned and notification email sent"
  *   }
  * }
  *
@@ -139,24 +140,8 @@ Deno.serve(async (req) => {
     const invitation = inviteResult[0]
     console.log(`Invitation result: invitation_id=${invitation.invitation_id}, status=${invitation.status}, user_exists=${invitation.user_exists}`)
 
-    // For existing users, they are directly assigned to the organization (no invitation/email needed)
-    if (invitation.status === 'assigned') {
-      console.log(`Existing user ${email} directly assigned to organization ${organizationId} as ${role}`)
-      return successResponse({
-        email: invitation.email,
-        role: invitation.role,
-        status: 'assigned',
-        userExists: true,
-        emailSent: false,
-        message: 'User has been assigned to the organization'
-      })
-    }
-
-    // For new users, continue with invitation email flow
-
     // Get organization's default app URL and name for redirect and email
-    // If organization has a default_app_id set, use that app's URL and name
-    // Otherwise fall back to SITE_URL (admin portal) and 'Playze' as app name
+    // (Needed for BOTH existing and new users)
     let redirectAppUrl = Deno.env.get('SITE_URL') || 'http://localhost:3001'
     let appName = 'Playze'
 
@@ -189,6 +174,49 @@ Deno.serve(async (req) => {
     }
 
     const redirectUrl = `${redirectAppUrl}/auth/accept-invite?invitation_id=${invitation.invitation_id}`
+
+    // For existing users, send notification email via Brevo
+    // (User already has an account - just notify them they've been added to a new org)
+    if (invitation.user_exists === true) {
+      console.log(`Existing user ${email} assigned to organization ${organizationId} - sending notification email via Brevo`)
+
+      const emailContent = organizationAssignedEmail({
+        organizationName: organization.name,
+        role: role,
+        appName: appName,
+        appUrl: redirectAppUrl
+      })
+
+      const emailResult = await sendEmail({
+        to: email.toLowerCase().trim(),
+        subject: emailContent.subject,
+        html: emailContent.html
+      })
+
+      if (!emailResult.success) {
+        console.error('Error sending notification email to existing user:', emailResult.error)
+        return successResponse({
+          email: invitation.email,
+          role: invitation.role,
+          status: 'assigned',
+          userExists: true,
+          emailSent: false,
+          message: 'User assigned but notification email failed to send'
+        })
+      }
+
+      console.log(`Notification email sent to existing user ${email}, messageId: ${emailResult.messageId}`)
+      return successResponse({
+        email: invitation.email,
+        role: invitation.role,
+        status: 'assigned',
+        userExists: true,
+        emailSent: true,
+        message: 'User has been assigned and notification email sent'
+      })
+    }
+
+    // For new users, continue with invitation email flow
 
     console.log(`Sending invitation email to new user ${email}, redirect: ${redirectUrl}`)
 
