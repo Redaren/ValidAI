@@ -184,7 +184,7 @@ Deno.serve(async (req) => {
         organizationName: organization.name,
         role: role,
         appName: appName,
-        appUrl: redirectAppUrl
+        appUrl: redirectUrl  // Include invitation_id so user goes through accept flow
       })
 
       const emailResult = await sendEmail({
