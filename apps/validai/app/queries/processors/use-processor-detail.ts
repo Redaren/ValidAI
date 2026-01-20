@@ -347,7 +347,7 @@ export function useUpdateProcessor() {
       name?: string
       description?: string | null
       usage_description?: string | null
-      status?: 'draft' | 'published' | 'archived'
+      status?: 'active' | 'archived' | 'draft' | 'published'
       visibility?: 'personal' | 'organization'
       system_prompt?: string | null
       tags?: string[] | null
@@ -376,7 +376,7 @@ export function useUpdateProcessor() {
         name?: string
         description?: string | null
         usage_description?: string | null
-        status?: 'draft' | 'published' | 'archived'
+        status?: 'active' | 'archived' | 'draft' | 'published'
         published_at?: string | null
         visibility?: 'personal' | 'organization'
         system_prompt?: string | null

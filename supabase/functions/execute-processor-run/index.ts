@@ -88,13 +88,13 @@ const corsHeaders = {
  *
  * Run source options:
  * - processor_id only: Uses live processor data (draft mode)
- * - processor_id + use_published_snapshot: Uses processor's active_snapshot_id
+ * - processor_id + use_published_snapshot: Queries snapshot table for published version
  * - playbook_snapshot_id only: Uses snapshot directly (portal/gallery runs)
  */
 interface InitialRequest {
   // Option A: Run from processor (current behavior or its active snapshot)
   processor_id?: string
-  use_published_snapshot?: boolean  // If true, uses processor's active_snapshot_id
+  use_published_snapshot?: boolean  // If true, queries snapshot table for published version
 
   // Option B: Run directly from snapshot (portal/gallery runs)
   playbook_snapshot_id?: string
@@ -267,49 +267,30 @@ serve(async (req) => {
         console.log(`Operations from snapshot: ${operations.length}`)
 
       } else if (initialBody.processor_id && initialBody.use_published_snapshot) {
-        // Mode B: Use processor's active published snapshot
-        console.log('Mode B: Using processor\'s active published snapshot')
+        // Mode B: Use processor's published snapshot (query snapshot table directly)
+        console.log('Mode B: Using processor\'s published snapshot')
 
-        // First fetch processor to get active_snapshot_id
-        const { data: proc, error: procError } = await supabase
-          .from('validai_processors')
+        // Query snapshot table directly for the published snapshot
+        // (No longer using active_snapshot_id on processor - snapshot table is source of truth)
+        const { data: snapshot, error: snapError } = await supabase
+          .from('validai_playbook_snapshots')
           .select('*')
-          .eq('id', initialBody.processor_id)
+          .eq('processor_id', initialBody.processor_id)
+          .eq('is_published', true)
           .single()
 
-        if (procError || !proc) {
-          return new Response(
-            JSON.stringify({ error: `Processor not found: ${procError?.message}` }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
-        if (!proc.active_snapshot_id) {
+        if (snapError || !snapshot) {
           return new Response(
             JSON.stringify({ error: 'Processor has no published version' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
-        // Fetch the active snapshot
-        const { data: snapshot, error: snapError } = await supabase
-          .from('validai_playbook_snapshots')
-          .select('*')
-          .eq('id', proc.active_snapshot_id)
-          .single()
-
-        if (snapError || !snapshot) {
-          return new Response(
-            JSON.stringify({ error: 'Active snapshot not found' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-
         // Extract processor and operations from snapshot
         snapshotData = snapshot.snapshot
         processor = {
-          id: proc.id,
-          organization_id: proc.organization_id,
+          id: snapshot.processor_id,
+          organization_id: snapshot.creator_organization_id,
           name: snapshotData.processor.name,
           description: snapshotData.processor.description,
           system_prompt: snapshotData.processor.system_prompt,
@@ -318,7 +299,7 @@ serve(async (req) => {
         operations = snapshotData.operations
         playbookSnapshotId = snapshot.id
 
-        console.log(`Using active snapshot v${snapshot.version_number}: ${snapshot.name}`)
+        console.log(`Using published snapshot v${snapshot.version_number}: ${snapshot.name}`)
         console.log(`Operations from snapshot: ${operations.length}`)
 
       } else {

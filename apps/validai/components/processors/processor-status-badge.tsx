@@ -9,6 +9,12 @@ interface ProcessorStatusBadgeProps {
 
 export function ProcessorStatusBadge({ status }: ProcessorStatusBadgeProps) {
   const variants = {
+    active: {
+      variant: "secondary" as const,
+      className: "bg-blue-100 text-blue-800 hover:bg-blue-100",
+      label: "Active"
+    },
+    // Legacy values (kept for backward compatibility, but no longer used)
     published: {
       variant: "default" as const,
       className: "bg-green-100 text-green-800 hover:bg-green-100",

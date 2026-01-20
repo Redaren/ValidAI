@@ -1125,7 +1125,6 @@ export type Database = {
       }
       validai_processors: {
         Row: {
-          active_snapshot_id: string | null
           area_configuration: Json | null
           configuration: Json | null
           created_at: string
@@ -1144,7 +1143,6 @@ export type Database = {
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }
         Insert: {
-          active_snapshot_id?: string | null
           area_configuration?: Json | null
           configuration?: Json | null
           created_at?: string
@@ -1163,7 +1161,6 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Update: {
-          active_snapshot_id?: string | null
           area_configuration?: Json | null
           configuration?: Json | null
           created_at?: string
@@ -1182,13 +1179,6 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Relationships: [
-          {
-            foreignKeyName: "validai_processors_active_snapshot_id_fkey"
-            columns: ["active_snapshot_id"]
-            isOneToOne: false
-            referencedRelation: "validai_playbook_snapshots"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "validai_processors_organization_id_fkey"
             columns: ["organization_id"]
@@ -1557,7 +1547,7 @@ export type Database = {
         }[]
       }
       admin_list_all_subscriptions: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           app_description: string
           app_id: string
@@ -1580,7 +1570,7 @@ export type Database = {
         }[]
       }
       admin_list_all_users: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           avatar_url: string
           created_at: string
@@ -1608,7 +1598,7 @@ export type Database = {
         }[]
       }
       admin_list_apps: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           app_url: string
           description: string
@@ -1667,7 +1657,7 @@ export type Database = {
         }[]
       }
       admin_list_organizations: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           city: string
           contact_email: string
@@ -1910,7 +1900,7 @@ export type Database = {
         Returns: string
       }
       generate_unique_org_slug: { Args: { base_slug: string }; Returns: string }
-      get_available_llm_models: { Args: Record<PropertyKey, never>; Returns: Json }
+      get_available_llm_models: { Args: never; Returns: Json }
       get_billing_usage_summary: {
         Args: { org_id: string; period_end: string; period_start: string }
         Returns: {
@@ -1924,7 +1914,7 @@ export type Database = {
         }[]
       }
       get_current_organization: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           created_at: string
           description: string
@@ -1934,7 +1924,7 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_current_organization_id: { Args: Record<PropertyKey, never>; Returns: string }
+      get_current_organization_id: { Args: never; Returns: string }
       get_gallery_detail: {
         Args: { p_gallery_id: string }
         Returns: {
@@ -2085,6 +2075,15 @@ export type Database = {
           processor_visibility: string
         }[]
       }
+      get_published_snapshot: {
+        Args: { p_processor_id: string }
+        Returns: {
+          id: string
+          published_at: string
+          version_number: number
+          visibility: string
+        }[]
+      }
       get_user_accessible_apps: {
         Args: { org_id: string }
         Returns: {
@@ -2094,7 +2093,7 @@ export type Database = {
         }[]
       }
       get_user_apps_with_admin: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           app_description: string
           app_id: string
@@ -2156,7 +2155,7 @@ export type Database = {
         Returns: number
       }
       get_user_organizations: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: {
           is_active: boolean
           joined_at: string
@@ -2218,7 +2217,7 @@ export type Database = {
       }
       get_user_processors_debug:
         | {
-            Args: Record<PropertyKey, never>
+            Args: never
             Returns: {
               creator_name: string
               current_org_id: string
@@ -2279,8 +2278,8 @@ export type Database = {
         Args: { p_run_id: string; p_status: string }
         Returns: undefined
       }
-      is_org_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
-      is_playze_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_org_admin: { Args: never; Returns: boolean }
+      is_playze_admin: { Args: never; Returns: boolean }
       publish_playbook: {
         Args: { p_processor_id: string; p_visibility?: string }
         Returns: {
@@ -2417,7 +2416,7 @@ export type Database = {
           user_exists: boolean
         }[]
       }
-      user_organization_id: { Args: Record<PropertyKey, never>; Returns: string }
+      user_organization_id: { Args: never; Returns: string }
       user_role_in_org: { Args: { org_id: string }; Returns: string }
       user_toggle_member_active: {
         Args: {
@@ -2459,7 +2458,8 @@ export type Database = {
         | "analysis"
         | "generic"
         | "traffic_light"
-      processor_status: "draft" | "published" | "archived"
+      processor_status: "draft" | "published" | "archived" | "active"
+      processor_status_new: "active" | "archived"
       processor_visibility: "personal" | "organization"
     }
     CompositeTypes: {
@@ -2599,7 +2599,8 @@ export const Constants = {
         "generic",
         "traffic_light",
       ],
-      processor_status: ["draft", "published", "archived"],
+      processor_status: ["draft", "published", "archived", "active"],
+      processor_status_new: ["active", "archived"],
       processor_visibility: ["personal", "organization"],
     },
   },

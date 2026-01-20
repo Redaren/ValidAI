@@ -34,7 +34,7 @@ import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
 import { PublishPlaybookDialog } from "@/components/processors/publish-playbook-dialog"
-import { useUnpublishPlaybook, useProcessorSnapshots } from "@/app/queries/playbook-snapshots"
+import { useUnpublishPlaybook, usePublishedSnapshot } from "@/app/queries/playbook-snapshots"
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
@@ -50,24 +50,23 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
   const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
-  const { data: snapshots } = useProcessorSnapshots(processor.processor_id)
+  const { data: publishedSnapshot } = usePublishedSnapshot(processor.processor_id)
   const unpublishPlaybook = useUnpublishPlaybook()
 
-  // Check if processor has an active published snapshot
-  const activeSnapshot = snapshots?.find(s => s.is_published)
-  const hasPublishedVersion = !!activeSnapshot
+  // Check if processor has a published snapshot (snapshot table is source of truth)
+  const hasPublishedVersion = !!publishedSnapshot
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   const handleUnpublish = async () => {
-    if (!activeSnapshot) return
+    if (!publishedSnapshot) return
 
     try {
-      await unpublishPlaybook.mutateAsync(activeSnapshot.id)
+      await unpublishPlaybook.mutateAsync(publishedSnapshot.id)
       toast.success('Playbook unpublished', {
-        description: `Version ${activeSnapshot.version_number} is now hidden from galleries.`,
+        description: `Version ${publishedSnapshot.version_number} is now hidden from galleries.`,
       })
     } catch (error) {
       toast.error('Failed to unpublish playbook', {
@@ -151,7 +150,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
             processorName={processor.processor_name}
             defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
             hasPublishedVersion={hasPublishedVersion}
-            publishedVersion={activeSnapshot?.version_number}
+            publishedVersion={publishedSnapshot?.version_number}
             trigger={
               <Button variant="default" size="icon" title={t('run')}>
                 <Play className="h-4 w-4" />
@@ -224,12 +223,18 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">{t('status')}</span>
             <div className="flex items-center gap-2">
-              <Badge className={getStatusColor(processor.status)}>
-                {processor.status}
-              </Badge>
-              {hasPublishedVersion && activeSnapshot && (
-                <Badge variant="outline" className="text-xs">
-                  v{activeSnapshot.version_number}
+              {hasPublishedVersion && publishedSnapshot ? (
+                <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">
+                  Published v{publishedSnapshot.version_number}
+                </Badge>
+              ) : (
+                <Badge className="bg-muted text-muted-foreground">
+                  Draft
+                </Badge>
+              )}
+              {processor.status === 'archived' && (
+                <Badge className="bg-gray-500/10 text-gray-700 dark:text-gray-400">
+                  Archived
                 </Badge>
               )}
             </div>

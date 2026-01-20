@@ -86,8 +86,8 @@ export interface PlaybookSnapshot {
  * Hook to publish a processor as a frozen snapshot
  *
  * Creates a new version of the playbook snapshot with the current processor
- * and operations state. Updates processor status to 'published' and sets
- * the active_snapshot_id.
+ * and operations state. Auto-unpublishes any existing published snapshot
+ * for the same processor (enforcing one published per processor).
  *
  * @returns Mutation hook for publishing
  *
@@ -136,10 +136,13 @@ export function usePublishPlaybook() {
     onSuccess: (data, variables) => {
       // Invalidate related queries
       queryClient.invalidateQueries({
-        queryKey: ['processor-detail', variables.processorId],
+        queryKey: ['published-snapshot', variables.processorId],
       })
       queryClient.invalidateQueries({
         queryKey: ['processor-snapshots', variables.processorId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['processor-detail', variables.processorId],
       })
       queryClient.invalidateQueries({ queryKey: ['user-processors'] })
     },
@@ -152,7 +155,7 @@ export function usePublishPlaybook() {
 /**
  * Hook to unpublish a snapshot (hide without deleting)
  *
- * Sets is_published to false and clears active_snapshot_id on the processor.
+ * Sets is_published to false on the snapshot.
  * The snapshot data is preserved for potential republishing.
  *
  * @returns Mutation hook for unpublishing
@@ -191,8 +194,9 @@ export function useUnpublishPlaybook() {
     },
     onSuccess: () => {
       // Invalidate all processor and snapshot queries
-      queryClient.invalidateQueries({ queryKey: ['processor-detail'] })
+      queryClient.invalidateQueries({ queryKey: ['published-snapshot'] })
       queryClient.invalidateQueries({ queryKey: ['processor-snapshots'] })
+      queryClient.invalidateQueries({ queryKey: ['processor-detail'] })
       queryClient.invalidateQueries({ queryKey: ['user-processors'] })
     },
     onError: (error) => {
@@ -204,7 +208,8 @@ export function useUnpublishPlaybook() {
 /**
  * Hook to republish a previously unpublished snapshot
  *
- * Sets is_published back to true and restores active_snapshot_id on the processor.
+ * Sets is_published back to true on the target snapshot.
+ * Auto-unpublishes any other published snapshot for the same processor.
  * No new snapshot is created - uses the existing snapshot data.
  *
  * @returns Mutation hook for republishing
@@ -243,8 +248,9 @@ export function useRepublishPlaybook() {
     },
     onSuccess: () => {
       // Invalidate all processor and snapshot queries
-      queryClient.invalidateQueries({ queryKey: ['processor-detail'] })
+      queryClient.invalidateQueries({ queryKey: ['published-snapshot'] })
       queryClient.invalidateQueries({ queryKey: ['processor-snapshots'] })
+      queryClient.invalidateQueries({ queryKey: ['processor-detail'] })
       queryClient.invalidateQueries({ queryKey: ['user-processors'] })
     },
     onError: (error) => {
@@ -304,12 +310,69 @@ export function useUpdatePlaybookVisibility() {
     },
     onSuccess: () => {
       // Invalidate snapshot queries
+      queryClient.invalidateQueries({ queryKey: ['published-snapshot'] })
       queryClient.invalidateQueries({ queryKey: ['processor-snapshots'] })
       queryClient.invalidateQueries({ queryKey: ['playbook-snapshot'] })
     },
     onError: (error) => {
       logger.error('Update visibility mutation failed:', extractErrorDetails(error))
     },
+  })
+}
+
+/**
+ * Published snapshot data for a processor
+ */
+export interface PublishedSnapshotMeta {
+  id: string
+  version_number: number
+  visibility: PlaybookVisibility
+  published_at: string
+}
+
+/**
+ * Hook to fetch the published snapshot for a processor
+ *
+ * Returns the currently published snapshot metadata, or null if none.
+ * Uses the new architecture where snapshot table is source of truth.
+ *
+ * @param processorId - UUID of the processor
+ * @returns Query hook with published snapshot or null
+ *
+ * @example
+ * ```tsx
+ * const { data: publishedSnapshot } = usePublishedSnapshot(processorId)
+ *
+ * const hasPublishedVersion = !!publishedSnapshot
+ * if (publishedSnapshot) {
+ *   console.log(`Published v${publishedSnapshot.version_number}`)
+ * }
+ * ```
+ */
+export function usePublishedSnapshot(processorId: string | undefined) {
+  const supabase = createBrowserClient()
+
+  return useQuery({
+    queryKey: ['published-snapshot', processorId],
+    queryFn: async () => {
+      if (!processorId) return null
+
+      const { data, error } = await supabase
+        .from('validai_playbook_snapshots')
+        .select('id, version_number, visibility, published_at')
+        .eq('processor_id', processorId)
+        .eq('is_published', true)
+        .maybeSingle() // Returns null if not found, no error
+
+      if (error) {
+        logger.error('Failed to fetch published snapshot:', extractErrorDetails(error))
+        throw new Error(error.message || 'Failed to fetch published snapshot')
+      }
+
+      return data as PublishedSnapshotMeta | null
+    },
+    enabled: !!processorId,
+    staleTime: 30 * 1000, // 30 seconds
   })
 }
 

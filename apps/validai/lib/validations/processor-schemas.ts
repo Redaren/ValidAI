@@ -35,7 +35,7 @@ export type CreateProcessorInput = z.infer<typeof createProcessorSchema>
 export const updateProcessorSchema = z.object({
   name: nameSchema.optional(),
   description: descriptionSchema,
-  status: z.enum(['draft', 'published', 'archived']).optional(),
+  status: z.enum(['active', 'archived', 'draft', 'published']).optional(),
   visibility: z.enum(['personal', 'organization']).optional(),
   usage_description: descriptionSchema,
   system_prompt: z.string().trim().max(2000).optional(),
