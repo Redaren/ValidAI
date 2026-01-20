@@ -8,7 +8,8 @@ import { devtools } from 'zustand/middleware'
 import { logger, extractErrorDetails } from '@/lib/utils/logger'
 import type { ConversationMessage, WorkbenchExecution } from '@/lib/validations'
 import { createBrowserClient } from '@playze/shared-auth/client'
-import type { RealtimeChannel } from '@supabase/supabase-js'
+// Use a simplified type to avoid version mismatches between @supabase/realtime-js versions
+type RealtimeChannelLike = { unsubscribe: () => void }
 import type { OperationType } from '@/lib/operation-types'
 
 /**
@@ -203,7 +204,7 @@ export interface WorkbenchStore {
   // Real-time Execution Tracking
   currentExecutionId: string | null
   executionStatus: 'idle' | 'pending' | 'processing' | 'completed' | 'failed'
-  realtimeChannel: RealtimeChannel | null
+  realtimeChannel: RealtimeChannelLike | null
 
   // Results
   isRunning: boolean

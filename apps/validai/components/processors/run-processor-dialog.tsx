@@ -107,6 +107,10 @@ interface RunProcessorDialogProps {
   processorName?: string
   /** Default view to navigate to (optional, defaults to "compliance") */
   defaultView?: 'technical' | 'compliance' | 'contract-comments'
+  /** Whether processor has a published version available */
+  hasPublishedVersion?: boolean
+  /** Published version number (for display) */
+  publishedVersion?: number
 }
 
 /**
@@ -154,6 +158,8 @@ export function RunProcessorDialog({
   trigger,
   processorName,
   defaultView = 'compliance',
+  hasPublishedVersion = false,
+  publishedVersion,
 }: RunProcessorDialogProps) {
   const t = useTranslations('common')
   const tUpload = useTranslations('upload')
@@ -165,6 +171,7 @@ export function RunProcessorDialog({
     messageKey: string
   }>({ progress: 0, messageKey: '' })
   const [showProgress, setShowProgress] = useState(false)
+  const [usePublishedVersion, setUsePublishedVersion] = useState(hasPublishedVersion)
   const router = useRouter()
 
   const createRun = useCreateRun()
@@ -229,9 +236,13 @@ export function RunProcessorDialog({
       })
       progressSimulator.start()
 
-      logger.info('[Direct Upload] Creating run with inline file', { processorId })
+      logger.info('[Direct Upload] Creating run with inline file', {
+        processorId,
+        usePublishedVersion: hasPublishedVersion && usePublishedVersion,
+      })
       const { run_id } = await createRun.mutateAsync({
         processor_id: processorId,
+        use_published_snapshot: hasPublishedVersion && usePublishedVersion,
         file_upload: {
           file: base64File,
           filename: file.name,
@@ -316,6 +327,31 @@ export function RunProcessorDialog({
             {tUpload('dragAndDrop')}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Version Toggle - only show when published version exists */}
+        {hasPublishedVersion && (
+          <div className="flex items-center justify-between rounded-md border p-3 bg-muted/30">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">
+                {usePublishedVersion
+                  ? `Published Version${publishedVersion ? ` (v${publishedVersion})` : ''}`
+                  : 'Draft Version'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {usePublishedVersion
+                  ? 'Uses frozen snapshot - edits won\'t affect this run'
+                  : 'Uses current draft - includes latest changes'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setUsePublishedVersion(!usePublishedVersion)}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              Switch to {usePublishedVersion ? 'Draft' : 'Published'}
+            </button>
+          </div>
+        )}
 
         <div className="py-4">
           <DropZone

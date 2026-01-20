@@ -85,9 +85,19 @@ const corsHeaders = {
 /**
  * Initial request payload (from UI)
  * Supports either Storage-based upload (document_id) or direct upload (file_upload)
+ *
+ * Run source options:
+ * - processor_id only: Uses live processor data (draft mode)
+ * - processor_id + use_published_snapshot: Uses processor's active_snapshot_id
+ * - playbook_snapshot_id only: Uses snapshot directly (portal/gallery runs)
  */
 interface InitialRequest {
-  processor_id: string
+  // Option A: Run from processor (current behavior or its active snapshot)
+  processor_id?: string
+  use_published_snapshot?: boolean  // If true, uses processor's active_snapshot_id
+
+  // Option B: Run directly from snapshot (portal/gallery runs)
+  playbook_snapshot_id?: string
 
   // EITHER document_id (existing Storage flow)
   document_id?: string
@@ -176,13 +186,22 @@ serve(async (req) => {
 
       console.log('=== Initial Invocation: Creating Run ===')
       console.log(`Processor ID: ${initialBody.processor_id}`)
+      console.log(`Playbook Snapshot ID: ${initialBody.playbook_snapshot_id}`)
+      console.log(`Use Published Snapshot: ${initialBody.use_published_snapshot}`)
       console.log(`Document ID: ${initialBody.document_id}`)
       console.log(`File Upload: ${initialBody.file_upload ? 'Direct upload' : 'N/A'}`)
 
-      // 1. Validate input - Phase 1.9: Support both Storage and direct upload
-      if (!initialBody.processor_id) {
+      // 1. Validate input - Must have either processor_id or playbook_snapshot_id
+      if (!initialBody.processor_id && !initialBody.playbook_snapshot_id) {
         return new Response(
-          JSON.stringify({ error: 'Missing required field: processor_id' }),
+          JSON.stringify({ error: 'Either processor_id or playbook_snapshot_id is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (initialBody.processor_id && initialBody.playbook_snapshot_id) {
+        return new Response(
+          JSON.stringify({ error: 'Cannot provide both processor_id and playbook_snapshot_id' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -202,32 +221,143 @@ serve(async (req) => {
         )
       }
 
-      // 2. Fetch processor
-      const { data: processor, error: procError } = await supabase
-        .from('validai_processors')
-        .select('*')
-        .eq('id', initialBody.processor_id)
-        .single()
+      // 2. Resolve processor and operations
+      // Three modes:
+      // A) playbook_snapshot_id: Use snapshot directly (portal/gallery runs)
+      // B) processor_id + use_published_snapshot: Use processor's active snapshot
+      // C) processor_id only: Use live processor data (draft mode)
 
-      if (procError || !processor) {
-        return new Response(
-          JSON.stringify({ error: `Processor not found: ${procError?.message}` }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
+      let processor: any = null
+      let operations: any[] = []
+      let playbookSnapshotId: string | null = null
+      let snapshotData: any = null
 
-      // 3. Fetch operations (ordered by position)
-      const { data: operations, error: opsError } = await supabase
-        .from('validai_operations')
-        .select('*')
-        .eq('processor_id', initialBody.processor_id)
-        .order('position', { ascending: true })
+      if (initialBody.playbook_snapshot_id) {
+        // Mode A: Run from snapshot directly (portal/gallery runs)
+        console.log('Mode A: Running from playbook snapshot')
 
-      if (opsError) {
-        return new Response(
-          JSON.stringify({ error: `Failed to fetch operations: ${opsError.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        const { data: snapshot, error: snapError } = await supabase
+          .from('validai_playbook_snapshots')
+          .select('*')
+          .eq('id', initialBody.playbook_snapshot_id)
+          .eq('is_published', true)
+          .single()
+
+        if (snapError || !snapshot) {
+          return new Response(
+            JSON.stringify({ error: 'Snapshot not found or not published' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Extract processor and operations from snapshot
+        snapshotData = snapshot.snapshot
+        processor = {
+          id: snapshot.processor_id,
+          organization_id: snapshot.creator_organization_id,
+          name: snapshotData.processor.name,
+          description: snapshotData.processor.description,
+          system_prompt: snapshotData.processor.system_prompt,
+          configuration: snapshotData.processor.configuration
+        }
+        operations = snapshotData.operations
+        playbookSnapshotId = snapshot.id
+
+        console.log(`Using snapshot v${snapshot.version_number}: ${snapshot.name}`)
+        console.log(`Operations from snapshot: ${operations.length}`)
+
+      } else if (initialBody.processor_id && initialBody.use_published_snapshot) {
+        // Mode B: Use processor's active published snapshot
+        console.log('Mode B: Using processor\'s active published snapshot')
+
+        // First fetch processor to get active_snapshot_id
+        const { data: proc, error: procError } = await supabase
+          .from('validai_processors')
+          .select('*')
+          .eq('id', initialBody.processor_id)
+          .single()
+
+        if (procError || !proc) {
+          return new Response(
+            JSON.stringify({ error: `Processor not found: ${procError?.message}` }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        if (!proc.active_snapshot_id) {
+          return new Response(
+            JSON.stringify({ error: 'Processor has no published version' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Fetch the active snapshot
+        const { data: snapshot, error: snapError } = await supabase
+          .from('validai_playbook_snapshots')
+          .select('*')
+          .eq('id', proc.active_snapshot_id)
+          .single()
+
+        if (snapError || !snapshot) {
+          return new Response(
+            JSON.stringify({ error: 'Active snapshot not found' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Extract processor and operations from snapshot
+        snapshotData = snapshot.snapshot
+        processor = {
+          id: proc.id,
+          organization_id: proc.organization_id,
+          name: snapshotData.processor.name,
+          description: snapshotData.processor.description,
+          system_prompt: snapshotData.processor.system_prompt,
+          configuration: snapshotData.processor.configuration
+        }
+        operations = snapshotData.operations
+        playbookSnapshotId = snapshot.id
+
+        console.log(`Using active snapshot v${snapshot.version_number}: ${snapshot.name}`)
+        console.log(`Operations from snapshot: ${operations.length}`)
+
+      } else {
+        // Mode C: Use live processor data (draft mode - existing behavior)
+        console.log('Mode C: Using live processor data (draft mode)')
+
+        const { data: proc, error: procError } = await supabase
+          .from('validai_processors')
+          .select('*')
+          .eq('id', initialBody.processor_id)
+          .single()
+
+        if (procError || !proc) {
+          return new Response(
+            JSON.stringify({ error: `Processor not found: ${procError?.message}` }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        processor = proc
+
+        // Fetch operations (ordered by position)
+        const { data: ops, error: opsError } = await supabase
+          .from('validai_operations')
+          .select('*')
+          .eq('processor_id', initialBody.processor_id)
+          .order('position', { ascending: true })
+
+        if (opsError) {
+          return new Response(
+            JSON.stringify({ error: `Failed to fetch operations: ${opsError.message}` }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        operations = ops || []
+
+        console.log(`Using live processor: ${processor.name}`)
+        console.log(`Operations from database: ${operations.length}`)
       }
 
       if (!operations || operations.length === 0) {
@@ -651,12 +781,14 @@ serve(async (req) => {
       }
 
       // 7. Create run record - Phase 1.9: Support nullable document_id and storage_status
+      // Note: organization_id is the RUNNER's org (who pays for the run)
       const { data: run, error: runError } = await supabase
         .from('validai_runs')
         .insert({
           processor_id: processor.id,
+          playbook_snapshot_id: playbookSnapshotId,  // Link to snapshot used (null for draft runs)
           document_id: documentId,  // Phase 1.9: Can be NULL for direct uploads
-          organization_id: organization_id,
+          organization_id: organization_id,  // Runner's org (for billing)
           snapshot: snapshot,
           status: 'pending',
           triggered_by: user?.id || null,

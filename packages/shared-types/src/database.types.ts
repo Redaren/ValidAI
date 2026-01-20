@@ -466,36 +466,86 @@ export type Database = {
       }
       organizations: {
         Row: {
+          city: string | null
+          contact_email: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          contact_role: string | null
+          country: string | null
           created_at: string | null
           created_by: string | null
+          default_app_id: string | null
           description: string | null
           id: string
           is_active: boolean | null
+          kam: string | null
+          lead_source: string | null
           llm_configuration: Json | null
           name: string
+          org_number: string | null
+          postal_code: string | null
+          referral: string | null
+          street_address: string | null
           updated_at: string | null
+          vat_number: string | null
         }
         Insert: {
+          city?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          contact_role?: string | null
+          country?: string | null
           created_at?: string | null
           created_by?: string | null
+          default_app_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
+          kam?: string | null
+          lead_source?: string | null
           llm_configuration?: Json | null
           name: string
+          org_number?: string | null
+          postal_code?: string | null
+          referral?: string | null
+          street_address?: string | null
           updated_at?: string | null
+          vat_number?: string | null
         }
         Update: {
+          city?: string | null
+          contact_email?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          contact_role?: string | null
+          country?: string | null
           created_at?: string | null
           created_by?: string | null
+          default_app_id?: string | null
           description?: string | null
           id?: string
           is_active?: boolean | null
+          kam?: string | null
+          lead_source?: string | null
           llm_configuration?: Json | null
           name?: string
+          org_number?: string | null
+          postal_code?: string | null
+          referral?: string | null
+          street_address?: string | null
           updated_at?: string | null
+          vat_number?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "organizations_default_app_id_fkey"
+            columns: ["default_app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -1007,8 +1057,75 @@ export type Database = {
         }
         Relationships: []
       }
+      validai_playbook_snapshots: {
+        Row: {
+          created_at: string
+          created_by: string
+          creator_organization_id: string
+          description: string | null
+          id: string
+          is_published: boolean
+          name: string
+          processor_id: string | null
+          published_at: string
+          snapshot: Json
+          unpublished_at: string | null
+          updated_at: string
+          version_number: number
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          creator_organization_id: string
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          name: string
+          processor_id?: string | null
+          published_at?: string
+          snapshot: Json
+          unpublished_at?: string | null
+          updated_at?: string
+          version_number?: number
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          creator_organization_id?: string
+          description?: string | null
+          id?: string
+          is_published?: boolean
+          name?: string
+          processor_id?: string | null
+          published_at?: string
+          snapshot?: Json
+          unpublished_at?: string | null
+          updated_at?: string
+          version_number?: number
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "validai_playbook_snapshots_creator_organization_id_fkey"
+            columns: ["creator_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validai_playbook_snapshots_processor_id_fkey"
+            columns: ["processor_id"]
+            isOneToOne: false
+            referencedRelation: "validai_processors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       validai_processors: {
         Row: {
+          active_snapshot_id: string | null
           area_configuration: Json | null
           configuration: Json | null
           created_at: string
@@ -1027,6 +1144,7 @@ export type Database = {
           visibility: Database["public"]["Enums"]["processor_visibility"]
         }
         Insert: {
+          active_snapshot_id?: string | null
           area_configuration?: Json | null
           configuration?: Json | null
           created_at?: string
@@ -1045,6 +1163,7 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Update: {
+          active_snapshot_id?: string | null
           area_configuration?: Json | null
           configuration?: Json | null
           created_at?: string
@@ -1063,6 +1182,13 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Relationships: [
+          {
+            foreignKeyName: "validai_processors_active_snapshot_id_fkey"
+            columns: ["active_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "validai_playbook_snapshots"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "validai_processors_organization_id_fkey"
             columns: ["organization_id"]
@@ -1106,6 +1232,7 @@ export type Database = {
           failed_operations: number
           id: string
           organization_id: string
+          playbook_snapshot_id: string | null
           processor_id: string | null
           snapshot: Json
           started_at: string
@@ -1124,6 +1251,7 @@ export type Database = {
           failed_operations?: number
           id?: string
           organization_id: string
+          playbook_snapshot_id?: string | null
           processor_id?: string | null
           snapshot: Json
           started_at?: string
@@ -1142,6 +1270,7 @@ export type Database = {
           failed_operations?: number
           id?: string
           organization_id?: string
+          playbook_snapshot_id?: string | null
           processor_id?: string | null
           snapshot?: Json
           started_at?: string
@@ -1171,6 +1300,13 @@ export type Database = {
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "validai_runs_playbook_snapshot_id_fkey"
+            columns: ["playbook_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "validai_playbook_snapshots"
             referencedColumns: ["id"]
           },
         ]
@@ -1256,11 +1392,14 @@ export type Database = {
     }
     Functions: {
       admin_activate_subscription: {
-        Args: { p_subscription_id: string }
+        Args: { activation_reason?: string; subscription_id: string }
         Returns: {
-          activated: boolean
+          app_id: string
+          id: string
+          notes: string
+          organization_id: string
           status: string
-          subscription_id: string
+          updated_at: string
         }[]
       }
       admin_assign_member: {
@@ -1297,6 +1436,14 @@ export type Database = {
           updated_at: string
         }[]
       }
+      admin_cancel_invitation: {
+        Args: { p_invitation_id: string }
+        Returns: {
+          email: string
+          id: string
+          status: string
+        }[]
+      }
       admin_cancel_subscription: {
         Args: { cancellation_reason?: string; subscription_id: string }
         Returns: {
@@ -1308,16 +1455,49 @@ export type Database = {
           updated_at: string
         }[]
       }
+      admin_get_members_and_invitations: {
+        Args: { p_org_id: string }
+        Returns: {
+          avatar_url: string
+          email: string
+          entry_type: string
+          expires_at: string
+          full_name: string
+          id: string
+          invited_at: string
+          invited_by_name: string
+          joined_at: string
+          member_is_active: boolean
+          role: string
+          status: string
+        }[]
+      }
       admin_get_organization: {
         Args: { org_id: string }
         Returns: {
+          city: string
+          contact_email: string
+          contact_person: string
+          contact_phone: string
+          contact_role: string
+          country: string
           created_at: string
+          created_by: string
+          created_by_email: string
+          default_app_id: string
           description: string
           id: string
           is_active: boolean
+          kam: string
+          lead_source: string
           member_count: number
           name: string
+          org_number: string
+          postal_code: string
+          referral: string
+          street_address: string
           updated_at: string
+          vat_number: string
         }[]
       }
       admin_get_user: {
@@ -1337,7 +1517,6 @@ export type Database = {
         Returns: {
           created_at: string
           email_notifications: boolean
-          id: string
           language: string
           push_notifications: boolean
           theme: string
@@ -1346,8 +1525,39 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_invite_member: {
+        Args: {
+          p_admin_user_id?: string
+          p_email: string
+          p_organization_id: string
+          p_role?: string
+        }
+        Returns: {
+          email: string
+          invitation_id: string
+          is_already_member: boolean
+          role: string
+          status: string
+          user_exists: boolean
+        }[]
+      }
+      admin_list_all_invitations_paginated: {
+        Args: { p_limit?: number; p_offset?: number; p_search?: string }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          invited_at: string
+          invited_by_name: string
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
+          total_count: number
+        }[]
+      }
       admin_list_all_subscriptions: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           app_description: string
           app_id: string
@@ -1370,7 +1580,7 @@ export type Database = {
         }[]
       }
       admin_list_all_users: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
           created_at: string
@@ -1395,6 +1605,16 @@ export type Database = {
           price_monthly: number
           price_yearly: number
           tier_name: string
+        }[]
+      }
+      admin_list_apps: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          app_url: string
+          description: string
+          id: string
+          is_active: boolean
+          name: string
         }[]
       }
       admin_list_organization_invitations: {
@@ -1447,7 +1667,34 @@ export type Database = {
         }[]
       }
       admin_list_organizations: {
-        Args: never
+        Args: Record<PropertyKey, never>
+        Returns: {
+          city: string
+          contact_email: string
+          contact_person: string
+          contact_phone: string
+          contact_role: string
+          country: string
+          created_at: string
+          created_by: string
+          default_app_id: string
+          description: string
+          id: string
+          is_active: boolean
+          kam: string
+          lead_source: string
+          member_count: number
+          name: string
+          org_number: string
+          postal_code: string
+          referral: string
+          street_address: string
+          updated_at: string
+          vat_number: string
+        }[]
+      }
+      admin_list_organizations_paginated: {
+        Args: { p_limit?: number; p_offset?: number; p_search?: string }
         Returns: {
           created_at: string
           description: string
@@ -1455,13 +1702,16 @@ export type Database = {
           is_active: boolean
           member_count: number
           name: string
+          total_count: number
           updated_at: string
         }[]
       }
       admin_list_user_memberships: {
         Args: { p_user_id: string }
         Returns: {
+          invited_by_name: string
           joined_at: string
+          member_is_active: boolean
           organization_id: string
           organization_is_active: boolean
           organization_name: string
@@ -1489,6 +1739,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      admin_reset_invitation_expiry: {
+        Args: { p_invitation_id: string }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+        }[]
+      }
       admin_toggle_user_membership_active: {
         Args: {
           p_is_active: boolean
@@ -1498,24 +1756,61 @@ export type Database = {
         Returns: {
           is_active: boolean
           organization_id: string
-          updated: boolean
+          updated_at: string
           user_id: string
+        }[]
+      }
+      admin_update_invitation_role: {
+        Args: { p_invitation_id: string; p_new_role: string }
+        Returns: {
+          email: string
+          id: string
+          role: string
         }[]
       }
       admin_update_organization: {
         Args: {
+          org_city?: string
+          org_contact_email?: string
+          org_contact_person?: string
+          org_contact_phone?: string
+          org_contact_role?: string
+          org_country?: string
+          org_default_app_id?: string
           org_description: string
           org_id: string
           org_is_active: boolean
+          org_kam?: string
+          org_lead_source?: string
           org_name: string
+          org_org_number?: string
+          org_postal_code?: string
+          org_referral?: string
+          org_street_address?: string
+          org_vat_number?: string
         }
         Returns: {
+          city: string
+          contact_email: string
+          contact_person: string
+          contact_phone: string
+          contact_role: string
+          country: string
           created_at: string
+          created_by: string
+          default_app_id: string
           description: string
           id: string
           is_active: boolean
+          kam: string
+          lead_source: string
           name: string
+          org_number: string
+          postal_code: string
+          referral: string
+          street_address: string
           updated_at: string
+          vat_number: string
         }[]
       }
       admin_update_subscription_tier: {
@@ -1615,7 +1910,7 @@ export type Database = {
         Returns: string
       }
       generate_unique_org_slug: { Args: { base_slug: string }; Returns: string }
-      get_available_llm_models: { Args: never; Returns: Json }
+      get_available_llm_models: { Args: Record<PropertyKey, never>; Returns: Json }
       get_billing_usage_summary: {
         Args: { org_id: string; period_end: string; period_start: string }
         Returns: {
@@ -1629,7 +1924,7 @@ export type Database = {
         }[]
       }
       get_current_organization: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           created_at: string
           description: string
@@ -1639,7 +1934,7 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_current_organization_id: { Args: never; Returns: string }
+      get_current_organization_id: { Args: Record<PropertyKey, never>; Returns: string }
       get_gallery_detail: {
         Args: { p_gallery_id: string }
         Returns: {
@@ -1668,6 +1963,19 @@ export type Database = {
           processor_usage_description: string
         }[]
       }
+      get_invitation_details: {
+        Args: { p_invitation_id: string }
+        Returns: {
+          email: string
+          expires_at: string
+          id: string
+          organization_description: string
+          organization_id: string
+          organization_name: string
+          role: string
+          status: string
+        }[]
+      }
       get_llm_config_for_run:
         | { Args: { p_processor_id?: string }; Returns: Json }
         | {
@@ -1691,12 +1999,14 @@ export type Database = {
           validation_rules: Json
         }[]
       }
+      get_org_accessible_apps: { Args: { org_id: string }; Returns: string[] }
       get_organization_apps: {
         Args: { org_id?: string }
         Returns: {
           app_description: string
           app_id: string
           app_name: string
+          app_url: string
           current_usage: Json
           features: Json
           limits: Json
@@ -1714,6 +2024,35 @@ export type Database = {
           organization_id: string
           role: string
           user_id: string
+        }[]
+      }
+      get_playbook_snapshot: {
+        Args: { p_snapshot_id: string }
+        Returns: {
+          created_at: string
+          creator_organization_id: string
+          description: string
+          id: string
+          is_published: boolean
+          name: string
+          processor_id: string
+          published_at: string
+          snapshot: Json
+          version_number: number
+          visibility: string
+        }[]
+      }
+      get_processor_snapshots: {
+        Args: { p_processor_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_published: boolean
+          operation_count: number
+          published_at: string
+          unpublished_at: string
+          version_number: number
+          visibility: string
         }[]
       }
       get_processor_with_operations: {
@@ -1746,12 +2085,21 @@ export type Database = {
           processor_visibility: string
         }[]
       }
+      get_user_accessible_apps: {
+        Args: { org_id: string }
+        Returns: {
+          app_id: string
+          app_name: string
+          app_url: string
+        }[]
+      }
       get_user_apps_with_admin: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           app_description: string
           app_id: string
           app_name: string
+          app_url: string
           current_usage: Json
           features: Json
           is_platform_app: boolean
@@ -1759,6 +2107,24 @@ export type Database = {
           status: string
           tier_display_name: string
           tier_name: string
+        }[]
+      }
+      get_user_authorization: {
+        Args: { p_app_id?: string; p_org_id?: string }
+        Returns: {
+          app_description: string
+          app_id: string
+          app_name: string
+          current_usage: Json
+          organization_id: string
+          organization_name: string
+          role_permissions: Json
+          subscription_status: string
+          tier_display_name: string
+          tier_features: Json
+          tier_limits: Json
+          tier_name: string
+          user_role: string
         }[]
       }
       get_user_galleries: {
@@ -1790,7 +2156,7 @@ export type Database = {
         Returns: number
       }
       get_user_organizations: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           is_active: boolean
           joined_at: string
@@ -1852,7 +2218,7 @@ export type Database = {
       }
       get_user_processors_debug:
         | {
-            Args: never
+            Args: Record<PropertyKey, never>
             Returns: {
               creator_name: string
               current_org_id: string
@@ -1889,6 +2255,16 @@ export type Database = {
               visibility: Database["public"]["Enums"]["processor_visibility"]
             }[]
           }
+      handle_existing_user_invitation: {
+        Args: { p_invitation_id: string; p_user_id: string }
+        Returns: {
+          default_app_url: string
+          organization_id: string
+          organization_name: string
+          role: string
+          success: boolean
+        }[]
+      }
       has_app_access: { Args: { app_name: string }; Returns: boolean }
       increment_app_usage: {
         Args: {
@@ -1903,8 +2279,17 @@ export type Database = {
         Args: { p_run_id: string; p_status: string }
         Returns: undefined
       }
-      is_org_admin: { Args: never; Returns: boolean }
-      is_playze_admin: { Args: never; Returns: boolean }
+      is_org_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_playze_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      publish_playbook: {
+        Args: { p_processor_id: string; p_visibility?: string }
+        Returns: {
+          message: string
+          operation_count: number
+          snapshot_id: string
+          version_number: number
+        }[]
+      }
       remove_organization_member: {
         Args: { org_id: string; target_user_id: string }
         Returns: {
@@ -1915,6 +2300,17 @@ export type Database = {
       rename_processor_area: {
         Args: { p_new_name: string; p_old_name: string; p_processor_id: string }
         Returns: undefined
+      }
+      republish_playbook: {
+        Args: { p_snapshot_id: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
+      role_permissions_for_role: {
+        Args: { p_app_id: string; p_role: string }
+        Returns: Json
       }
       set_organization_llm_config: {
         Args: {
@@ -1928,8 +2324,22 @@ export type Database = {
         Args: { file_path: string }
         Returns: boolean
       }
+      unpublish_playbook: {
+        Args: { p_snapshot_id: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
       update_organization_member_role: {
         Args: { new_role: string; org_id: string; target_user_id: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
+      }
+      update_playbook_visibility: {
+        Args: { p_snapshot_id: string; p_visibility: string }
         Returns: {
           message: string
           success: boolean
@@ -2007,7 +2417,7 @@ export type Database = {
           user_exists: boolean
         }[]
       }
-      user_organization_id: { Args: never; Returns: string }
+      user_organization_id: { Args: Record<PropertyKey, never>; Returns: string }
       user_role_in_org: { Args: { org_id: string }; Returns: string }
       user_toggle_member_active: {
         Args: {

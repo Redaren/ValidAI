@@ -20,18 +20,23 @@ import {
 import {
   Archive,
   Eye,
+  EyeOff,
   History,
   Lock,
   MoreHorizontal,
   Pencil,
   Play,
+  RefreshCw,
   Upload,
   Users,
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
+import { PublishPlaybookDialog } from "@/components/processors/publish-playbook-dialog"
+import { useUnpublishPlaybook, useProcessorSnapshots } from "@/app/queries/playbook-snapshots"
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
@@ -42,12 +47,40 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
+  const { data: snapshots } = useProcessorSnapshots(processor.processor_id)
+  const unpublishPlaybook = useUnpublishPlaybook()
+
+  // Check if processor has an active published snapshot
+  const activeSnapshot = snapshots?.find(s => s.is_published)
+  const hasPublishedVersion = !!activeSnapshot
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const handleUnpublish = async () => {
+    if (!activeSnapshot) return
+
+    try {
+      await unpublishPlaybook.mutateAsync(activeSnapshot.id)
+      toast.success('Playbook unpublished', {
+        description: `Version ${activeSnapshot.version_number} is now hidden from galleries.`,
+      })
+    } catch (error) {
+      toast.error('Failed to unpublish playbook', {
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      })
+    }
+  }
+
+  const handlePublishSuccess = (snapshotId: string, versionNumber: number) => {
+    toast.success('Playbook published', {
+      description: `Version ${versionNumber} is now available.`,
+    })
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -117,6 +150,8 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
             processorId={processor.processor_id}
             processorName={processor.processor_name}
             defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
+            hasPublishedVersion={hasPublishedVersion}
+            publishedVersion={activeSnapshot?.version_number}
             trigger={
               <Button variant="default" size="icon" title={t('run')}>
                 <Play className="h-4 w-4" />
@@ -144,10 +179,29 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Publish
-                </DropdownMenuItem>
+                {hasPublishedVersion ? (
+                  <>
+                    <DropdownMenuItem onClick={() => setIsPublishDialogOpen(true)}>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Update Version
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleUnpublish}
+                      disabled={unpublishPlaybook.isPending}
+                    >
+                      <EyeOff className="mr-2 h-4 w-4" />
+                      {unpublishPlaybook.isPending ? 'Unpublishing...' : 'Unpublish'}
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => setIsPublishDialogOpen(true)}
+                    disabled={processor.operations?.length === 0}
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Publish
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem disabled>
                   <Eye className="mr-2 h-4 w-4" />
                   Preview
@@ -169,9 +223,16 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
           {/* Status Column */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">{t('status')}</span>
-            <Badge className={getStatusColor(processor.status)}>
-              {processor.status}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={getStatusColor(processor.status)}>
+                {processor.status}
+              </Badge>
+              {hasPublishedVersion && activeSnapshot && (
+                <Badge variant="outline" className="text-xs">
+                  v{activeSnapshot.version_number}
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Visibility Column */}
@@ -272,6 +333,15 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         open={isEditSheetOpen}
         onOpenChange={setIsEditSheetOpen}
         processor={processor}
+      />
+
+      <PublishPlaybookDialog
+        open={isPublishDialogOpen}
+        onOpenChange={setIsPublishDialogOpen}
+        processorId={processor.processor_id}
+        processorName={processor.processor_name}
+        operationCount={processor.operations?.length ?? 0}
+        onSuccess={handlePublishSuccess}
       />
     </Collapsible>
   )
