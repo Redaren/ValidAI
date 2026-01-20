@@ -239,9 +239,9 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <SheetHeader>
-          <SheetTitle>Edit Template</SheetTitle>
+          <SheetTitle>Edit Playbook</SheetTitle>
           <SheetDescription>
-            Update template settings and configuration
+            Update playbook settings and configuration
           </SheetDescription>
         </SheetHeader>
 
@@ -268,7 +268,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
               <Input
                 id="name"
                 {...form.register('name')} // React Hook Form registration with auto-validation
-                placeholder="Template name"
+                placeholder="Playbook name"
                 aria-invalid={!!form.formState.errors.name} // Accessibility: marks invalid state
               />
               {form.formState.errors.name && (
@@ -284,7 +284,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
               <Textarea
                 id="description"
                 {...form.register('description')}
-                placeholder="A short description so you know what the template does"
+                placeholder="A short description so you know what the playbook does"
                 rows={3}
               />
               {form.formState.errors.description && (
@@ -300,7 +300,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
               <Textarea
                 id="usage_description"
                 {...form.register('usage_description')}
-                placeholder="A short text explaining to users when to use this template and not"
+                placeholder="A short text explaining to users when to use this playbook and not"
                 rows={2}
               />
               {form.formState.errors.usage_description && (

@@ -29,9 +29,9 @@
   },
   "nav": {
     "dashboard": "Översikt",
-    "processors": "Mallar",
+    "processors": "Playbooks",
     "galleries": "Gallerier",
-    "operations": "Tester",
+    "operations": "Instruktioner",
     "runs": "Historik",
     "documents": "Dokument",
     "settings": "Inställningar",
@@ -50,7 +50,7 @@
     "more": "Mer"
   },
   "breadcrumb": {
-    "processors": "Mallar",
+    "processors": "Playbooks",
     "galleries": "Gallerier",
     "workbench": "Verktygslåda",
     "history": "Historik",
@@ -102,29 +102,29 @@
     }
   },
   "processors": {
-    "title": "Analysmallar",
-    "description": "Skapa och hantera AI-drivna dokumentanalysmallar",
-    "breadcrumb": "Mallar",
-    "loading": "Laddar mall...",
-    "loadingProcessors": "Laddar mallar...",
-    "failed": "Kunde inte ladda mall",
-    "failedList": "Kunde inte ladda mallar",
+    "title": "Playbooks",
+    "description": "Skapa och hantera AI-drivna playbooks för dokumentanalys",
+    "breadcrumb": "Playbooks",
+    "loading": "Laddar playbook...",
+    "loadingProcessors": "Laddar playbooks...",
+    "failed": "Kunde inte ladda playbook",
+    "failedList": "Kunde inte ladda playbooks",
     "unknownError": "Okänt fel uppstod",
-    "backToList": "Tillbaka till mallar",
-    "backToProcessor": "Tillbaka till mall",
+    "backToList": "Tillbaka till playbooks",
+    "backToProcessor": "Tillbaka till playbook",
     "new": "Ny",
     "filterPlaceholder": "Filtrera...",
     "empty": {
-      "title": "Inga mallar än",
-      "description": "Kom igång genom att skapa din första mall för att analysera kontrakt, fakturor eller andra dokument.",
-      "createFirst": "Skapa din första mall"
+      "title": "Inga playbooks än",
+      "description": "Kom igång genom att skapa din första playbook för att analysera kontrakt, fakturor eller andra dokument.",
+      "createFirst": "Skapa din första playbook"
     },
     "noResults": {
-      "title": "Inga mallar hittades",
-      "description": "Inga mallar matchar din sökning. Försök justera dina söktermer."
+      "title": "Inga playbooks hittades",
+      "description": "Inga playbooks matchar din sökning. Försök justera dina söktermer."
     },
     "detail": {
-      "operations": "Tester",
+      "operations": "Instruktioner",
       "settings": "Inställningar",
       "workbench": "Verktygslåda",
       "newArea": "Nytt område",

@@ -29,9 +29,9 @@
   },
   "nav": {
     "dashboard": "Dashboard",
-    "processors": "Templates",
+    "processors": "Playbooks",
     "galleries": "Galleries",
-    "operations": "Checks",
+    "operations": "Instructions",
     "runs": "Runs",
     "documents": "Documents",
     "settings": "Settings",
@@ -50,7 +50,7 @@
     "more": "More"
   },
   "breadcrumb": {
-    "processors": "Templates",
+    "processors": "Playbooks",
     "galleries": "Galleries",
     "workbench": "Workbench",
     "history": "History",
@@ -102,29 +102,29 @@
     }
   },
   "processors": {
-    "title": "Document Templates",
-    "description": "Create and manage AI-powered document analysis templates",
-    "breadcrumb": "Templates",
+    "title": "Document Playbooks",
+    "description": "Create and manage AI-powered document analysis playbooks",
+    "breadcrumb": "Playbooks",
     "loading": "Loading processor...",
-    "loadingProcessors": "Loading templates...",
+    "loadingProcessors": "Loading playbooks...",
     "failed": "Failed to load processor",
-    "failedList": "Failed to load templates",
+    "failedList": "Failed to load playbooks",
     "unknownError": "Unknown error occurred",
-    "backToList": "Back to Templates",
+    "backToList": "Back to Playbooks",
     "backToProcessor": "Back to Processor",
     "new": "New",
     "filterPlaceholder": "Filter...",
     "empty": {
-      "title": "No templates yet",
-      "description": "Get started by creating your first template to analyze contracts, invoices, or any other documents.",
-      "createFirst": "Create your first template"
+      "title": "No playbooks yet",
+      "description": "Get started by creating your first playbook to analyze contracts, invoices, or any other documents.",
+      "createFirst": "Create your first playbook"
     },
     "noResults": {
-      "title": "No templates found",
-      "description": "No templates match your search. Try adjusting your search terms."
+      "title": "No playbooks found",
+      "description": "No playbooks match your search. Try adjusting your search terms."
     },
     "detail": {
-      "operations": "Checks",
+      "operations": "Instructions",
       "settings": "Settings",
       "workbench": "Workbench",
       "newArea": "New Area",

@@ -214,9 +214,9 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetContent side="right" className="sm:max-w-xl">
         <SheetHeader>
-          <SheetTitle>New Template</SheetTitle>
+          <SheetTitle>New Playbook</SheetTitle>
           <SheetDescription>
-            Define a reusable template for analyzing documents
+            Define a reusable playbook for analyzing documents
           </SheetDescription>
         </SheetHeader>
 
@@ -243,7 +243,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
               <Input
                 id="name"
                 {...form.register('name')} // React Hook Form registration with auto-validation
-                placeholder="Template name"
+                placeholder="Playbook name"
                 aria-invalid={!!form.formState.errors.name} // Accessibility: marks invalid state
                 autoFocus
               />
@@ -260,7 +260,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
               <Textarea
                 id="description"
                 {...form.register('description')}
-                placeholder="A short description so you know what the template does"
+                placeholder="A short description so you know what the playbook does"
                 rows={3}
               />
               {form.formState.errors.description && (
@@ -276,7 +276,7 @@ export function CreateProcessorSheet({ open, onOpenChange }: CreateProcessorShee
               <Textarea
                 id="usage_description"
                 {...form.register('usage_description')}
-                placeholder="A short text explaining to users when to use this template and not"
+                placeholder="A short text explaining to users when to use this playbook and not"
                 rows={2}
               />
               {form.formState.errors.usage_description && (
