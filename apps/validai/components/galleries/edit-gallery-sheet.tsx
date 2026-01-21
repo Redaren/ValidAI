@@ -232,7 +232,7 @@ export function EditGallerySheet({ gallery, open, onOpenChange }: EditGalleryShe
                     <SelectItem value="personal">
                       <span className="flex items-center gap-2">
                         <Lock className="h-3.5 w-3.5" />
-                        Personal (only you)
+                        You
                       </span>
                     </SelectItem>
                     <SelectItem value="organization">

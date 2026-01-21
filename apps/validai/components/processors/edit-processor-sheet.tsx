@@ -330,7 +330,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
                */}
               <div className="space-y-2">
                 <Label htmlFor="visibility">
-                  Visibility <span className="text-destructive">*</span>
+                  Who can view/edit <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={form.watch('visibility')} // Watch for value changes
@@ -347,7 +347,7 @@ export function EditProcessorSheet({ open, onOpenChange, processor }: EditProces
                     <SelectItem value="personal">
                       <span className="flex items-center gap-2">
                         <Lock className="h-3.5 w-3.5" />
-                        Personal (only you)
+                        You
                       </span>
                     </SelectItem>
                     <SelectItem value="organization">

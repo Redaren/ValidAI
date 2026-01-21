@@ -214,7 +214,7 @@ export function ProcessorHeader({
             <span className="text-xs text-muted-foreground">{t('visibility')}</span>
             <div className="flex items-center gap-1.5 text-sm">
               <VisibilityIcon className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="capitalize">{processor.visibility}</span>
+              <span>{processor.visibility === "personal" ? "You" : "Organization"}</span>
             </div>
           </div>
 

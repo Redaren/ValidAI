@@ -311,7 +311,7 @@ export function ProcessorsTable({
         cell: ({ row }) => {
           const visibility = row.getValue("visibility") as string
           const Icon = visibility === "personal" ? Lock : Users
-          const label = visibility === "personal" ? "Personal" : "Organization"
+          const label = visibility === "personal" ? "You" : "Organization"
 
           return (
             <div className="flex items-center gap-1.5">
