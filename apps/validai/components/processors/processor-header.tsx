@@ -27,6 +27,7 @@ import {
   Pencil,
   Play,
   RefreshCw,
+  Save,
   Upload,
   Users,
 } from "lucide-react"
@@ -34,15 +35,29 @@ import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
 import { PublishPlaybookDialog } from "@/components/processors/publish-playbook-dialog"
-import { useUnpublishPlaybook, usePublishedSnapshot } from "@/app/queries/playbook-snapshots"
+import {
+  useUnpublishPlaybook,
+  usePublishedSnapshot,
+  useProcessorSnapshots,
+} from "@/app/queries/playbook-snapshots"
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
+  isDirty?: boolean
+  hasLoadedVersion?: boolean
+  loadedSnapshotId?: string | null
+  onOpenSaveDialog?: () => void
 }
 
-export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
+export function ProcessorHeader({
+  processor,
+  isDirty = false,
+  hasLoadedVersion = false,
+  loadedSnapshotId,
+  onOpenSaveDialog,
+}: ProcessorHeaderProps) {
   const t = useTranslations('processors.header')
 
   const [isExpanded, setIsExpanded] = useState(false)
@@ -51,10 +66,14 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
   const [mounted, setMounted] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
   const { data: publishedSnapshot } = usePublishedSnapshot(processor.processor_id)
+  const { data: snapshots } = useProcessorSnapshots(processor.processor_id)
   const unpublishPlaybook = useUnpublishPlaybook()
 
   // Check if processor has a published snapshot (snapshot table is source of truth)
-  const hasPublishedVersion = !!publishedSnapshot
+  const hasPublishedVersionState = !!publishedSnapshot
+
+  // Find the loaded version number
+  const loadedVersionNumber = snapshots?.find(s => s.id === loadedSnapshotId)?.version_number
 
   useEffect(() => {
     setMounted(true)
@@ -122,39 +141,78 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
 
   const VisibilityIcon = processor.visibility === "personal" ? Lock : Users
 
+  // Get version display text
+  const getVersionDisplayText = () => {
+    if (!hasLoadedVersion && !loadedVersionNumber) {
+      return 'Draft'
+    }
+    if (isDirty && loadedVersionNumber) {
+      return `Draft (from v${loadedVersionNumber})`
+    }
+    if (loadedVersionNumber) {
+      return `v${loadedVersionNumber} (loaded)`
+    }
+    return 'Draft'
+  }
+
   return (
     <Collapsible
       open={isExpanded}
       onOpenChange={setIsExpanded}
       className="space-y-4 rounded-lg border bg-card p-6"
     >
-      {/* Title, Description, and Action Buttons */}
+      {/* Title and Description Row */}
+      <div className="flex items-center gap-4 flex-1 min-w-0">
+        <h1 className="text-2xl font-bold tracking-tight shrink-0">
+          {processor.processor_name}
+        </h1>
+        {processor.processor_description && (
+          <p
+            className="text-muted-foreground text-sm truncate"
+            title={processor.processor_description}
+          >
+            {processor.processor_description}
+          </p>
+        )}
+      </div>
+
+      {/* Version Selector, Change Indicator, and Action Buttons */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4 flex-1 min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight shrink-0">
-            {processor.processor_name}
-          </h1>
-          {processor.processor_description && (
-            <p
-              className="text-muted-foreground text-sm truncate"
-              title={processor.processor_description}
-            >
-              {processor.processor_description}
-            </p>
-          )}
+        <div className="flex items-center gap-4">
+          {/* Version Indicator Badge */}
+          <Badge variant="outline" className="text-sm font-medium py-1 px-3">
+            {getVersionDisplayText()}
+          </Badge>
+
+          {/* Change Indicator */}
+          <span className={`text-sm ${isDirty ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+            {isDirty ? 'Unsaved changes' : 'No changes'}
+          </span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          {/* Save Button */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenSaveDialog}
+            disabled={!isDirty || processor.operations?.length === 0}
+            title={isDirty ? 'Save as new version' : 'No changes to save'}
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save
+          </Button>
+
           <RunProcessorDialog
             processorId={processor.processor_id}
             processorName={processor.processor_name}
             defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
-            hasPublishedVersion={hasPublishedVersion}
+            hasPublishedVersion={hasPublishedVersionState}
             publishedVersion={publishedSnapshot?.version_number}
             trigger={
-              <Button variant="default" size="icon" title={t('run')}>
-                <Play className="h-4 w-4" />
-                <span className="sr-only">{t('run')}</span>
+              <Button variant="default" size="sm" title={t('run')}>
+                <Play className="h-4 w-4 mr-2" />
+                {t('run')}
               </Button>
             }
           />
@@ -178,7 +236,7 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
                   Edit
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {hasPublishedVersion ? (
+                {hasPublishedVersionState ? (
                   <>
                     <DropdownMenuItem onClick={() => setIsPublishDialogOpen(true)}>
                       <RefreshCw className="mr-2 h-4 w-4" />
@@ -216,21 +274,19 @@ export function ProcessorHeader({ processor }: ProcessorHeaderProps) {
         </div>
       </div>
 
-      {/* Status, Visibility, and Usage Description Row - Entire row clickable */}
+      {/* Publish Status, Visibility, and Usage Description Row - Entire row clickable */}
       <CollapsibleTrigger asChild>
         <div className="flex gap-8 items-start hover:bg-accent/50 cursor-pointer transition-colors rounded-md p-2 -mx-2">
-          {/* Status Column */}
+          {/* Published Version Column */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{t('status')}</span>
+            <span className="text-xs text-muted-foreground">Published</span>
             <div className="flex items-center gap-2">
-              {hasPublishedVersion && publishedSnapshot ? (
+              {hasPublishedVersionState && publishedSnapshot ? (
                 <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">
-                  Published v{publishedSnapshot.version_number}
+                  v{publishedSnapshot.version_number}
                 </Badge>
               ) : (
-                <Badge className="bg-muted text-muted-foreground">
-                  Draft
-                </Badge>
+                <span className="text-sm text-muted-foreground">None</span>
               )}
               {processor.status === 'archived' && (
                 <Badge className="bg-gray-500/10 text-gray-700 dark:text-gray-400">

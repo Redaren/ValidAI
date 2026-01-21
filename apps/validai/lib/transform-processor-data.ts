@@ -30,6 +30,7 @@ interface ProcessorWithOperationsRow {
   processor_created_at: string
   processor_updated_at: string
   processor_published_at: string | null
+  processor_loaded_snapshot_id: string | null
   processor_created_by?: string
   created_by?: string
   creator_name: string | null
@@ -117,6 +118,7 @@ export function transformProcessorData(
     created_at: firstRow.processor_created_at,
     updated_at: firstRow.processor_updated_at,
     published_at: firstRow.processor_published_at,
+    loaded_snapshot_id: firstRow.processor_loaded_snapshot_id,
     operations, // Always an array (empty or populated)
   }
 

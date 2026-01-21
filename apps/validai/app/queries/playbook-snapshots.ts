@@ -44,6 +44,8 @@ export interface PlaybookSnapshotMeta {
   published_at: string
   unpublished_at: string | null
   created_at: string
+  created_by?: string
+  created_by_name?: string | null
 }
 
 /**
@@ -465,5 +467,200 @@ export function usePlaybookSnapshot(snapshotId: string | undefined) {
     },
     enabled: !!snapshotId,
     staleTime: 60 * 1000, // 1 minute (snapshots are immutable)
+  })
+}
+
+/**
+ * Hook to save current processor state as a new version (without publishing)
+ *
+ * Creates a new snapshot from the current processor and operations state.
+ * Does NOT publish the version - use useSetPublishedVersion to publish.
+ * Sets loaded_snapshot_id to track the saved version.
+ *
+ * @returns Mutation hook for saving version
+ *
+ * @example
+ * ```tsx
+ * const saveAsVersion = useSaveAsVersion()
+ *
+ * const handleSave = async () => {
+ *   const result = await saveAsVersion.mutateAsync({
+ *     processorId: 'uuid',
+ *     visibility: 'organization'
+ *   })
+ *   console.log(`Saved as v${result.version_number}`)
+ * }
+ * ```
+ */
+export function useSaveAsVersion() {
+  const supabase = createBrowserClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      processorId: string
+      visibility?: PlaybookVisibility
+    }) => {
+      const { data, error } = await supabase.rpc('save_as_version', {
+        p_processor_id: params.processorId,
+        p_visibility: params.visibility || 'private',
+      })
+
+      if (error) {
+        logger.error('Failed to save version:', extractErrorDetails(error))
+        throw new Error(error.message || 'Failed to save version')
+      }
+
+      // RPC returns array, get first row
+      const result = Array.isArray(data) ? data[0] : data
+
+      return result as {
+        snapshot_id: string
+        version_number: number
+        operation_count: number
+        message: string
+      }
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate related queries
+      queryClient.invalidateQueries({
+        queryKey: ['processor-snapshots', variables.processorId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['processor', variables.processorId],
+      })
+      queryClient.invalidateQueries({ queryKey: ['user-processors'] })
+    },
+    onError: (error) => {
+      logger.error('Save version mutation failed:', extractErrorDetails(error))
+    },
+  })
+}
+
+/**
+ * Hook to load a snapshot version into the processor editor
+ *
+ * Replaces the current processor configuration and operations with
+ * the data from the specified snapshot. Sets loaded_snapshot_id.
+ *
+ * @returns Mutation hook for loading snapshot
+ *
+ * @example
+ * ```tsx
+ * const loadSnapshot = useLoadSnapshot()
+ *
+ * const handleLoad = async () => {
+ *   await loadSnapshot.mutateAsync({
+ *     processorId: 'uuid',
+ *     snapshotId: 'uuid'
+ *   })
+ * }
+ * ```
+ */
+export function useLoadSnapshot() {
+  const supabase = createBrowserClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      processorId: string
+      snapshotId: string
+    }) => {
+      const { data, error } = await supabase.rpc('load_snapshot', {
+        p_processor_id: params.processorId,
+        p_snapshot_id: params.snapshotId,
+      })
+
+      if (error) {
+        logger.error('Failed to load snapshot:', extractErrorDetails(error))
+        throw new Error(error.message || 'Failed to load snapshot')
+      }
+
+      // RPC returns array, get first row
+      const result = Array.isArray(data) ? data[0] : data
+
+      return result as {
+        success: boolean
+        message: string
+        version_number: number
+      }
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate processor queries to reload data
+      queryClient.invalidateQueries({
+        queryKey: ['processor', variables.processorId],
+      })
+      queryClient.invalidateQueries({
+        queryKey: ['processor-snapshots', variables.processorId],
+      })
+    },
+    onError: (error) => {
+      logger.error('Load snapshot mutation failed:', extractErrorDetails(error))
+    },
+  })
+}
+
+/**
+ * Hook to toggle publish status on an existing snapshot
+ *
+ * When publishing: auto-unpublishes any other published snapshot for the processor.
+ * When unpublishing: clears the active_snapshot_id and sets processor to draft.
+ *
+ * @returns Mutation hook for setting published version
+ *
+ * @example
+ * ```tsx
+ * const setPublishedVersion = useSetPublishedVersion()
+ *
+ * // Publish a version
+ * await setPublishedVersion.mutateAsync({ snapshotId: 'uuid', publish: true })
+ *
+ * // Unpublish
+ * await setPublishedVersion.mutateAsync({ snapshotId: 'uuid', publish: false })
+ * ```
+ */
+export function useSetPublishedVersion() {
+  const supabase = createBrowserClient()
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (params: {
+      snapshotId: string
+      publish: boolean
+      processorId?: string // For cache invalidation
+    }) => {
+      const { data, error } = await supabase.rpc('set_published_version', {
+        p_snapshot_id: params.snapshotId,
+        p_publish: params.publish,
+      })
+
+      if (error) {
+        logger.error('Failed to set published version:', extractErrorDetails(error))
+        throw new Error(error.message || 'Failed to set published version')
+      }
+
+      // RPC returns array, get first row
+      const result = Array.isArray(data) ? data[0] : data
+
+      return result as {
+        success: boolean
+        message: string
+      }
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate all processor and snapshot queries
+      queryClient.invalidateQueries({ queryKey: ['published-snapshot'] })
+      queryClient.invalidateQueries({ queryKey: ['processor-snapshots'] })
+      queryClient.invalidateQueries({ queryKey: ['processor'] })
+      queryClient.invalidateQueries({ queryKey: ['user-processors'] })
+      if (variables.processorId) {
+        queryClient.invalidateQueries({
+          queryKey: ['processor', variables.processorId],
+        })
+      }
+    },
+    onError: (error) => {
+      logger.error('Set published version mutation failed:', extractErrorDetails(error))
+    },
   })
 }

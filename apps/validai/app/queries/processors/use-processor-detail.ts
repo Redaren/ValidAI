@@ -47,6 +47,7 @@ export interface ProcessorDetail {
   created_at: string
   updated_at: string
   published_at: string | null
+  loaded_snapshot_id: string | null
   operations: Operation[]
   [key: string]: unknown
 }

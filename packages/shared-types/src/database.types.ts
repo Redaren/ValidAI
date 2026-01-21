@@ -1132,6 +1132,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           id: string
+          loaded_snapshot_id: string | null
           name: string
           organization_id: string
           published_at: string | null
@@ -1150,6 +1151,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          loaded_snapshot_id?: string | null
           name: string
           organization_id: string
           published_at?: string | null
@@ -1168,6 +1170,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          loaded_snapshot_id?: string | null
           name?: string
           organization_id?: string
           published_at?: string | null
@@ -1179,6 +1182,13 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["processor_visibility"]
         }
         Relationships: [
+          {
+            foreignKeyName: "validai_processors_loaded_snapshot_id_fkey"
+            columns: ["loaded_snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "validai_playbook_snapshots"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "validai_processors_organization_id_fkey"
             columns: ["organization_id"]
@@ -1547,7 +1557,7 @@ export type Database = {
         }[]
       }
       admin_list_all_subscriptions: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           app_description: string
           app_id: string
@@ -1570,7 +1580,7 @@ export type Database = {
         }[]
       }
       admin_list_all_users: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           avatar_url: string
           created_at: string
@@ -1598,7 +1608,7 @@ export type Database = {
         }[]
       }
       admin_list_apps: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           app_url: string
           description: string
@@ -1657,7 +1667,7 @@ export type Database = {
         }[]
       }
       admin_list_organizations: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           city: string
           contact_email: string
@@ -1900,7 +1910,7 @@ export type Database = {
         Returns: string
       }
       generate_unique_org_slug: { Args: { base_slug: string }; Returns: string }
-      get_available_llm_models: { Args: never; Returns: Json }
+      get_available_llm_models: { Args: Record<PropertyKey, never>; Returns: Json }
       get_billing_usage_summary: {
         Args: { org_id: string; period_end: string; period_start: string }
         Returns: {
@@ -1914,7 +1924,7 @@ export type Database = {
         }[]
       }
       get_current_organization: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           created_at: string
           description: string
@@ -1924,7 +1934,7 @@ export type Database = {
           updated_at: string
         }[]
       }
-      get_current_organization_id: { Args: never; Returns: string }
+      get_current_organization_id: { Args: Record<PropertyKey, never>; Returns: string }
       get_gallery_detail: {
         Args: { p_gallery_id: string }
         Returns: {
@@ -2036,6 +2046,8 @@ export type Database = {
         Args: { p_processor_id: string }
         Returns: {
           created_at: string
+          created_by: string
+          created_by_name: string
           id: string
           is_published: boolean
           operation_count: number
@@ -2065,6 +2077,7 @@ export type Database = {
           processor_created_at: string
           processor_description: string
           processor_id: string
+          processor_loaded_snapshot_id: string
           processor_name: string
           processor_published_at: string
           processor_status: string
@@ -2093,7 +2106,7 @@ export type Database = {
         }[]
       }
       get_user_apps_with_admin: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           app_description: string
           app_id: string
@@ -2155,7 +2168,7 @@ export type Database = {
         Returns: number
       }
       get_user_organizations: {
-        Args: never
+        Args: Record<PropertyKey, never>
         Returns: {
           is_active: boolean
           joined_at: string
@@ -2217,7 +2230,7 @@ export type Database = {
       }
       get_user_processors_debug:
         | {
-            Args: never
+            Args: Record<PropertyKey, never>
             Returns: {
               creator_name: string
               current_org_id: string
@@ -2278,8 +2291,16 @@ export type Database = {
         Args: { p_run_id: string; p_status: string }
         Returns: undefined
       }
-      is_org_admin: { Args: never; Returns: boolean }
-      is_playze_admin: { Args: never; Returns: boolean }
+      is_org_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_playze_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      load_snapshot: {
+        Args: { p_processor_id: string; p_snapshot_id: string }
+        Returns: {
+          message: string
+          success: boolean
+          version_number: number
+        }[]
+      }
       publish_playbook: {
         Args: { p_processor_id: string; p_visibility?: string }
         Returns: {
@@ -2311,6 +2332,15 @@ export type Database = {
         Args: { p_app_id: string; p_role: string }
         Returns: Json
       }
+      save_as_version: {
+        Args: { p_processor_id: string; p_visibility?: string }
+        Returns: {
+          message: string
+          operation_count: number
+          snapshot_id: string
+          version_number: number
+        }[]
+      }
       set_organization_llm_config: {
         Args: {
           p_api_keys: Json
@@ -2318,6 +2348,13 @@ export type Database = {
           p_default_model_id: string
         }
         Returns: Json
+      }
+      set_published_version: {
+        Args: { p_publish: boolean; p_snapshot_id: string }
+        Returns: {
+          message: string
+          success: boolean
+        }[]
       }
       storage_check_document_access: {
         Args: { file_path: string }
@@ -2416,7 +2453,7 @@ export type Database = {
           user_exists: boolean
         }[]
       }
-      user_organization_id: { Args: never; Returns: string }
+      user_organization_id: { Args: Record<PropertyKey, never>; Returns: string }
       user_role_in_org: { Args: { org_id: string }; Returns: string }
       user_toggle_member_active: {
         Args: {
