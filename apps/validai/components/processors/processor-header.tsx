@@ -22,18 +22,15 @@ import {
   Lock,
   MoreHorizontal,
   Pencil,
-  Upload,
   Users,
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
-import { PublishPlaybookDialog } from "@/components/processors/publish-playbook-dialog"
 import {
   usePublishedSnapshot,
   useProcessorSnapshots,
 } from "@/app/queries/playbook-snapshots"
 import { useTranslations } from 'next-intl'
-import { toast } from 'sonner'
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
@@ -54,7 +51,6 @@ export function ProcessorHeader({
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
-  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
   const { data: publishedSnapshot } = usePublishedSnapshot(processor.processor_id)
@@ -69,12 +65,6 @@ export function ProcessorHeader({
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  const handlePublishSuccess = (snapshotId: string, versionNumber: number) => {
-    toast.success('Playbook published', {
-      description: `Version ${versionNumber} is now available.`,
-    })
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -184,18 +174,10 @@ export function ProcessorHeader({
                 Edit
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setIsPublishDialogOpen(true)}
-                disabled={processor.operations?.length === 0}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Publish
-              </DropdownMenuItem>
               <DropdownMenuItem disabled>
                 <Eye className="mr-2 h-4 w-4" />
                 Preview
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
               <DropdownMenuItem disabled>
                 <Archive className="mr-2 h-4 w-4" />
                 Archive
@@ -325,15 +307,6 @@ export function ProcessorHeader({
         open={isEditSheetOpen}
         onOpenChange={setIsEditSheetOpen}
         processor={processor}
-      />
-
-      <PublishPlaybookDialog
-        open={isPublishDialogOpen}
-        onOpenChange={setIsPublishDialogOpen}
-        processorId={processor.processor_id}
-        processorName={processor.processor_name}
-        operationCount={processor.operations?.length ?? 0}
-        onSuccess={handlePublishSuccess}
       />
     </Collapsible>
   )
