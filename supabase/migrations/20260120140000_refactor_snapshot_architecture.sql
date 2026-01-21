@@ -166,7 +166,7 @@ BEGIN
     RAISE EXCEPTION 'Cannot publish an archived processor';
   END IF;
 
-  -- Fetch and build operations array
+  -- Fetch and build operations array (no deleted_at column on operations table)
   SELECT
     jsonb_agg(
       jsonb_build_object(
@@ -184,8 +184,7 @@ BEGIN
     COUNT(*)::integer
   INTO v_operations, v_operation_count
   FROM validai_operations op
-  WHERE op.processor_id = p_processor_id
-    AND op.deleted_at IS NULL;
+  WHERE op.processor_id = p_processor_id;
 
   -- Check for at least one operation
   IF v_operation_count = 0 THEN
