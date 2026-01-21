@@ -85,7 +85,7 @@ BEGIN
     o.configuration
   FROM validai_processors p
   LEFT JOIN profiles prof ON prof.id = p.created_by
-  LEFT JOIN validai_operations o ON o.processor_id = p.id AND o.deleted_at IS NULL
+  LEFT JOIN validai_operations o ON o.processor_id = p.id
   WHERE p.id = p_processor_id
     AND p.deleted_at IS NULL
   ORDER BY o.area, o.position;
@@ -222,8 +222,7 @@ BEGIN
     COUNT(*)::integer
   INTO v_operations, v_operation_count
   FROM validai_operations op
-  WHERE op.processor_id = p_processor_id
-    AND op.deleted_at IS NULL;
+  WHERE op.processor_id = p_processor_id;
 
   -- Check for at least one operation
   IF v_operation_count = 0 THEN
@@ -361,11 +360,9 @@ BEGIN
     updated_at = now()
   WHERE id = p_processor_id;
 
-  -- Soft-delete existing operations
-  UPDATE validai_operations
-  SET deleted_at = now()
-  WHERE processor_id = p_processor_id
-    AND deleted_at IS NULL;
+  -- Delete existing operations (hard delete - operations table has no deleted_at)
+  DELETE FROM validai_operations
+  WHERE processor_id = p_processor_id;
 
   -- Insert operations from snapshot
   FOR v_op IN
@@ -470,20 +467,9 @@ BEGIN
       updated_at = now()
     WHERE id = p_snapshot_id;
 
-    -- Update processor with active snapshot reference and status
-    IF v_snapshot.processor_id IS NOT NULL THEN
-      UPDATE validai_processors
-      SET
-        active_snapshot_id = p_snapshot_id,
-        status = 'published',
-        published_at = now(),
-        updated_at = now()
-      WHERE id = v_snapshot.processor_id;
-    END IF;
-
     RETURN QUERY SELECT
-      true AS success,
-      format('Version %s is now published', v_snapshot.version_number) AS message;
+      true,
+      format('Version %s is now published', v_snapshot.version_number);
   ELSE
     -- Unpublishing
     UPDATE validai_playbook_snapshots
@@ -493,20 +479,9 @@ BEGIN
       updated_at = now()
     WHERE id = p_snapshot_id;
 
-    -- Clear active_snapshot_id on processor if this was the active one
-    IF v_snapshot.processor_id IS NOT NULL THEN
-      UPDATE validai_processors
-      SET
-        active_snapshot_id = NULL,
-        status = 'draft',
-        updated_at = now()
-      WHERE id = v_snapshot.processor_id
-        AND active_snapshot_id = p_snapshot_id;
-    END IF;
-
     RETURN QUERY SELECT
-      true AS success,
-      format('Version %s is now unpublished', v_snapshot.version_number) AS message;
+      true,
+      format('Version %s is now unpublished', v_snapshot.version_number);
   END IF;
 END;
 $$;
