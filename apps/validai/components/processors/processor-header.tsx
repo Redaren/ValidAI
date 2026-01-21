@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Link } from "@/lib/i18n/navigation"
 import { ProcessorDetail } from "@/app/queries/processors/use-processor-detail"
 import {
   Badge,
@@ -20,23 +19,16 @@ import {
 import {
   Archive,
   Eye,
-  EyeOff,
-  History,
   Lock,
   MoreHorizontal,
   Pencil,
-  Play,
-  RefreshCw,
-  Save,
   Upload,
   Users,
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
-import { RunProcessorDialog } from "@/components/processors/run-processor-dialog"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
 import { PublishPlaybookDialog } from "@/components/processors/publish-playbook-dialog"
 import {
-  useUnpublishPlaybook,
   usePublishedSnapshot,
   useProcessorSnapshots,
 } from "@/app/queries/playbook-snapshots"
@@ -48,7 +40,7 @@ interface ProcessorHeaderProps {
   isDirty?: boolean
   hasLoadedVersion?: boolean
   loadedSnapshotId?: string | null
-  onOpenSaveDialog?: () => void
+  isComparisonLoading?: boolean
 }
 
 export function ProcessorHeader({
@@ -56,7 +48,7 @@ export function ProcessorHeader({
   isDirty = false,
   hasLoadedVersion = false,
   loadedSnapshotId,
-  onOpenSaveDialog,
+  isComparisonLoading = false,
 }: ProcessorHeaderProps) {
   const t = useTranslations('processors.header')
 
@@ -67,7 +59,6 @@ export function ProcessorHeader({
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
   const { data: publishedSnapshot } = usePublishedSnapshot(processor.processor_id)
   const { data: snapshots } = useProcessorSnapshots(processor.processor_id)
-  const unpublishPlaybook = useUnpublishPlaybook()
 
   // Check if processor has a published snapshot (snapshot table is source of truth)
   const hasPublishedVersionState = !!publishedSnapshot
@@ -78,21 +69,6 @@ export function ProcessorHeader({
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  const handleUnpublish = async () => {
-    if (!publishedSnapshot) return
-
-    try {
-      await unpublishPlaybook.mutateAsync(publishedSnapshot.id)
-      toast.success('Playbook unpublished', {
-        description: `Version ${publishedSnapshot.version_number} is now hidden from galleries.`,
-      })
-    } catch (error) {
-      toast.error('Failed to unpublish playbook', {
-        description: error instanceof Error ? error.message : 'Unknown error occurred',
-      })
-    }
-  }
 
   const handlePublishSuccess = (snapshotId: string, versionNumber: number) => {
     toast.success('Playbook published', {
@@ -143,6 +119,10 @@ export function ProcessorHeader({
 
   // Get version display text
   const getVersionDisplayText = () => {
+    // If comparison is loading and we have a loaded version number, show it
+    if (isComparisonLoading && loadedVersionNumber) {
+      return `v${loadedVersionNumber} (loaded)`
+    }
     if (!hasLoadedVersion && !loadedVersionNumber) {
       return 'Draft'
     }
@@ -190,88 +170,39 @@ export function ProcessorHeader({
           </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Save Button */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onOpenSaveDialog}
-            disabled={!isDirty || processor.operations?.length === 0}
-            title={isDirty ? 'Save as new version' : 'No changes to save'}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            Save
-          </Button>
-
-          <RunProcessorDialog
-            processorId={processor.processor_id}
-            processorName={processor.processor_name}
-            defaultView={(processor.configuration as { default_run_view?: 'technical' | 'compliance' | 'contract-comments' })?.default_run_view}
-            hasPublishedVersion={hasPublishedVersionState}
-            publishedVersion={publishedSnapshot?.version_number}
-            trigger={
-              <Button variant="default" size="sm" title={t('run')}>
-                <Play className="h-4 w-4 mr-2" />
-                {t('run')}
+        {mounted && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" title="More options">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
               </Button>
-            }
-          />
-          <Button variant="ghost" size="icon" asChild title="View Runs">
-            <Link href={`/proc/${processor.processor_id}/runs`}>
-              <History className="h-4 w-4" />
-              <span className="sr-only">View Runs</span>
-            </Link>
-          </Button>
-          {mounted && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" title="More options">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setIsEditSheetOpen(true)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {hasPublishedVersionState ? (
-                  <>
-                    <DropdownMenuItem onClick={() => setIsPublishDialogOpen(true)}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      Update Version
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleUnpublish}
-                      disabled={unpublishPlaybook.isPending}
-                    >
-                      <EyeOff className="mr-2 h-4 w-4" />
-                      {unpublishPlaybook.isPending ? 'Unpublishing...' : 'Unpublish'}
-                    </DropdownMenuItem>
-                  </>
-                ) : (
-                  <DropdownMenuItem
-                    onClick={() => setIsPublishDialogOpen(true)}
-                    disabled={processor.operations?.length === 0}
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Publish
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem disabled>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Preview
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <Archive className="mr-2 h-4 w-4" />
-                  Archive
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setIsEditSheetOpen(true)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setIsPublishDialogOpen(true)}
+                disabled={processor.operations?.length === 0}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Publish
+              </DropdownMenuItem>
+              <DropdownMenuItem disabled>
+                <Eye className="mr-2 h-4 w-4" />
+                Preview
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem disabled>
+                <Archive className="mr-2 h-4 w-4" />
+                Archive
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
 
       {/* Publish Status, Visibility, and Usage Description Row - Entire row clickable */}

@@ -13,7 +13,7 @@
 
 import { useMemo } from 'react'
 import type { ProcessorDetail } from '@/app/queries/processors/use-processor-detail'
-import type { PlaybookSnapshot } from '@/app/queries/playbook-snapshots'
+import type { SnapshotForComparison } from '@/app/queries/playbook-snapshots'
 
 /**
  * Deep comparison utility for checking if two values are equal
@@ -78,11 +78,17 @@ function normalizeOperation(op: {
  *
  * @param processor - Current processor state from useProcessorDetail
  * @param loadedSnapshot - The snapshot that's currently loaded (or null if new/no version)
- * @returns isDirty boolean and optional details about what changed
+ * @param loadedSnapshotId - The ID of the loaded snapshot from processor (source of truth)
+ * @returns isDirty boolean, hasLoadedVersion, and isComparisonLoading state
  *
  * @example
  * ```tsx
- * const { isDirty } = useDirtyState(processor, loadedSnapshot)
+ * const { isDirty, isComparisonLoading } = useDirtyState(processor, loadedSnapshot, processor?.loaded_snapshot_id)
+ *
+ * // Show loading state while comparing
+ * if (isComparisonLoading) {
+ *   return <Badge>Loading...</Badge>
+ * }
  *
  * // Show warning if dirty
  * if (isDirty) {
@@ -92,44 +98,59 @@ function normalizeOperation(op: {
  */
 export function useDirtyState(
   processor: ProcessorDetail | undefined,
-  loadedSnapshot: PlaybookSnapshot | null | undefined
+  loadedSnapshot: SnapshotForComparison | null | undefined,
+  loadedSnapshotId: string | null | undefined
 ): {
   isDirty: boolean
   hasLoadedVersion: boolean
+  isComparisonLoading: boolean
 } {
   return useMemo(() => {
     // If no processor, not dirty
     if (!processor) {
-      return { isDirty: false, hasLoadedVersion: false }
+      return { isDirty: false, hasLoadedVersion: false, isComparisonLoading: false }
     }
 
-    // If no loaded snapshot, we're working on a new/unsaved processor
-    // Consider dirty if there are any operations (there's work to save)
-    if (!loadedSnapshot) {
+    // If processor has a loaded_snapshot_id but snapshot data hasn't loaded yet,
+    // we're waiting for comparison data - NOT dirty, just loading
+    if (loadedSnapshotId && !loadedSnapshot) {
       return {
-        isDirty: processor.operations?.length > 0,
-        hasLoadedVersion: false,
+        isDirty: false,
+        hasLoadedVersion: true,
+        isComparisonLoading: true,
       }
     }
 
-    const snapshotData = loadedSnapshot.snapshot
+    // If no loaded_snapshot_id, we're working on a new/unsaved processor
+    // Consider dirty if there are any operations (there's work to save)
+    if (!loadedSnapshotId) {
+      return {
+        isDirty: processor.operations?.length > 0,
+        hasLoadedVersion: false,
+        isComparisonLoading: false,
+      }
+    }
+
+    // Now we have both loadedSnapshotId AND loadedSnapshot - do real comparison
+    // (loadedSnapshot is guaranteed non-null here due to the check on line 116)
+    const snapshotData = loadedSnapshot!.snapshot
 
     // Compare system_prompt
     const currentSystemPrompt = processor.system_prompt || null
     const snapshotSystemPrompt = snapshotData.processor.system_prompt || null
     if (currentSystemPrompt !== snapshotSystemPrompt) {
-      return { isDirty: true, hasLoadedVersion: true }
+      return { isDirty: true, hasLoadedVersion: true, isComparisonLoading: false }
     }
 
     // Compare configuration
     if (!deepEqual(processor.configuration, snapshotData.processor.configuration)) {
-      return { isDirty: true, hasLoadedVersion: true }
+      return { isDirty: true, hasLoadedVersion: true, isComparisonLoading: false }
     }
 
     // Compare area_configuration (if it's stored in the snapshot)
     const snapshotAreaConfig = (snapshotData.processor as { area_configuration?: unknown }).area_configuration
     if (snapshotAreaConfig !== undefined && !deepEqual(processor.area_configuration, snapshotAreaConfig)) {
-      return { isDirty: true, hasLoadedVersion: true }
+      return { isDirty: true, hasLoadedVersion: true, isComparisonLoading: false }
     }
 
     // Compare operations
@@ -137,7 +158,7 @@ export function useDirtyState(
     const snapshotOps = snapshotData.operations || []
 
     if (currentOps.length !== snapshotOps.length) {
-      return { isDirty: true, hasLoadedVersion: true }
+      return { isDirty: true, hasLoadedVersion: true, isComparisonLoading: false }
     }
 
     // Normalize and compare each operation
@@ -145,9 +166,9 @@ export function useDirtyState(
     const normalizedSnapshot = snapshotOps.map(normalizeOperation)
 
     if (!deepEqual(normalizedCurrent, normalizedSnapshot)) {
-      return { isDirty: true, hasLoadedVersion: true }
+      return { isDirty: true, hasLoadedVersion: true, isComparisonLoading: false }
     }
 
-    return { isDirty: false, hasLoadedVersion: true }
-  }, [processor, loadedSnapshot])
+    return { isDirty: false, hasLoadedVersion: true, isComparisonLoading: false }
+  }, [processor, loadedSnapshot, loadedSnapshotId])
 }
