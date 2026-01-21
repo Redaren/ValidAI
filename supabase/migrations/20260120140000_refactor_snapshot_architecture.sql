@@ -201,10 +201,10 @@ BEGIN
   WHERE processor_id = p_processor_id AND is_published = true;
 
   -- Calculate next version number for this processor
-  SELECT COALESCE(MAX(version_number), 0) + 1
+  SELECT COALESCE(MAX(ps.version_number), 0) + 1
   INTO v_next_version
-  FROM validai_playbook_snapshots
-  WHERE processor_id = p_processor_id;
+  FROM validai_playbook_snapshots ps
+  WHERE ps.processor_id = p_processor_id;
 
   -- Build the complete snapshot
   v_snapshot := jsonb_build_object(
@@ -248,12 +248,12 @@ BEGIN
   -- Note: No longer updating processor.active_snapshot_id or status
   -- Snapshot table is now the source of truth for "published" state
 
-  -- Return result
+  -- Return result (use explicit variable names to avoid ambiguity)
   RETURN QUERY SELECT
-    v_snapshot_id AS snapshot_id,
-    v_next_version AS version_number,
-    v_operation_count AS operation_count,
-    format('Published version %s with %s operations', v_next_version, v_operation_count) AS message;
+    v_snapshot_id,
+    v_next_version,
+    v_operation_count,
+    format('Published version %s with %s operations', v_next_version, v_operation_count)::text;
 END;
 $$;
 
