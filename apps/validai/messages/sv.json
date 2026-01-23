@@ -128,7 +128,10 @@
       "settings": "Inställningar",
       "workbench": "Verktygslåda",
       "newArea": "Nytt område",
-      "bulkImportExport": "Massimport/export"
+      "bulkImportExport": "Massimport/export",
+      "saveAsNewVersion": "Spara som ny version",
+      "viewRuns": "Visa körningar",
+      "run": "Kör"
     },
     "form": {
       "description": "Beskrivning",
@@ -139,15 +142,17 @@
       "name": "Namn",
       "status": "Status",
       "description": "Beskrivning",
-      "visibility": "Synlighet"
+      "visibility": "Vem kan visa/redigera"
     },
     "header": {
       "status": "Status",
-      "visibility": "Synlighet",
+      "visibility": "Vem kan visa/redigera",
       "tags": "Taggar",
-      "run": "Kör"
+      "run": "Kör",
+      "version": "Version"
     },
     "actions": "Åtgärder",
+    "run": "Kör",
     "bulkImport": {
       "row": "Rad",
       "errors": "Fel",

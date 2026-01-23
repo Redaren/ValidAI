@@ -128,7 +128,10 @@
       "settings": "Налаштування",
       "workbench": "Робоче місце",
       "newArea": "Нова область",
-      "bulkImportExport": "Масовий імпорт/експорт"
+      "bulkImportExport": "Масовий імпорт/експорт",
+      "saveAsNewVersion": "Зберегти як нову версію",
+      "viewRuns": "Переглянути запуски",
+      "run": "Запустити"
     },
     "form": {
       "description": "Опис",
@@ -139,15 +142,17 @@
       "name": "Назва",
       "status": "Статус",
       "description": "Опис",
-      "visibility": "Видимість"
+      "visibility": "Хто може переглядати/редагувати"
     },
     "header": {
       "status": "Статус",
-      "visibility": "Видимість",
+      "visibility": "Хто може переглядати/редагувати",
       "tags": "Теги",
-      "run": "Запустити"
+      "run": "Запустити",
+      "version": "Версія"
     },
     "actions": "Дії",
+    "run": "Запустити",
     "bulkImport": {
       "row": "Рядок",
       "errors": "Помилки",

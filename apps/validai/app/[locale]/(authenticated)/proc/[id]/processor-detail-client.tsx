@@ -295,8 +295,8 @@ export function ProcessorDetailClient({
       <ProcessorHeader
         processor={processor}
         isDirty={isDirty}
-        hasLoadedVersion={hasLoadedVersion}
-        loadedSnapshotId={processor.loaded_snapshot_id}
+        loadedVersionNumber={loadedVersionNumber}
+        isLoadedVersionPublished={isLoadedVersionPublished}
         isComparisonLoading={isComparisonLoading}
       />
 

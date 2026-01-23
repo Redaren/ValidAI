@@ -128,7 +128,10 @@
       "settings": "Settings",
       "workbench": "Workbench",
       "newArea": "New Area",
-      "bulkImportExport": "Bulk Import/Export"
+      "bulkImportExport": "Bulk Import/Export",
+      "saveAsNewVersion": "Save as new version",
+      "viewRuns": "View runs",
+      "run": "Run"
     },
     "form": {
       "description": "Description",
@@ -139,15 +142,17 @@
       "name": "Name",
       "status": "Status",
       "description": "Description",
-      "visibility": "Visibility"
+      "visibility": "Who can view/edit"
     },
     "header": {
       "status": "Status",
-      "visibility": "Visibility",
+      "visibility": "Who can view/edit",
       "tags": "Tags",
-      "run": "Run"
+      "run": "Run",
+      "version": "Version"
     },
     "actions": "Actions",
+    "run": "Run",
     "bulkImport": {
       "row": "Row",
       "errors": "Errors",

@@ -26,58 +26,59 @@ import {
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
-import {
-  usePublishedSnapshot,
-  useProcessorSnapshots,
-} from "@/app/queries/playbook-snapshots"
+import { usePublishedSnapshot } from "@/app/queries/playbook-snapshots"
 import { useTranslations } from 'next-intl'
 
 interface ProcessorHeaderProps {
   processor: ProcessorDetail
   isDirty?: boolean
-  hasLoadedVersion?: boolean
-  loadedSnapshotId?: string | null
+  loadedVersionNumber?: number | null
+  isLoadedVersionPublished?: boolean
   isComparisonLoading?: boolean
 }
 
 export function ProcessorHeader({
   processor,
   isDirty = false,
-  hasLoadedVersion = false,
-  loadedSnapshotId,
+  loadedVersionNumber,
+  isLoadedVersionPublished = false,
   isComparisonLoading = false,
 }: ProcessorHeaderProps) {
   const t = useTranslations('processors.header')
+
+  /**
+   * Get the version text to display in the header
+   */
+  const getVersionDisplayText = () => {
+    // If comparison is loading, show the version number while waiting
+    if (isComparisonLoading && loadedVersionNumber) {
+      return isLoadedVersionPublished
+        ? `v${loadedVersionNumber} - (Live)`
+        : `v${loadedVersionNumber}`
+    }
+    if (isDirty) {
+      return 'Draft'
+    }
+    if (loadedVersionNumber) {
+      return isLoadedVersionPublished
+        ? `v${loadedVersionNumber} - (Live)`
+        : `v${loadedVersionNumber}`
+    }
+    return 'Draft'
+  }
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isEditSheetOpen, setIsEditSheetOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const { data: llmConfig, isLoading: llmConfigLoading } = useResolvedLLMConfig(processor.processor_id)
   const { data: publishedSnapshot } = usePublishedSnapshot(processor.processor_id)
-  const { data: snapshots } = useProcessorSnapshots(processor.processor_id)
 
   // Check if processor has a published snapshot (snapshot table is source of truth)
   const hasPublishedVersionState = !!publishedSnapshot
 
-  // Find the loaded version number
-  const loadedVersionNumber = snapshots?.find(s => s.id === loadedSnapshotId)?.version_number
-
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "published":
-        return "bg-green-500/10 text-green-700 dark:text-green-400"
-      case "draft":
-        return "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400"
-      case "archived":
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400"
-      default:
-        return "bg-gray-500/10 text-gray-700 dark:text-gray-400"
-    }
-  }
 
   const formatRelativeTime = (dateString: string) => {
     const date = new Date(dateString)
@@ -107,59 +108,29 @@ export function ProcessorHeader({
 
   const VisibilityIcon = processor.visibility === "personal" ? Lock : Users
 
-  // Get version display text
-  const getVersionDisplayText = () => {
-    // If comparison is loading and we have a loaded version number, show it
-    if (isComparisonLoading && loadedVersionNumber) {
-      return `v${loadedVersionNumber} (loaded)`
-    }
-    if (!hasLoadedVersion && !loadedVersionNumber) {
-      return 'Draft'
-    }
-    if (isDirty && loadedVersionNumber) {
-      return `Draft (from v${loadedVersionNumber})`
-    }
-    if (loadedVersionNumber) {
-      return `v${loadedVersionNumber} (loaded)`
-    }
-    return 'Draft'
-  }
-
   return (
     <Collapsible
       open={isExpanded}
       onOpenChange={setIsExpanded}
       className="space-y-4 rounded-lg border bg-card p-6"
     >
-      {/* Title and Description Row */}
-      <div className="flex items-center gap-4 flex-1 min-w-0">
-        <h1 className="text-2xl font-bold tracking-tight shrink-0">
-          {processor.processor_name}
-        </h1>
-        {processor.processor_description && (
-          <p
-            className="text-muted-foreground text-sm truncate"
-            title={processor.processor_description}
-          >
-            {processor.processor_description}
-          </p>
-        )}
-      </div>
-
-      {/* Version Selector, Change Indicator, and Action Buttons */}
+      {/* Title, Description, and More Options Row */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          {/* Version Indicator Badge */}
-          <Badge variant="outline" className="text-sm font-medium py-1 px-3">
-            {getVersionDisplayText()}
-          </Badge>
-
-          {/* Change Indicator */}
-          <span className={`text-sm ${isDirty ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
-            {isDirty ? 'Unsaved changes' : 'No changes'}
-          </span>
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight shrink-0">
+            {processor.processor_name}
+          </h1>
+          {processor.processor_description && (
+            <p
+              className="text-muted-foreground text-sm truncate"
+              title={processor.processor_description}
+            >
+              {processor.processor_description}
+            </p>
+          )}
         </div>
 
+        {/* More Options Menu */}
         {mounted && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -187,9 +158,17 @@ export function ProcessorHeader({
         )}
       </div>
 
-      {/* Publish Status, Visibility, and Usage Description Row - Entire row clickable */}
+      {/* Version, Publish Status, Visibility, and Usage Description Row - Entire row clickable */}
       <CollapsibleTrigger asChild>
         <div className="flex gap-8 items-start hover:bg-accent/50 cursor-pointer transition-colors rounded-md p-2 -mx-2">
+          {/* Version Column */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">{t('version')}</span>
+            <span className={`text-sm ${isDirty || !loadedVersionNumber ? 'text-amber-600 dark:text-amber-400' : ''}`}>
+              {getVersionDisplayText()}
+            </span>
+          </div>
+
           {/* Published Version Column */}
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">Published</span>
