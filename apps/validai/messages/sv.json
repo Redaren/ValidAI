@@ -149,7 +149,8 @@
       "visibility": "Vem kan visa/redigera",
       "tags": "Taggar",
       "run": "Kör",
-      "version": "Version"
+      "thisVersion": "Denna version",
+      "versionLive": "Version live"
     },
     "actions": "Åtgärder",
     "run": "Kör",

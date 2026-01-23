@@ -149,7 +149,8 @@
       "visibility": "Who can view/edit",
       "tags": "Tags",
       "run": "Run",
-      "version": "Version"
+      "thisVersion": "This version",
+      "versionLive": "Version live"
     },
     "actions": "Actions",
     "run": "Run",

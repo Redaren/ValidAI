@@ -19,10 +19,8 @@ import {
 import {
   Archive,
   Eye,
-  Lock,
   MoreHorizontal,
   Pencil,
-  Users,
 } from "lucide-react"
 import { useResolvedLLMConfig } from "@/hooks/use-llm-config"
 import { EditProcessorSheet } from "@/components/processors/edit-processor-sheet"
@@ -106,8 +104,6 @@ export function ProcessorHeader({
     return `${years} year${years !== 1 ? "s" : ""} ago`
   }
 
-  const VisibilityIcon = processor.visibility === "personal" ? Lock : Users
-
   return (
     <Collapsible
       open={isExpanded}
@@ -161,17 +157,17 @@ export function ProcessorHeader({
       {/* Version, Publish Status, Visibility, and Usage Description Row - Entire row clickable */}
       <CollapsibleTrigger asChild>
         <div className="flex gap-8 items-start hover:bg-accent/50 cursor-pointer transition-colors rounded-md p-2 -mx-2">
-          {/* Version Column */}
+          {/* This Version Column */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{t('version')}</span>
+            <span className="text-xs text-muted-foreground">{t('thisVersion')}</span>
             <span className={`text-sm ${isDirty || !loadedVersionNumber ? 'text-amber-600 dark:text-amber-400' : ''}`}>
               {getVersionDisplayText()}
             </span>
           </div>
 
-          {/* Published Version Column */}
+          {/* Version Live Column */}
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">Published</span>
+            <span className="text-xs text-muted-foreground">{t('versionLive')}</span>
             <div className="flex items-center gap-2">
               {hasPublishedVersionState && publishedSnapshot ? (
                 <Badge className="bg-green-500/10 text-green-700 dark:text-green-400">
@@ -185,15 +181,6 @@ export function ProcessorHeader({
                   Archived
                 </Badge>
               )}
-            </div>
-          </div>
-
-          {/* Visibility Column */}
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">{t('visibility')}</span>
-            <div className="flex items-center gap-1.5 text-sm">
-              <VisibilityIcon className="h-3.5 w-3.5 text-muted-foreground" />
-              <span>{processor.visibility === "personal" ? "You" : "Organization"}</span>
             </div>
           </div>
 
