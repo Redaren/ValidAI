@@ -98,7 +98,7 @@ export function ProcessorDetailClient({
   const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false)
 
   // Tab state
-  const [activeTab, setActiveTab] = useState<string>('editor')
+  const [activeTab, setActiveTab] = useState<string>('ai-setup')
 
   // Pending load state (for confirmation dialog)
   const [pendingLoad, setPendingLoad] = useState<{
@@ -171,7 +171,7 @@ export function ProcessorDetailClient({
       toast.success(`Loaded version ${versionNumber}`)
       setIsLoadDialogOpen(false)
       setPendingLoad(null)
-      setActiveTab('editor') // Switch to editor tab after load
+      setActiveTab('ai-setup') // Switch to AI Setup tab after load
     } catch (error) {
       logger.error('Failed to load version:', extractErrorDetails(error))
       toast.error('Failed to load version', {
@@ -303,12 +303,35 @@ export function ProcessorDetailClient({
       {/* Tabs: Editor / Versions */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="editor">Editor</TabsTrigger>
+          <TabsTrigger value="preview">Preview</TabsTrigger>
+          <TabsTrigger value="profile">Profile</TabsTrigger>
+          <TabsTrigger value="ai-setup">AI Setup</TabsTrigger>
+          <TabsTrigger value="sharing">Sharing</TabsTrigger>
           <TabsTrigger value="versions">Versions</TabsTrigger>
         </TabsList>
 
-        {/* Editor Tab */}
-        <TabsContent value="editor" className="space-y-4">
+        {/* Preview Tab */}
+        <TabsContent value="preview" className="space-y-4">
+          <div className="rounded-lg border bg-card p-6">
+            <div className="flex min-h-[200px] flex-col items-center justify-center text-muted-foreground">
+              <p className="text-lg font-medium">Preview</p>
+              <p className="text-sm">Coming soon</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Profile Tab */}
+        <TabsContent value="profile" className="space-y-4">
+          <div className="rounded-lg border bg-card p-6">
+            <div className="flex min-h-[200px] flex-col items-center justify-center text-muted-foreground">
+              <p className="text-lg font-medium">Profile</p>
+              <p className="text-sm">Coming soon</p>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* AI Setup Tab (formerly Editor) */}
+        <TabsContent value="ai-setup" className="space-y-4">
           <div className="space-y-4 rounded-lg border bg-card p-6">
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
@@ -385,6 +408,16 @@ export function ProcessorDetailClient({
               </div>
             </div>
             <OperationsByArea processor={processor} />
+          </div>
+        </TabsContent>
+
+        {/* Sharing Tab */}
+        <TabsContent value="sharing" className="space-y-4">
+          <div className="rounded-lg border bg-card p-6">
+            <div className="flex min-h-[200px] flex-col items-center justify-center text-muted-foreground">
+              <p className="text-lg font-medium">Sharing</p>
+              <p className="text-sm">Coming soon</p>
+            </div>
           </div>
         </TabsContent>
 
