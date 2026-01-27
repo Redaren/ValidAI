@@ -1,0 +1,45 @@
+# Supabase Configuration
+# See: https://supabase.com/docs/guides/local-development/cli/config
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost:54321"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+# ============================================================================
+# PERSISTENT STAGING BRANCH CONFIGURATION
+# ============================================================================
+# After creating a persistent staging branch via CLI:
+#   supabase --experimental branches create --persistent --project-ref xczippkxxdqlvaacjexj
+#
+# Then list branches to get the staging project_ref:
+#   supabase --experimental branches list --project-ref xczippkxxdqlvaacjexj
+#
+# Update the project_id below with the staging branch's project_ref
+# ============================================================================
+
+[remotes.staging]
+project_id = "cijfuxvudgoqupvjcbsd"
+
+[remotes.staging.db.seed]
+enabled = true
+sql_paths = ["./seeds/staging.sql"]
