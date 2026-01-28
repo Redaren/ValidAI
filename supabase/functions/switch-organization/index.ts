@@ -79,6 +79,7 @@ Deno.serve(async (req) => {
     const { data: org, error: orgError } = await supabase
       .from('organizations')
       .select(`
+        name,
         is_active,
         default_app_id,
         default_app:apps!organizations_default_app_id_fkey(app_url)
@@ -111,13 +112,15 @@ Deno.serve(async (req) => {
       return forbiddenResponse('Organization has no active subscriptions')
     }
 
-    // Update user's JWT metadata with new organization_id and accessible_apps
+    // Update user's JWT metadata with new organization context
     const { error: updateError } = await supabase.auth.admin.updateUserById(
       user.id,
       {
         app_metadata: {
           ...user.app_metadata,
           organization_id: organizationId,
+          organization_name: org.name,
+          organization_role: membership.role,
           accessible_apps: accessibleApps,
         }
       }
