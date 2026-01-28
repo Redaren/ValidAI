@@ -35,38 +35,47 @@ type OperationResult = Database['public']['Tables']['validai_operation_results']
  * Hook to create a new processor run
  *
  * Invokes the execute-processor-run Edge Function which:
- * 1. Creates a frozen snapshot of the processor state
+ * 1. Creates a frozen snapshot of the processor state (or uses existing snapshot)
  * 2. Creates a run record in the database
  * 3. Triggers background execution
  * 4. Returns immediately with run_id (HTTP 202)
  *
- * Phase 1.9: Supports both Storage-based and direct upload paths:
- * - Storage path: Provide document_id (existing document in validai_documents)
- * - Direct upload path: Provide file_upload (base64 file, no Storage)
+ * **Run source options:**
+ * - processor_id only: Uses live processor data (draft mode)
+ * - processor_id + use_published_snapshot: Uses processor's active published snapshot
+ * - playbook_snapshot_id only: Uses snapshot directly (portal/gallery runs)
+ *
+ * **Document options:**
+ * - document_id: Existing document in validai_documents (Storage)
+ * - file_upload: Direct upload (base64, no Storage)
  *
  * @returns Mutation hook for creating runs
  *
- * @example Storage upload (legacy)
+ * @example Draft run (live data)
  * ```tsx
  * const createRun = useCreateRun()
  * const { run_id } = await createRun.mutateAsync({
  *   processor_id: 'uuid',
- *   document_id: 'uuid'
+ *   file_upload: { ... }
  * })
  * ```
  *
- * @example Direct upload (Phase 1.9)
+ * @example Published run (from snapshot)
  * ```tsx
  * const createRun = useCreateRun()
- * const base64File = await fileToBase64(file)
  * const { run_id } = await createRun.mutateAsync({
  *   processor_id: 'uuid',
- *   file_upload: {
- *     file: base64File,
- *     filename: file.name,
- *     mime_type: file.type,
- *     size_bytes: file.size
- *   }
+ *   use_published_snapshot: true,
+ *   file_upload: { ... }
+ * })
+ * ```
+ *
+ * @example Gallery run (direct from snapshot)
+ * ```tsx
+ * const createRun = useCreateRun()
+ * const { run_id } = await createRun.mutateAsync({
+ *   playbook_snapshot_id: 'uuid',
+ *   file_upload: { ... }
  * })
  * ```
  */
@@ -76,8 +85,11 @@ export function useCreateRun() {
 
   return useMutation({
     mutationFn: async (params: {
-      processor_id: string
-      // Phase 1.9: Support both Storage and direct upload
+      // Run source options (one required)
+      processor_id?: string
+      use_published_snapshot?: boolean
+      playbook_snapshot_id?: string
+      // Document options (one required)
       document_id?: string
       file_upload?: {
         file: string           // base64 encoded
@@ -86,7 +98,16 @@ export function useCreateRun() {
         size_bytes: number
       }
     }) => {
-      // Validate exactly one of document_id or file_upload
+      // Validate run source: either processor_id or playbook_snapshot_id
+      if (!params.processor_id && !params.playbook_snapshot_id) {
+        throw new Error('Either processor_id or playbook_snapshot_id is required')
+      }
+
+      if (params.processor_id && params.playbook_snapshot_id) {
+        throw new Error('Cannot provide both processor_id and playbook_snapshot_id')
+      }
+
+      // Validate document: either document_id or file_upload
       if (!params.document_id && !params.file_upload) {
         throw new Error('Either document_id or file_upload is required')
       }
@@ -106,9 +127,11 @@ export function useCreateRun() {
     },
     onSuccess: (data, variables) => {
       // Invalidate processor runs list
-      queryClient.invalidateQueries({
-        queryKey: ['processor-runs', variables.processor_id],
-      })
+      if (variables.processor_id) {
+        queryClient.invalidateQueries({
+          queryKey: ['processor-runs', variables.processor_id],
+        })
+      }
     },
   })
 }

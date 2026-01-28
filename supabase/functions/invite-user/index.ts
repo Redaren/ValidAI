@@ -1,7 +1,7 @@
 import { createAdminClient } from '../_shared/supabaseAdmin.ts'
 import { handleCors } from '../_shared/cors.ts'
 import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse, notFoundResponse } from '../_shared/response.ts'
-import { getUserFromRequest, validateOrgMembership, isOrgAdmin } from '../_shared/auth.ts'
+import { getAuthenticatedUser, validateOrgMembership, isOrgAdmin } from '../_shared/auth.ts'
 import { validateRequired, validateEmail } from '../_shared/validation.ts'
 
 /**
@@ -64,11 +64,12 @@ Deno.serve(async (req) => {
   try {
     const supabase = createAdminClient()
 
-    // Get authenticated user
-    const user = await getUserFromRequest(req, supabase)
-    if (!user) {
+    // Get authenticated user (uses getClaims() for asymmetric JWT support)
+    const authResult = await getAuthenticatedUser(req, supabase)
+    if (!authResult) {
       return unauthorizedResponse('Invalid or missing authentication token')
     }
+    const { user } = authResult
 
     // Parse and validate request body
     const { email, organizationId, role } = await req.json()

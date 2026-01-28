@@ -158,6 +158,7 @@ serve(async (req) => {
     // Get Supabase client with service role
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2')
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -169,6 +170,17 @@ serve(async (req) => {
 
     if (authHeader && !('background' in body) && !isServiceRoleCall) {
       const token = authHeader.replace('Bearer ', '')
+
+      // Verify JWT using getClaims() (supports asymmetric JWT signing)
+      const anonClient = createClient(supabaseUrl, supabaseAnonKey)
+      const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
+
+      if (claimsError || !claimsData?.claims) {
+        console.error('JWT verification failed:', claimsError)
+        throw new Error('Invalid user token')
+      }
+
+      // Get full user object (now that JWT is verified via getClaims())
       const { data: { user: authUser }, error: userError } = await supabase.auth.getUser(token)
 
       if (userError || !authUser) {

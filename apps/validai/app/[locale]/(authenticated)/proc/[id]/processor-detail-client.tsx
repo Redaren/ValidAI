@@ -3,6 +3,7 @@
 import { useState, useMemo, useCallback } from "react"
 import { useProcessorDetail, useCreateArea } from "@/app/queries/processors/use-processor-detail"
 import { ProcessorHeader } from "@/components/processors/processor-header"
+import { ProcessorProfileForm } from "@/components/processors/processor-profile-form"
 import { OperationsByArea } from "@/components/processors/operations-by-area"
 import { CreateAreaDialog } from "@/components/processors/create-area-dialog"
 import { BulkImportExportDialog } from "@/components/processors/bulk-import-export-dialog"
@@ -323,10 +324,7 @@ export function ProcessorDetailClient({
         {/* Profile Tab */}
         <TabsContent value="profile" className="space-y-4">
           <div className="rounded-lg border bg-card p-6">
-            <div className="flex min-h-[200px] flex-col items-center justify-center text-muted-foreground">
-              <p className="text-lg font-medium">Profile</p>
-              <p className="text-sm">Coming soon</p>
-            </div>
+            <ProcessorProfileForm processor={processor} />
           </div>
         </TabsContent>
 

@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
     const isProduction = process.env.NODE_ENV === 'production'
     const isDevelopment = process.env.NODE_ENV === 'development'
 
+    // Dynamic Supabase URLs for CSP - supports both staging and production environments
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://xczippkxxdqlvaacjexj.supabase.co'
+    const supabaseWsUrl = supabaseUrl.replace('https://', 'wss://')
+
     return [
       {
         // Apply to all routes
@@ -56,11 +60,11 @@ const nextConfig: NextConfig = {
               // Styles: Always allow unsafe-inline (required for Radix UI/shadcn)
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // Images: Self + data URIs + Supabase Storage
-              "img-src 'self' data: https://xczippkxxdqlvaacjexj.supabase.co",
+              `img-src 'self' data: ${supabaseUrl}`,
               // Fonts: Self + data URIs + Google Fonts
               "font-src 'self' data: https://fonts.gstatic.com",
               // Connect: Self + Supabase API (database, auth, storage, realtime)
-              "connect-src 'self' https://xczippkxxdqlvaacjexj.supabase.co wss://xczippkxxdqlvaacjexj.supabase.co",
+              `connect-src 'self' ${supabaseUrl} ${supabaseWsUrl}`,
               // Frames: None allowed
               "frame-src 'none'",
               // Objects: None allowed

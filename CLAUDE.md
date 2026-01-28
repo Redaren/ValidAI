@@ -426,7 +426,9 @@ validai/                                    # Root repository
 - `/docs/updated-migration-plan.md`: Phase 2 import plan
 
 ### Supabase Integration
-- **Shared Instance**: All apps use single Supabase project (xczippkxxdqlvaacjexj)
+- **Two Environments** (accessible via MCP):
+  - **Production**: `xczippkxxdqlvaacjexj.supabase.co` - Full schema with ValidAI tables
+  - **Staging**: `cijfuxvudgoqupvjcbsd.supabase.co`
 - **Table Naming Convention**:
   - Core tables: No prefix (`organizations`, `apps`, `profiles`)
   - App tables: Prefixed with app ID (`validai_documents`, `futureapp_entities`)

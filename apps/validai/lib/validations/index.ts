@@ -10,9 +10,11 @@ export {
   updateProcessorSchema,
   updateProcessorSettingsSchema,
   processorNameSchema,
+  processorProfileSchema,
   type CreateProcessorInput,
   type UpdateProcessorInput,
   type UpdateProcessorSettingsInput,
+  type ProcessorProfileInput,
 } from './processor-schemas'
 
 // Area schemas

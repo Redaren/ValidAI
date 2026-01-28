@@ -1,4 +1,113 @@
-import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+/**
+ * JWT Claims structure returned by getClaims()
+ */
+export interface JWTClaims {
+  sub: string
+  email?: string
+  phone?: string
+  role: string
+  app_metadata?: Record<string, unknown>
+  user_metadata?: Record<string, unknown>
+  [key: string]: unknown
+}
+
+/**
+ * Verify JWT and get user claims using Supabase's built-in getClaims()
+ * Works with both symmetric (HS256) and asymmetric (RS256/ES256) JWTs
+ *
+ * This is the recommended approach for Edge Functions as it:
+ * - Uses the JWKS endpoint internally for asymmetric keys
+ * - Works transparently with both old and new signing methods
+ * - Is the official Supabase recommendation
+ *
+ * @param req - Incoming request with Authorization header
+ * @returns User claims or null if invalid
+ */
+export async function verifyAndGetClaims(req: Request): Promise<JWTClaims | null> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    return null
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  // Create a client just for verification
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables')
+    return null
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+  const { data, error } = await supabase.auth.getClaims(token)
+
+  if (error || !data?.claims) {
+    console.error('JWT verification failed:', error)
+    return null
+  }
+
+  return data.claims as JWTClaims
+}
+
+/**
+ * Get authenticated user with full user object
+ * Combines getClaims() verification with getUser() for full user data
+ *
+ * This function:
+ * 1. Verifies the JWT using getClaims() (supports asymmetric signing)
+ * 2. Fetches the full user object using getUser()
+ *
+ * Use this when you need both JWT verification AND full user data.
+ *
+ * @param req - Incoming request with Authorization header
+ * @param supabase - Supabase admin client (service-role)
+ * @returns Object with user and claims, or null if invalid
+ */
+export async function getAuthenticatedUser(
+  req: Request,
+  supabase: SupabaseClient
+): Promise<{ user: any; claims: JWTClaims } | null> {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    return null
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+
+  // Create anon client for getClaims() verification
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables')
+    return null
+  }
+
+  const anonClient = createClient(supabaseUrl, supabaseAnonKey)
+
+  // First verify the JWT using getClaims()
+  const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token)
+
+  if (claimsError || !claimsData?.claims) {
+    console.error('JWT verification failed:', claimsError)
+    return null
+  }
+
+  // Then get full user object using the admin client
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+
+  if (userError || !user) {
+    console.error('Failed to get user:', userError)
+    return null
+  }
+
+  return { user, claims: claimsData.claims as JWTClaims }
+}
 
 /**
  * Check if email belongs to Playze admin

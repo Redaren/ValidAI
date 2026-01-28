@@ -3,6 +3,7 @@ import { handleCors } from '../_shared/cors.ts'
 import { successResponse, errorResponse, unauthorizedResponse } from '../_shared/response.ts'
 import { validateRequired, validateEmail, validateUuid } from '../_shared/validation.ts'
 import { sendEmail, existingUserInviteEmail } from '../_shared/email.ts'
+import { verifyAndGetClaims } from '../_shared/auth.ts'
 
 /**
  * Edge Function: user-invite-member
@@ -78,13 +79,19 @@ Deno.serve(async (req) => {
     }
     const jwt = authHeader.replace('Bearer ', '')
 
+    // Verify JWT using getClaims() (supports asymmetric JWT signing)
+    const claims = await verifyAndGetClaims(req)
+    if (!claims) {
+      return unauthorizedResponse('Invalid or missing authentication token')
+    }
+
     // Create admin client for service-role operations (email sending, fetching org details)
     const adminClient = createAdminClient()
 
     // Create user client for RPC calls that need auth.uid() context
     const userClient = createUserClient(jwt)
 
-    // Get authenticated user from JWT
+    // Get full user object (now that JWT is verified via getClaims())
     const { data: { user }, error: userError } = await adminClient.auth.getUser(jwt)
     if (userError || !user) {
       console.error('Error getting user from token:', userError)

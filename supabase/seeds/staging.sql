@@ -1,15 +1,21 @@
 -- =============================================================================
--- STAGING SEED DATA
+-- STAGING SEED DATA (AUDITED)
 -- =============================================================================
 -- Purpose: Seed data for the persistent staging environment
--- Note: This data is applied when seeding the staging branch
+-- Note: Apps and tiers already exist from migrations - DO NOT recreate
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. TEST ORGANIZATIONS
+-- 1. ADMIN USERS (Required for Admin Portal access)
 -- -----------------------------------------------------------------------------
--- Create test organizations for staging environment testing
--- Using deterministic UUIDs for predictable references
+
+INSERT INTO admin_users (email, notes)
+VALUES ('johan.mardfelt@olivab.se', 'Core platform administrator')
+ON CONFLICT (email) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 2. TEST ORGANIZATIONS
+-- -----------------------------------------------------------------------------
 
 INSERT INTO organizations (id, name, description, is_active)
 VALUES
@@ -22,121 +28,66 @@ ON CONFLICT (id) DO UPDATE SET
   is_active = EXCLUDED.is_active;
 
 -- -----------------------------------------------------------------------------
--- 2. ENSURE VALIDAI APP IS REGISTERED
+-- 3. ORGANIZATION MEMBERS (link users to organizations)
 -- -----------------------------------------------------------------------------
--- The app registration should already exist from migrations, but ensure it's present
+-- Note: User ID is from staging auth.users table (johan.mardfelt@olivab.se)
 
-INSERT INTO apps (id, name, description, is_active)
-VALUES
-  ('validai', 'ValidAI', 'AI-powered document validation and processing', true)
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  description = EXCLUDED.description,
+-- Add admin user as owner of Staging Test Org
+INSERT INTO organization_members (user_id, organization_id, role, is_active)
+VALUES (
+  'ea050d4c-6204-4b37-94a1-f335112c71ba'::uuid,  -- johan.mardfelt@olivab.se in staging
+  '00000000-0000-0000-0000-000000000001'::uuid,   -- Staging Test Org
+  'owner',
+  true
+)
+ON CONFLICT (user_id, organization_id) DO UPDATE SET
+  role = EXCLUDED.role,
+  is_active = EXCLUDED.is_active;
+
+-- Also add to Demo Organization for testing multiple orgs
+INSERT INTO organization_members (user_id, organization_id, role, is_active)
+VALUES (
+  'ea050d4c-6204-4b37-94a1-f335112c71ba'::uuid,
+  '00000000-0000-0000-0000-000000000003'::uuid,   -- Demo Organization
+  'admin',
+  true
+)
+ON CONFLICT (user_id, organization_id) DO UPDATE SET
+  role = EXCLUDED.role,
   is_active = EXCLUDED.is_active;
 
 -- -----------------------------------------------------------------------------
--- 3. ENSURE VALIDAI TIERS EXIST
+-- 4. SUBSCRIPTIONS (link orgs to existing tiers)
 -- -----------------------------------------------------------------------------
-
-INSERT INTO app_tiers (app_id, tier_name, display_name, description, features, limits)
-VALUES
-  ('validai', 'free', 'Free', 'Basic validation features',
-   '{"basic_validation": true}'::jsonb,
-   '{"documents_per_month": 10, "processors": 2}'::jsonb),
-  ('validai', 'pro', 'Professional', 'Advanced validation with AI features',
-   '{"basic_validation": true, "ai_validation": true, "export": true}'::jsonb,
-   '{"documents_per_month": 1000, "processors": 50}'::jsonb),
-  ('validai', 'enterprise', 'Enterprise', 'Full feature access with priority support',
-   '{"basic_validation": true, "ai_validation": true, "export": true, "api_access": true, "priority_support": true}'::jsonb,
-   '{"documents_per_month": -1, "processors": -1}'::jsonb)
-ON CONFLICT (app_id, tier_name) DO UPDATE SET
-  display_name = EXCLUDED.display_name,
-  description = EXCLUDED.description,
-  features = EXCLUDED.features,
-  limits = EXCLUDED.limits;
-
--- -----------------------------------------------------------------------------
--- 4. ASSIGN SUBSCRIPTIONS TO TEST ORGANIZATIONS
--- -----------------------------------------------------------------------------
+-- Note: apps and app_tiers already exist from migrations
+-- IMPORTANT: tier_name is a required NOT NULL column
 
 -- Staging Test Org gets Pro tier
 INSERT INTO organization_app_subscriptions (
-  organization_id,
-  app_id,
-  tier_id,
-  status,
-  current_period_start,
-  current_period_end
+  organization_id, app_id, tier_id, tier_name, status, billing_period_start, billing_period_end
 )
 SELECT
-  '00000000-0000-0000-0000-000000000001'::uuid,
-  'validai',
-  id,
-  'active',
-  now(),
-  now() + interval '1 year'
-FROM app_tiers
-WHERE app_id = 'validai' AND tier_name = 'pro'
+  '00000000-0000-0000-0000-000000000001'::uuid, 'validai', id, tier_name, 'active', now(), now() + interval '1 year'
+FROM app_tiers WHERE app_id = 'validai' AND tier_name = 'pro'
 ON CONFLICT (organization_id, app_id) DO UPDATE SET
-  tier_id = EXCLUDED.tier_id,
-  status = EXCLUDED.status,
-  current_period_end = EXCLUDED.current_period_end;
+  tier_id = EXCLUDED.tier_id, tier_name = EXCLUDED.tier_name, status = EXCLUDED.status, billing_period_end = EXCLUDED.billing_period_end;
 
 -- QA Team gets Enterprise tier
 INSERT INTO organization_app_subscriptions (
-  organization_id,
-  app_id,
-  tier_id,
-  status,
-  current_period_start,
-  current_period_end
+  organization_id, app_id, tier_id, tier_name, status, billing_period_start, billing_period_end
 )
 SELECT
-  '00000000-0000-0000-0000-000000000002'::uuid,
-  'validai',
-  id,
-  'active',
-  now(),
-  now() + interval '1 year'
-FROM app_tiers
-WHERE app_id = 'validai' AND tier_name = 'enterprise'
+  '00000000-0000-0000-0000-000000000002'::uuid, 'validai', id, tier_name, 'active', now(), now() + interval '1 year'
+FROM app_tiers WHERE app_id = 'validai' AND tier_name = 'enterprise'
 ON CONFLICT (organization_id, app_id) DO UPDATE SET
-  tier_id = EXCLUDED.tier_id,
-  status = EXCLUDED.status,
-  current_period_end = EXCLUDED.current_period_end;
+  tier_id = EXCLUDED.tier_id, tier_name = EXCLUDED.tier_name, status = EXCLUDED.status, billing_period_end = EXCLUDED.billing_period_end;
 
 -- Demo Organization gets Free tier
 INSERT INTO organization_app_subscriptions (
-  organization_id,
-  app_id,
-  tier_id,
-  status,
-  current_period_start,
-  current_period_end
+  organization_id, app_id, tier_id, tier_name, status, billing_period_start, billing_period_end
 )
 SELECT
-  '00000000-0000-0000-0000-000000000003'::uuid,
-  'validai',
-  id,
-  'active',
-  now(),
-  now() + interval '1 year'
-FROM app_tiers
-WHERE app_id = 'validai' AND tier_name = 'free'
+  '00000000-0000-0000-0000-000000000003'::uuid, 'validai', id, tier_name, 'active', now(), now() + interval '1 year'
+FROM app_tiers WHERE app_id = 'validai' AND tier_name = 'free'
 ON CONFLICT (organization_id, app_id) DO UPDATE SET
-  tier_id = EXCLUDED.tier_id,
-  status = EXCLUDED.status,
-  current_period_end = EXCLUDED.current_period_end;
-
--- -----------------------------------------------------------------------------
--- NOTE: User data and memberships
--- -----------------------------------------------------------------------------
--- User records are created through Supabase Auth, not directly in the database.
--- When you sign up or are invited in the staging environment:
---   1. Create user through Supabase Auth (email/password or OAuth)
---   2. Use the admin portal to invite users to test organizations
---   3. Or use the switch-organization Edge Function to assign org context
---
--- For automated testing, you can create test users via Supabase Auth API:
---   supabase.auth.admin.createUser({ email: 'test@example.com', ... })
--- Then add them to organizations via the admin functions.
+  tier_id = EXCLUDED.tier_id, tier_name = EXCLUDED.tier_name, status = EXCLUDED.status, billing_period_end = EXCLUDED.billing_period_end;

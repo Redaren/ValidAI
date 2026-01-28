@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { createBrowserClient } from '@playze/shared-auth/client'
 import { useCurrentOrganization, useUserOrganizations, useAuthorization } from '@playze/shared-auth'
 import { Button, Card, AppSwitcher, OrgSwitcher, AuthGate } from '@playze/shared-ui'
-import { LogOut, User, Loader2, Building2, Grid3x3, Crown, Shield, Edit3 } from 'lucide-react'
+import { LogOut, User, Loader2, Building2, Grid3x3, Crown, Shield, Edit3, Settings, Users } from 'lucide-react'
+import Link from 'next/link'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 
 /**
@@ -201,6 +202,29 @@ export default function DashboardContent() {
                     </span>
                   </div>
                 </div>
+              </div>
+            </div>
+          </Card>
+
+          {/* Organization Management Card */}
+          <Card className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="rounded-full bg-indigo-100 dark:bg-indigo-900 p-3">
+                <Users className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold text-foreground mb-2">
+                  Organization Management
+                </h2>
+                <p className="text-muted-foreground mb-4">
+                  Manage team members, send invitations, and control access to your organization.
+                </p>
+                <Link href="/settings/members">
+                  <Button>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Manage Members
+                  </Button>
+                </Link>
               </div>
             </div>
           </Card>

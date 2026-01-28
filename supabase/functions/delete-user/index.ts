@@ -1,7 +1,7 @@
 import { createAdminClient } from '../_shared/supabaseAdmin.ts'
 import { handleCors } from '../_shared/cors.ts'
 import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse, notFoundResponse } from '../_shared/response.ts'
-import { getUserFromRequest, isPlayzeAdmin } from '../_shared/auth.ts'
+import { getAuthenticatedUser, isPlayzeAdmin } from '../_shared/auth.ts'
 import { validateRequired } from '../_shared/validation.ts'
 
 /**
@@ -26,21 +26,17 @@ import { validateRequired } from '../_shared/validation.ts'
  *   }
  * }
  *
- * Output (blocked - sole owner):
- * {
- *   "success": false,
- *   "error": "Cannot delete user. They are the sole owner of: Org A, Org B"
- * }
- *
- * Safety: Blocks deletion if user is the sole owner of any organization
+ * Note: If user is sole owner of organizations, those orgs will be left orphaned.
+ * An admin can assign a new owner later via the admin portal.
  *
  * Cascade behavior (handled by database ON DELETE CASCADE):
  * - profiles → deleted
- * - organization_members → deleted
+ * - organization_members → deleted (user removed from all orgs)
  * - user_preferences → deleted
- * - admin_users → deleted
  *
  * Audit trail (ON DELETE SET NULL):
+ * - admin_users.created_by → NULL
+ * - organizations.created_by → NULL
  * - organization_members.invited_by → NULL
  * - organization_invitations.invited_by → NULL
  * - organization_app_subscriptions.assigned_by → NULL
@@ -66,11 +62,12 @@ Deno.serve(async (req) => {
   try {
     const supabase = createAdminClient()
 
-    // Get authenticated user
-    const adminUser = await getUserFromRequest(req, supabase)
-    if (!adminUser) {
+    // Get authenticated user (uses getClaims() for asymmetric JWT support)
+    const authResult = await getAuthenticatedUser(req, supabase)
+    if (!authResult) {
       return unauthorizedResponse('Invalid or missing authentication token')
     }
+    const adminUser = authResult.user
 
     // Verify user is Playze admin
     const isAdmin = await isPlayzeAdmin(adminUser.email, supabase)
@@ -103,61 +100,9 @@ Deno.serve(async (req) => {
 
     const targetEmail = targetUser.user.email
 
-    // Check if user is sole owner of any organization
-    const { data: soleOwnerOrgs, error: checkError } = await supabase
-      .from('organizations')
-      .select(`
-        id,
-        name,
-        organization_members!inner (
-          user_id,
-          role
-        )
-      `)
-      .eq('organization_members.user_id', userId)
-      .eq('organization_members.role', 'owner')
-
-    if (checkError) {
-      console.error('Error checking sole owner status:', checkError)
-      return errorResponse('Failed to verify user ownership status', 500)
-    }
-
-    // For each org where user is owner, check if there are other owners
-    const orgsWhereUserIsSoleOwner: string[] = []
-
-    if (soleOwnerOrgs && soleOwnerOrgs.length > 0) {
-      for (const org of soleOwnerOrgs) {
-        // Check if there are other owners in this organization
-        const { data: otherOwners, error: ownerCheckError } = await supabase
-          .from('organization_members')
-          .select('user_id')
-          .eq('organization_id', org.id)
-          .eq('role', 'owner')
-          .neq('user_id', userId)
-
-        if (ownerCheckError) {
-          console.error(`Error checking other owners for org ${org.id}:`, ownerCheckError)
-          continue
-        }
-
-        // If no other owners exist, this user is the sole owner
-        if (!otherOwners || otherOwners.length === 0) {
-          orgsWhereUserIsSoleOwner.push(org.name)
-        }
-      }
-    }
-
-    // Block deletion if user is sole owner of any organization
-    if (orgsWhereUserIsSoleOwner.length > 0) {
-      const orgNames = orgsWhereUserIsSoleOwner.join(', ')
-      console.log(`Deletion blocked - user is sole owner of: ${orgNames}`)
-      return errorResponse(
-        `Cannot delete user. They are the sole owner of: ${orgNames}. Please assign another owner first.`,
-        400
-      )
-    }
-
     // Proceed with deletion
+    // Note: If user is sole owner of organizations, those orgs will be left orphaned
+    // An admin can assign a new owner later via the admin portal
     console.log(`Deleting user ${targetEmail} (${userId})`)
 
     const { error: deleteError } = await supabase.auth.admin.deleteUser(userId)

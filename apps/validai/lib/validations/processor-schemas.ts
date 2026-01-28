@@ -63,3 +63,16 @@ export type UpdateProcessorSettingsInput = z.infer<typeof updateProcessorSetting
  * Schema for validating processor name (useful for rename operations)
  */
 export const processorNameSchema = nameSchema
+
+/**
+ * Schema for updating processor profile information
+ * Used in: ProcessorProfileForm on the processor detail page Profile tab
+ * Fields: Title (name), Usage Description, Tags
+ */
+export const processorProfileSchema = z.object({
+  name: nameSchema,
+  usage_description: descriptionSchema,
+  tags: tagsSchema,
+})
+
+export type ProcessorProfileInput = z.infer<typeof processorProfileSchema>

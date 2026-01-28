@@ -43,3 +43,53 @@ project_id = "cijfuxvudgoqupvjcbsd"
 [remotes.staging.db.seed]
 enabled = true
 sql_paths = ["./seeds/staging.sql"]
+
+# ============================================================================
+# EDGE FUNCTION JWT CONFIGURATION
+# ============================================================================
+# Disable built-in JWT verification for all edge functions.
+# We use supabase.auth.getClaims() instead, which supports both symmetric (HS256)
+# and asymmetric (RS256/ES256) JWT signing.
+#
+# This is required for the staging environment which uses asymmetric JWT signing.
+# See: https://supabase.com/docs/guides/functions/auth
+# ============================================================================
+
+[functions.switch-organization]
+verify_jwt = false
+
+[functions.create-organization]
+verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
+
+[functions.create-user]
+verify_jwt = false
+
+[functions.invite-member]
+verify_jwt = false
+
+[functions.invite-user]
+verify_jwt = false
+
+[functions.cancel-invitation]
+verify_jwt = false
+
+[functions.resend-invitation]
+verify_jwt = false
+
+[functions.accept-invitation]
+verify_jwt = false
+
+[functions.user-invite-member]
+verify_jwt = false
+
+[functions.enrich-jwt]
+verify_jwt = false
+
+[functions.execute-workbench-test]
+verify_jwt = false
+
+[functions.execute-processor-run]
+verify_jwt = false

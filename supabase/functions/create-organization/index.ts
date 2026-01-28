@@ -1,7 +1,7 @@
 import { createAdminClient } from '../_shared/supabaseAdmin.ts'
 import { handleCors } from '../_shared/cors.ts'
 import { successResponse, errorResponse, unauthorizedResponse, forbiddenResponse, conflictResponse } from '../_shared/response.ts'
-import { getUserFromRequest, isPlayzeAdmin } from '../_shared/auth.ts'
+import { getAuthenticatedUser, isPlayzeAdmin } from '../_shared/auth.ts'
 import { validateRequired } from '../_shared/validation.ts'
 
 /**
@@ -70,11 +70,12 @@ Deno.serve(async (req) => {
   try {
     const supabase = createAdminClient()
 
-    // Get authenticated user
-    const user = await getUserFromRequest(req, supabase)
-    if (!user) {
+    // Get authenticated user (uses getClaims() for asymmetric JWT support)
+    const authResult = await getAuthenticatedUser(req, supabase)
+    if (!authResult) {
       return unauthorizedResponse('Invalid or missing authentication token')
     }
+    const { user } = authResult
 
     // Verify user is Playze admin
     console.log('=== ADMIN CHECK DEBUG ===')

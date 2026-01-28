@@ -1,4 +1,6 @@
-import type { Config } from "tailwindcss";
+import type { Config } from "tailwindcss"
+// @ts-ignore
+import sharedConfig from "@playze/shared-config/tailwind/base.js"
 
 const config: Config = {
   content: [
@@ -7,10 +9,7 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "../../packages/shared-ui/src/**/*.{js,ts,jsx,tsx}",
   ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-};
+  presets: [sharedConfig],
+}
 
-export default config;
+export default config

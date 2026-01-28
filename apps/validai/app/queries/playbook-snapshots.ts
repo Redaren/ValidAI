@@ -323,6 +323,37 @@ export function useUpdatePlaybookVisibility() {
 }
 
 /**
+ * Snapshot data for dirty state comparison
+ * Only includes fields needed for comparing processor state
+ */
+export interface SnapshotForComparison {
+  id: string
+  processor_id: string | null
+  version_number: number
+  snapshot: {
+    processor: {
+      id: string
+      name: string
+      description: string | null
+      system_prompt: string | null
+      configuration: Record<string, unknown> | null
+      area_configuration?: Record<string, unknown> | null
+    }
+    operations: Array<{
+      id: string
+      name: string
+      description: string | null
+      operation_type: string
+      prompt: string
+      position: number
+      area: string | null
+      configuration: Record<string, unknown> | null
+      output_schema: Record<string, unknown> | null
+    }>
+  }
+}
+
+/**
  * Published snapshot data for a processor
  */
 export interface PublishedSnapshotMeta {
@@ -471,6 +502,52 @@ export function usePlaybookSnapshot(snapshotId: string | undefined) {
 }
 
 /**
+ * Hook to fetch a snapshot for dirty state comparison
+ *
+ * Unlike usePlaybookSnapshot (which uses RPC for published access),
+ * this queries the table directly to work with ANY snapshot including
+ * unpublished versions. This is safe because:
+ * - RLS enforces we can only access our organization's snapshots
+ * - The snapshot belongs to our processor (we control loaded_snapshot_id)
+ *
+ * @param snapshotId - UUID of the snapshot
+ * @returns Query hook with snapshot data for comparison
+ *
+ * @example
+ * ```tsx
+ * const { data: loadedSnapshot } = useSnapshotForComparison(processor?.loaded_snapshot_id)
+ *
+ * // Use for dirty state comparison
+ * const { isDirty } = useDirtyState(processor, loadedSnapshot)
+ * ```
+ */
+export function useSnapshotForComparison(snapshotId: string | undefined) {
+  const supabase = createBrowserClient()
+
+  return useQuery({
+    queryKey: ['snapshot-comparison', snapshotId],
+    queryFn: async () => {
+      if (!snapshotId) return null
+
+      const { data, error } = await supabase
+        .from('validai_playbook_snapshots')
+        .select('id, processor_id, snapshot, version_number')
+        .eq('id', snapshotId)
+        .maybeSingle()
+
+      if (error) {
+        logger.error('Failed to fetch snapshot for comparison:', extractErrorDetails(error))
+        throw new Error(error.message || 'Failed to fetch snapshot')
+      }
+
+      return data as SnapshotForComparison | null
+    },
+    enabled: !!snapshotId,
+    staleTime: 60 * 1000, // 1 minute (snapshots are immutable)
+  })
+}
+
+/**
  * Hook to save current processor state as a new version (without publishing)
  *
  * Creates a new snapshot from the current processor and operations state.
@@ -521,13 +598,18 @@ export function useSaveAsVersion() {
         message: string
       }
     },
-    onSuccess: (data, variables) => {
-      // Invalidate related queries
-      queryClient.invalidateQueries({
+    onSuccess: async (data, variables) => {
+      // Await processor refetch first - this updates loaded_snapshot_id
+      await queryClient.invalidateQueries({
+        queryKey: ['processor', variables.processorId],
+      })
+      // Then await snapshots refetch
+      await queryClient.invalidateQueries({
         queryKey: ['processor-snapshots', variables.processorId],
       })
+      // Now invalidate snapshot comparison - will fetch with new loaded_snapshot_id
       queryClient.invalidateQueries({
-        queryKey: ['processor', variables.processorId],
+        queryKey: ['snapshot-comparison', data.snapshot_id],
       })
       queryClient.invalidateQueries({ queryKey: ['user-processors'] })
     },
@@ -592,6 +674,10 @@ export function useLoadSnapshot() {
       })
       queryClient.invalidateQueries({
         queryKey: ['processor-snapshots', variables.processorId],
+      })
+      // Invalidate snapshot comparison queries (for dirty state)
+      queryClient.invalidateQueries({
+        queryKey: ['snapshot-comparison'],
       })
     },
     onError: (error) => {
