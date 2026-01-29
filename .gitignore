@@ -12,6 +12,7 @@ out/
 # Environment files (sensitive)
 .env.local
 .env*.local
+.env.local.*
 .env.production
 .env.development
 
