@@ -107,7 +107,34 @@ This balances privacy with functionality for analytics and debugging.
 }
 ```
 
-### 6. Content-Security-Policy (CSP)
+### 6. CORS (Cross-Origin Resource Sharing)
+
+**Purpose**: Controls which domains can make cross-origin requests to Edge Functions from browsers.
+
+**Location**: [`supabase/functions/_shared/cors.ts`](../../supabase/functions/_shared/cors.ts)
+
+**Allowed Origins**:
+| Origin | Environment | Purpose |
+|--------|-------------|---------|
+| `https://app.sanitycheck.se` | Production | ValidAI application |
+| `https://admin.sanitycheck.se` | Production | Admin Portal |
+| `http://localhost:3000` | Development | Primary dev server |
+| `http://localhost:3001-3004` | Development | Additional dev servers |
+
+**Implementation**:
+- Origin is validated against allowlist on every request
+- Preflight (OPTIONS) requests return 403 Forbidden for unauthorized origins
+- CORS headers only included in response when origin is allowed
+- No wildcard (`*`) origins permitted
+
+**Impact**:
+- Browsers enforce CORS restrictions on cross-origin fetch/XHR requests
+- Unauthorized origins cannot call Edge Functions from browser JavaScript
+- Server-to-server requests (e.g., from Next.js API routes) are not affected by CORS
+
+**Security Note**: CORS was updated on 2026-01-29 to replace wildcard origin (`*`) with explicit allowlist. See [Security Audit 2026-01](./security-audit-2026-01.md) for details.
+
+### 7. Content-Security-Policy (CSP)
 
 **Purpose**: The most powerful security header. Defines which resources can be loaded and executed, preventing XSS attacks.
 
@@ -318,6 +345,7 @@ const scriptSrc = isDevelopment
 | Clickjacking | X-Frame-Options, frame-ancestors | High |
 | MIME Sniffing | X-Content-Type-Options | Medium |
 | Protocol Downgrade | HSTS | High |
+| Unauthorized API Access | CORS | High |
 | Information Leakage | Referrer-Policy | Low |
 | Unwanted Feature Access | Permissions-Policy | Medium |
 
@@ -384,6 +412,6 @@ const scriptSrc = isDevelopment
 
 ---
 
-**Last Updated**: 2025-11-05
+**Last Updated**: 2026-01-29
 **Author**: Claude Code
-**Review Status**: Initial Implementation
+**Review Status**: Updated with CORS configuration
