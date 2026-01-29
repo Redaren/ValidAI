@@ -57,6 +57,9 @@ import { sendEmail, organizationAssignedEmail } from '../_shared/email.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -64,7 +67,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -73,14 +76,14 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
     // Verify user is Playze admin
     const isAdmin = await isPlayzeAdmin(user.email, supabase)
     if (!isAdmin) {
-      return forbiddenResponse('Only Playze administrators can invite members')
+      return forbiddenResponse('Only Playze administrators can invite members', origin)
     }
 
     // Parse and validate request body
@@ -88,20 +91,20 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ organizationId, email }, ['organizationId', 'email'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     if (!validateUuid(organizationId)) {
-      return errorResponse('Invalid organization ID format')
+      return errorResponse('Invalid organization ID format', 400, origin)
     }
 
     if (!validateEmail(email)) {
-      return errorResponse('Invalid email format')
+      return errorResponse('Invalid email format', 400, origin)
     }
 
     const validRoles = ['owner', 'admin', 'member', 'viewer']
     if (!validRoles.includes(role)) {
-      return errorResponse('Invalid role. Must be owner, admin, member, or viewer')
+      return errorResponse('Invalid role. Must be owner, admin, member, or viewer', 400, origin)
     }
 
     console.log(`Admin ${user.email} inviting ${email} to organization ${organizationId} as ${role}`)
@@ -115,7 +118,7 @@ Deno.serve(async (req) => {
 
     if (orgError || !organization) {
       console.error('Error fetching organization:', orgError)
-      return errorResponse('Organization not found', 404)
+      return errorResponse('Organization not found', 404, origin)
     }
 
     // Create invitation record using RPC function
@@ -131,11 +134,11 @@ Deno.serve(async (req) => {
 
     if (inviteError) {
       console.error('Error creating invitation:', inviteError)
-      return errorResponse(inviteError.message || 'Failed to create invitation')
+      return errorResponse(inviteError.message || 'Failed to create invitation', 400, origin)
     }
 
     if (!inviteResult || inviteResult.length === 0) {
-      return errorResponse('Failed to create invitation')
+      return errorResponse('Failed to create invitation', 400, origin)
     }
 
     const invitation = inviteResult[0]
@@ -203,7 +206,7 @@ Deno.serve(async (req) => {
           userExists: true,
           emailSent: false,
           message: 'User assigned but notification email failed to send'
-        })
+        }, origin)
       }
 
       console.log(`Notification email sent to existing user ${email}, messageId: ${emailResult.messageId}`)
@@ -214,7 +217,7 @@ Deno.serve(async (req) => {
         userExists: true,
         emailSent: true,
         message: 'User has been assigned and notification email sent'
-      })
+      }, origin)
     }
 
     // For new users, continue with invitation email flow
@@ -249,7 +252,7 @@ Deno.serve(async (req) => {
         invitation: invitation,
         emailSent: false,
         message: 'Invitation created but email failed to send. You can resend the invitation later.'
-      })
+      }, origin)
     }
 
     console.log(`Invitation email sent successfully to ${email}`)
@@ -260,10 +263,10 @@ Deno.serve(async (req) => {
       userExists: false,
       status: 'pending',
       message: 'Invitation email sent. The user will be added to the organization after they sign up.'
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in invite-member:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

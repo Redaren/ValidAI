@@ -42,6 +42,9 @@ import { validateRequired, validateUuid } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -49,7 +52,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -58,14 +61,14 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
     // Verify user is Playze admin
     const isAdmin = await isPlayzeAdmin(user.email, supabase)
     if (!isAdmin) {
-      return forbiddenResponse('Only Playze administrators can cancel invitations')
+      return forbiddenResponse('Only Playze administrators can cancel invitations', origin)
     }
 
     // Parse and validate request body
@@ -73,11 +76,11 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ invitationId }, ['invitationId'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     if (!validateUuid(invitationId)) {
-      return errorResponse('Invalid invitation ID format')
+      return errorResponse('Invalid invitation ID format', 400, origin)
     }
 
     console.log(`Admin ${user.email} canceling invitation ${invitationId}`)
@@ -91,11 +94,11 @@ Deno.serve(async (req) => {
 
     if (fetchError || !invitation) {
       console.error('Error fetching invitation:', fetchError)
-      return errorResponse('Invitation not found', 404)
+      return errorResponse('Invitation not found', 404, origin)
     }
 
     if (invitation.status !== 'pending') {
-      return errorResponse(`Cannot cancel invitation with status: ${invitation.status}. Only pending invitations can be canceled.`)
+      return errorResponse(`Cannot cancel invitation with status: ${invitation.status}. Only pending invitations can be canceled.`, 400, origin)
     }
 
     const invitedEmail = invitation.email.toLowerCase().trim()
@@ -108,11 +111,11 @@ Deno.serve(async (req) => {
 
     if (cancelError) {
       console.error('Error canceling invitation:', cancelError)
-      return errorResponse(cancelError.message || 'Failed to cancel invitation')
+      return errorResponse(cancelError.message || 'Failed to cancel invitation', 400, origin)
     }
 
     if (!cancelResult || cancelResult.length === 0) {
-      return errorResponse('Failed to cancel invitation')
+      return errorResponse('Failed to cancel invitation', 400, origin)
     }
 
     const canceledInvitation = cancelResult[0]
@@ -164,10 +167,10 @@ Deno.serve(async (req) => {
       message: userCleanedUp
         ? 'Invitation canceled and orphaned user cleaned up'
         : 'Invitation canceled successfully'
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in cancel-invitation:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

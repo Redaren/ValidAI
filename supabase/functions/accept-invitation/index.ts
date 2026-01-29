@@ -43,6 +43,9 @@ import { validateRequired, validateUuid } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -50,7 +53,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -59,7 +62,7 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
@@ -68,11 +71,11 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ invitationId }, ['invitationId'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     if (!validateUuid(invitationId)) {
-      return errorResponse('Invalid invitation ID format')
+      return errorResponse('Invalid invitation ID format', 400, origin)
     }
 
     console.log(`User ${user.email} accepting invitation ${invitationId}`)
@@ -113,17 +116,17 @@ Deno.serve(async (req) => {
 
       // Provide user-friendly error messages
       if (acceptError.message.includes('not found')) {
-        return notFoundResponse('Invitation not found, expired, or already used')
+        return notFoundResponse('Invitation not found, expired, or already used', origin)
       }
       if (acceptError.message.includes('email does not match')) {
-        return errorResponse('This invitation was sent to a different email address')
+        return errorResponse('This invitation was sent to a different email address', 400, origin)
       }
 
-      return errorResponse(acceptError.message || 'Failed to accept invitation')
+      return errorResponse(acceptError.message || 'Failed to accept invitation', 400, origin)
     }
 
     if (!result || result.length === 0) {
-      return errorResponse('Failed to process invitation')
+      return errorResponse('Failed to process invitation', 400, origin)
     }
 
     const invitation = result[0]
@@ -138,11 +141,11 @@ Deno.serve(async (req) => {
 
     if (orgError || !org) {
       console.error('Error fetching organization:', orgError)
-      return errorResponse('Organization not found', 404)
+      return errorResponse('Organization not found', 404, origin)
     }
 
     if (!org.is_active) {
-      return forbiddenResponse('Organization is inactive. Cannot accept invitation.')
+      return forbiddenResponse('Organization is inactive. Cannot accept invitation.', origin)
     }
 
     // Get accessible apps for this organization (also validates at least one exists)
@@ -151,11 +154,11 @@ Deno.serve(async (req) => {
 
     if (appsError) {
       console.error('Error fetching accessible apps:', appsError)
-      return errorResponse('Failed to verify subscription status', 500)
+      return errorResponse('Failed to verify subscription status', 500, origin)
     }
 
     if (!accessibleApps || accessibleApps.length === 0) {
-      return forbiddenResponse('Organization has no active subscriptions. Cannot accept invitation.')
+      return forbiddenResponse('Organization has no active subscriptions. Cannot accept invitation.', origin)
     }
 
     // Update user's JWT metadata with new organization and accessible_apps using admin API
@@ -196,10 +199,10 @@ Deno.serve(async (req) => {
       role: invitation.role,
       defaultAppUrl: invitation.default_app_url || null,
       message: `Welcome to ${invitation.organization_name}!`
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in accept-invitation:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

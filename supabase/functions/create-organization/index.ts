@@ -57,6 +57,9 @@ import { validateRequired } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -64,7 +67,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -73,7 +76,7 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
@@ -90,7 +93,7 @@ Deno.serve(async (req) => {
     console.log('=== END DEBUG ===')
 
     if (!isAdmin) {
-      return forbiddenResponse('Only Playze administrators can create organizations')
+      return forbiddenResponse('Only Playze administrators can create organizations', origin)
     }
 
     // Parse and validate request body
@@ -117,7 +120,7 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ name }, ['name'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     console.log(`Admin ${user.email} creating organization: ${name}`)
@@ -155,10 +158,10 @@ Deno.serve(async (req) => {
 
       // Handle unique constraint violation (duplicate name)
       if (orgError.code === '23505') {
-        return conflictResponse(`Organization name '${name}' already exists. Please choose a different name.`)
+        return conflictResponse(`Organization name '${name}' already exists. Please choose a different name.`, origin)
       }
 
-      return errorResponse('Failed to create organization', 500)
+      return errorResponse('Failed to create organization', 500, origin)
     }
 
     console.log(`Organization created: ${organization.id}`)
@@ -231,10 +234,10 @@ Deno.serve(async (req) => {
 
     console.log(`Organization creation complete: ${organization.id}`)
 
-    return successResponse(result)
+    return successResponse(result, origin)
 
   } catch (error) {
     console.error('Unexpected error in create-organization:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

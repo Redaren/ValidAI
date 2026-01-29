@@ -68,13 +68,16 @@ import type {
   LLMProvider
 } from '../_shared/types.ts'
 
-/**
- * CORS headers configuration
- */
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+import { getCorsHeaders, handleCors } from '../_shared/cors.ts'
+
+// Helper to get CORS headers for the current request
+// Background invocations (self-invoked) don't have browser origins so we pass null
+let requestOrigin: string | null = null
+
+function getCorsHeadersForRequest(): Record<string, string> {
+  return getCorsHeaders(requestOrigin)
 }
+
 
 /**
  * Chunk size moved to provider-specific execution_config (2025-11-08)
@@ -147,9 +150,12 @@ interface RunSnapshot {
  * Main request handler
  */
 serve(async (req) => {
+  // Store origin for CORS headers throughout this request
+  requestOrigin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return handleCors(req)
   }
 
   try {
@@ -207,14 +213,14 @@ serve(async (req) => {
       if (!initialBody.processor_id && !initialBody.playbook_snapshot_id) {
         return new Response(
           JSON.stringify({ error: 'Either processor_id or playbook_snapshot_id is required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
       if (initialBody.processor_id && initialBody.playbook_snapshot_id) {
         return new Response(
           JSON.stringify({ error: 'Cannot provide both processor_id and playbook_snapshot_id' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -222,14 +228,14 @@ serve(async (req) => {
       if (!initialBody.document_id && !initialBody.file_upload) {
         return new Response(
           JSON.stringify({ error: 'Either document_id or file_upload is required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
       if (initialBody.document_id && initialBody.file_upload) {
         return new Response(
           JSON.stringify({ error: 'Cannot provide both document_id and file_upload' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -258,7 +264,7 @@ serve(async (req) => {
         if (snapError || !snapshot) {
           return new Response(
             JSON.stringify({ error: 'Snapshot not found or not published' }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 404, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -294,7 +300,7 @@ serve(async (req) => {
         if (snapError || !snapshot) {
           return new Response(
             JSON.stringify({ error: 'Processor has no published version' }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -327,7 +333,7 @@ serve(async (req) => {
         if (procError || !proc) {
           return new Response(
             JSON.stringify({ error: `Processor not found: ${procError?.message}` }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 404, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -343,7 +349,7 @@ serve(async (req) => {
         if (opsError) {
           return new Response(
             JSON.stringify({ error: `Failed to fetch operations: ${opsError.message}` }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -356,7 +362,7 @@ serve(async (req) => {
       if (!operations || operations.length === 0) {
         return new Response(
           JSON.stringify({ error: 'Processor has no operations' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -378,7 +384,7 @@ serve(async (req) => {
         if (docError || !document) {
           return new Response(
             JSON.stringify({ error: `Document not found: ${docError?.message}` }),
-            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 404, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -402,7 +408,7 @@ serve(async (req) => {
         if (initialBody.file_upload.size_bytes > MAX_FILE_SIZE) {
           return new Response(
             JSON.stringify({ error: `File size exceeds 10MB limit (${(initialBody.file_upload.size_bytes / 1024 / 1024).toFixed(2)}MB)` }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 400, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -432,7 +438,7 @@ serve(async (req) => {
         if (!organization_id) {
           return new Response(
             JSON.stringify({ error: 'No active organization in user context' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 403, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
 
@@ -447,7 +453,7 @@ serve(async (req) => {
         if (!membership) {
           return new Response(
             JSON.stringify({ error: 'User not member of active organization' }),
-            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 403, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
       }
@@ -462,7 +468,7 @@ serve(async (req) => {
       if (llmError || !llmConfig) {
         return new Response(
           JSON.stringify({ error: `Failed to resolve LLM configuration: ${llmError?.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -528,7 +534,7 @@ serve(async (req) => {
               error: 'Document upload to Mistral failed',
               details: error.message
             }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
       }
@@ -598,7 +604,7 @@ serve(async (req) => {
                 error: 'Document upload to Anthropic failed',
                 details: error.message
               }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
         } else {
@@ -729,7 +735,7 @@ serve(async (req) => {
               error: 'Document upload/cache creation for Gemini failed',
               details: error.message
             }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
           )
         }
       }
@@ -796,7 +802,7 @@ serve(async (req) => {
       if (runError || !run) {
         return new Response(
           JSON.stringify({ error: `Failed to create run: ${runError?.message}` }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -830,7 +836,7 @@ serve(async (req) => {
         }),
         {
           status: 202,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' }
         }
       )
 
@@ -853,7 +859,7 @@ serve(async (req) => {
         console.error(`Failed to fetch run: ${runError?.message}`)
         return new Response(
           JSON.stringify({ error: 'Run not found' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 404, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -886,7 +892,7 @@ serve(async (req) => {
           .eq('id', backgroundBody.run_id)
         return new Response(
           JSON.stringify({ error: 'Failed to resolve LLM config' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
         )
       }
 
@@ -915,7 +921,7 @@ serve(async (req) => {
               .eq('id', backgroundBody.run_id)
             return new Response(
               JSON.stringify({ error: 'Failed to decrypt Mistral API key' }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
           apiKey = decryptedKey
@@ -934,7 +940,7 @@ serve(async (req) => {
               .eq('id', backgroundBody.run_id)
             return new Response(
               JSON.stringify({ error: 'No Mistral API key available' }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
           apiKey = globalKey
@@ -960,7 +966,7 @@ serve(async (req) => {
               .eq('id', backgroundBody.run_id)
             return new Response(
               JSON.stringify({ error: 'Failed to decrypt Google API key' }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
           apiKey = decryptedKey
@@ -979,7 +985,7 @@ serve(async (req) => {
               .eq('id', backgroundBody.run_id)
             return new Response(
               JSON.stringify({ error: 'No Google API key available' }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
           apiKey = globalKey
@@ -1005,7 +1011,7 @@ serve(async (req) => {
               .eq('id', backgroundBody.run_id)
             return new Response(
               JSON.stringify({ error: 'Failed to decrypt Anthropic API key' }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
           apiKey = decryptedKey
@@ -1024,7 +1030,7 @@ serve(async (req) => {
               .eq('id', backgroundBody.run_id)
             return new Response(
               JSON.stringify({ error: 'No Anthropic API key available' }),
-              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              { status: 500, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
             )
           }
           apiKey = globalKey
@@ -1287,7 +1293,7 @@ serve(async (req) => {
       // 7. Return success
       return new Response(
         JSON.stringify({ success: true }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' } }
       )
     }
 
@@ -1301,7 +1307,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' }
       }
     )
   }

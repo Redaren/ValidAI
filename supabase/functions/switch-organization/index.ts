@@ -37,6 +37,9 @@ import { validateRequired, validateUuid } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -44,7 +47,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -53,7 +56,7 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
@@ -62,17 +65,17 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ organizationId }, ['organizationId'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     if (!validateUuid(organizationId)) {
-      return errorResponse('Invalid organization ID format (must be valid UUID)')
+      return errorResponse('Invalid organization ID format (must be valid UUID)', 400, origin)
     }
 
     // Verify user is member of target organization
     const membership = await validateOrgMembership(supabase, user.id, organizationId)
     if (!membership) {
-      return forbiddenResponse('You are not a member of this organization')
+      return forbiddenResponse('You are not a member of this organization', origin)
     }
 
     // Verify organization is active and get default app URL
@@ -89,11 +92,11 @@ Deno.serve(async (req) => {
 
     if (orgError || !org) {
       console.error('Error fetching organization:', orgError)
-      return errorResponse('Organization not found', 404)
+      return errorResponse('Organization not found', 404, origin)
     }
 
     if (!org.is_active) {
-      return forbiddenResponse('Organization is inactive')
+      return forbiddenResponse('Organization is inactive', origin)
     }
 
     // Extract default app URL (handle both object and null cases)
@@ -105,11 +108,11 @@ Deno.serve(async (req) => {
 
     if (appsError) {
       console.error('Error fetching accessible apps:', appsError)
-      return errorResponse('Failed to verify subscription status', 500)
+      return errorResponse('Failed to verify subscription status', 500, origin)
     }
 
     if (!accessibleApps || accessibleApps.length === 0) {
-      return forbiddenResponse('Organization has no active subscriptions')
+      return forbiddenResponse('Organization has no active subscriptions', origin)
     }
 
     // Update user's JWT metadata with new organization context
@@ -128,7 +131,7 @@ Deno.serve(async (req) => {
 
     if (updateError) {
       console.error('Error updating user metadata:', updateError)
-      return errorResponse('Failed to switch organization', 500)
+      return errorResponse('Failed to switch organization', 500, origin)
     }
 
     console.log(`User ${user.id} switched to organization ${organizationId}`)
@@ -137,10 +140,10 @@ Deno.serve(async (req) => {
       organizationId,
       defaultAppUrl,
       message: 'Organization switched successfully. Please refresh your session to apply changes.'
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in switch-organization:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

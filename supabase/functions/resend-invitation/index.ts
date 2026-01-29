@@ -40,6 +40,9 @@ import { validateRequired, validateUuid } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -47,7 +50,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -56,14 +59,14 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
     // Verify user is Playze admin
     const isAdmin = await isPlayzeAdmin(user.email, supabase)
     if (!isAdmin) {
-      return forbiddenResponse('Only Playze administrators can resend invitations')
+      return forbiddenResponse('Only Playze administrators can resend invitations', origin)
     }
 
     // Parse and validate request body
@@ -71,11 +74,11 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ invitationId }, ['invitationId'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     if (!validateUuid(invitationId)) {
-      return errorResponse('Invalid invitation ID format')
+      return errorResponse('Invalid invitation ID format', 400, origin)
     }
 
     console.log(`Admin ${user.email} resending invitation ${invitationId}`)
@@ -100,11 +103,11 @@ Deno.serve(async (req) => {
 
     if (fetchError || !invitation) {
       console.error('Error fetching invitation:', fetchError)
-      return notFoundResponse('Invitation not found')
+      return notFoundResponse('Invitation not found', origin)
     }
 
     if (invitation.status !== 'pending') {
-      return errorResponse(`Cannot resend invitation with status: ${invitation.status}. Only pending invitations can be resent.`)
+      return errorResponse(`Cannot resend invitation with status: ${invitation.status}. Only pending invitations can be resent.`, 400, origin)
     }
 
     // Reset expiration date using RPC function
@@ -115,11 +118,11 @@ Deno.serve(async (req) => {
 
     if (resetError) {
       console.error('Error resetting invitation expiry:', resetError)
-      return errorResponse(resetError.message || 'Failed to reset invitation expiry')
+      return errorResponse(resetError.message || 'Failed to reset invitation expiry', 400, origin)
     }
 
     if (!resetResult || resetResult.length === 0) {
-      return errorResponse('Failed to reset invitation expiry')
+      return errorResponse('Failed to reset invitation expiry', 400, origin)
     }
 
     const updatedInvitation = resetResult[0]
@@ -193,6 +196,7 @@ Deno.serve(async (req) => {
         return errorResponse(
           'Could not send email automatically. Please share the invitation link manually.',
           400,
+          origin,
           { invitationUrl: redirectUrl }
         )
       }
@@ -202,7 +206,7 @@ Deno.serve(async (req) => {
         invitation: updatedInvitation,
         emailSent: true,
         message: 'Login link sent. User will complete invitation after signing in.'
-      })
+      }, origin)
     }
 
     // User doesn't exist - use inviteUserByEmail to create user and send invite
@@ -228,6 +232,7 @@ Deno.serve(async (req) => {
       return errorResponse(
         'Could not send invitation email. Please share the invitation link manually.',
         400,
+        origin,
         { invitationUrl: redirectUrl }
       )
     }
@@ -238,10 +243,10 @@ Deno.serve(async (req) => {
       invitation: updatedInvitation,
       emailSent: true,
       message: 'Invitation resent successfully. A new magic link has been sent to the user.'
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in resend-invitation:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

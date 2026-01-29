@@ -62,13 +62,13 @@ import {
   type GeminiExecutionParams
 } from '../_shared/llm-executor-gemini.ts'
 
-/**
- * CORS headers configuration for cross-origin requests
- * @constant
- */
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+import { getCorsHeaders, handleCors } from '../_shared/cors.ts'
+
+// Helper to get CORS headers for the current request
+let requestOrigin: string | null = null
+
+function getCorsHeadersForRequest(): Record<string, string> {
+  return getCorsHeaders(requestOrigin)
 }
 
 /**
@@ -309,7 +309,7 @@ async function handleOCRRequest(body: OCRTestRequest): Promise<Response> {
   if (!body.file_content) {
     return new Response(
       JSON.stringify({ error: 'No file content provided' }),
-      { status: 400, headers: corsHeaders }
+      { status: 400, headers: getCorsHeadersForRequest() }
     )
   }
 
@@ -386,7 +386,7 @@ async function handleOCRRequest(body: OCRTestRequest): Promise<Response> {
       } satisfies OCRTestResponse),
       {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...getCorsHeadersForRequest(), 'Content-Type': 'application/json' }
       }
     )
 
@@ -397,7 +397,7 @@ async function handleOCRRequest(body: OCRTestRequest): Promise<Response> {
         error: 'OCR processing failed',
         details: error.message
       }),
-      { status: 500, headers: corsHeaders }
+      { status: 500, headers: getCorsHeadersForRequest() }
     )
   }
 }
@@ -458,9 +458,12 @@ function extractAnnotationsFromOCR(ocrResponse: any): any {
  * @throws {Error} Authentication failures, configuration issues, or LLM API errors
  */
 serve(async (req) => {
+  // Store origin for CORS headers throughout this request
+  requestOrigin = req.headers.get('origin')
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return handleCors(req)
   }
 
   let executionId: string | null = null
@@ -2027,7 +2030,7 @@ serve(async (req) => {
         JSON.stringify(result),
         {
           headers: {
-            ...corsHeaders,
+            ...getCorsHeadersForRequest(),
             'Content-Type': 'application/json'
           }
         }
@@ -2094,7 +2097,7 @@ serve(async (req) => {
         JSON.stringify(result),
         {
           headers: {
-            ...corsHeaders,
+            ...getCorsHeadersForRequest(),
             'Content-Type': 'application/json'
           }
         }
@@ -2132,7 +2135,7 @@ serve(async (req) => {
       {
         status: 500,
         headers: {
-          ...corsHeaders,
+          ...getCorsHeadersForRequest(),
           'Content-Type': 'application/json'
         }
       }

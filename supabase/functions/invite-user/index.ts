@@ -51,6 +51,9 @@ import { validateRequired, validateEmail } from '../_shared/validation.ts'
 const VALID_ROLES = ['admin', 'member', 'viewer']
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -58,7 +61,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -67,7 +70,7 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
@@ -79,17 +82,17 @@ Deno.serve(async (req) => {
       ['email', 'organizationId', 'role']
     )
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     // Validate email format
     if (!validateEmail(email)) {
-      return errorResponse('Invalid email format')
+      return errorResponse('Invalid email format', 400, origin)
     }
 
     // Validate role
     if (!VALID_ROLES.includes(role)) {
-      return errorResponse(`Invalid role. Must be one of: ${VALID_ROLES.join(', ')}`)
+      return errorResponse(`Invalid role. Must be one of: ${VALID_ROLES.join(', ')}`, 400, origin)
     }
 
     console.log(`User ${user.email} inviting ${email} to org ${organizationId} as ${role}`)
@@ -97,11 +100,11 @@ Deno.serve(async (req) => {
     // Verify user has permission to invite (must be admin or owner)
     const membership = await validateOrgMembership(supabase, user.id, organizationId)
     if (!membership) {
-      return forbiddenResponse('You are not a member of this organization')
+      return forbiddenResponse('You are not a member of this organization', origin)
     }
 
     if (!isOrgAdmin(membership)) {
-      return forbiddenResponse('Only organization admins and owners can invite users')
+      return forbiddenResponse('Only organization admins and owners can invite users', origin)
     }
 
     // Get organization details for the invitation email
@@ -113,7 +116,7 @@ Deno.serve(async (req) => {
 
     if (orgError || !organization) {
       console.error('Error fetching organization:', orgError)
-      return notFoundResponse('Organization not found')
+      return notFoundResponse('Organization not found', origin)
     }
 
     // Send invitation email via Supabase Auth
@@ -135,10 +138,10 @@ Deno.serve(async (req) => {
 
       // Handle specific error cases
       if (inviteError.message?.includes('already registered')) {
-        return errorResponse('User is already registered. They can be added directly to the organization.', 409)
+        return errorResponse('User is already registered. They can be added directly to the organization.', 409, origin)
       }
 
-      return errorResponse(`Failed to send invitation: ${inviteError.message}`, 500)
+      return errorResponse(`Failed to send invitation: ${inviteError.message}`, 500, origin)
     }
 
     console.log(`Invitation sent successfully to ${email}`)
@@ -150,10 +153,10 @@ Deno.serve(async (req) => {
         role,
         organizationName: organization.name,
       },
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in invite-user:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

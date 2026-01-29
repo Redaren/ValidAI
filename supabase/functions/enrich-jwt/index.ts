@@ -1,6 +1,18 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
+import { getCorsHeaders, handleCors, isOriginAllowed } from '../_shared/cors.ts';
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return handleCors(req)
+  }
+
+  // Get CORS headers for this origin
+  const corsHeaders = getCorsHeaders(origin)
+
   try {
     // Create admin client
     const supabaseAdmin = createClient(
@@ -23,8 +35,7 @@ Deno.serve(async (req) => {
           status: 401,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -42,8 +53,7 @@ Deno.serve(async (req) => {
           status: 401,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -59,8 +69,7 @@ Deno.serve(async (req) => {
           status: 401,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -80,8 +89,7 @@ Deno.serve(async (req) => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -119,8 +127,7 @@ Deno.serve(async (req) => {
           {
             headers: {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Headers': 'authorization, content-type'
+              ...corsHeaders
             }
           }
         );
@@ -154,8 +161,7 @@ Deno.serve(async (req) => {
             status: 500,
             headers: {
               'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-              'Access-Control-Allow-Headers': 'authorization, content-type'
+              ...corsHeaders
             }
           }
         );
@@ -174,8 +180,7 @@ Deno.serve(async (req) => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -204,8 +209,7 @@ Deno.serve(async (req) => {
           status: 404,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -240,8 +244,7 @@ Deno.serve(async (req) => {
           status: 500,
           headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, content-type'
+            ...corsHeaders
           }
         }
       );
@@ -260,8 +263,7 @@ Deno.serve(async (req) => {
       {
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, content-type'
+          ...corsHeaders
         }
       }
     );
@@ -273,8 +275,7 @@ Deno.serve(async (req) => {
         status: 500,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, content-type'
+          ...getCorsHeaders(req.headers.get('origin'))
         }
       }
     );

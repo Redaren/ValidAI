@@ -61,6 +61,9 @@ interface InviteResult {
 }
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -68,21 +71,21 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
     // Get JWT token from Authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return unauthorizedResponse('Missing Authorization header')
+      return unauthorizedResponse('Missing Authorization header', origin)
     }
     const jwt = authHeader.replace('Bearer ', '')
 
     // Verify JWT using getClaims() (supports asymmetric JWT signing)
     const claims = await verifyAndGetClaims(req)
     if (!claims) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
 
     // Create admin client for service-role operations (email sending, fetching org details)
@@ -95,7 +98,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error: userError } = await adminClient.auth.getUser(jwt)
     if (userError || !user) {
       console.error('Error getting user from token:', userError)
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
 
     // Parse and validate request body
@@ -104,24 +107,24 @@ Deno.serve(async (req) => {
     // Validate required fields
     const validationError = validateRequired({ organizationId, emails, appId }, ['organizationId', 'emails', 'appId'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     if (!validateUuid(organizationId)) {
-      return errorResponse('Invalid organization ID format')
+      return errorResponse('Invalid organization ID format', 400, origin)
     }
 
     if (!Array.isArray(emails) || emails.length === 0) {
-      return errorResponse('emails must be a non-empty array')
+      return errorResponse('emails must be a non-empty array', 400, origin)
     }
 
     if (emails.length > 50) {
-      return errorResponse('Maximum 50 emails per request')
+      return errorResponse('Maximum 50 emails per request', 400, origin)
     }
 
     const validRoles = ['owner', 'admin', 'member', 'viewer']
     if (!validRoles.includes(role)) {
-      return errorResponse('Invalid role. Must be owner, admin, member, or viewer')
+      return errorResponse('Invalid role. Must be owner, admin, member, or viewer', 400, origin)
     }
 
     console.log(`User ${user.email} inviting ${emails.length} user(s) to organization ${organizationId} as ${role}`)
@@ -135,7 +138,7 @@ Deno.serve(async (req) => {
 
     if (orgError || !organization) {
       console.error('Error fetching organization:', orgError)
-      return errorResponse('Organization not found', 404)
+      return errorResponse('Organization not found', 404, origin)
     }
 
     // Get redirect URL for invitation emails
@@ -317,10 +320,10 @@ Deno.serve(async (req) => {
         successful,
         failed
       }
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in user-invite-member:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

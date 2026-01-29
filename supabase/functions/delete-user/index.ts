@@ -49,6 +49,9 @@ import { validateRequired } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -56,7 +59,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -65,14 +68,14 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const adminUser = authResult.user
 
     // Verify user is Playze admin
     const isAdmin = await isPlayzeAdmin(adminUser.email, supabase)
     if (!isAdmin) {
-      return forbiddenResponse('Only Playze administrators can delete users')
+      return forbiddenResponse('Only Playze administrators can delete users', origin)
     }
 
     // Parse and validate request body
@@ -80,12 +83,12 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ userId }, ['userId'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     // Prevent self-deletion
     if (userId === adminUser.id) {
-      return errorResponse('You cannot delete your own account')
+      return errorResponse('You cannot delete your own account', 400, origin)
     }
 
     console.log(`Admin ${adminUser.email} attempting to delete user: ${userId}`)
@@ -95,7 +98,7 @@ Deno.serve(async (req) => {
 
     if (userError || !targetUser?.user) {
       console.error('User not found:', userError)
-      return notFoundResponse('User not found')
+      return notFoundResponse('User not found', origin)
     }
 
     const targetEmail = targetUser.user.email
@@ -109,7 +112,7 @@ Deno.serve(async (req) => {
 
     if (deleteError) {
       console.error('Error deleting user:', deleteError)
-      return errorResponse('Failed to delete user', 500)
+      return errorResponse('Failed to delete user', 500, origin)
     }
 
     console.log(`User deleted successfully: ${targetEmail} (${userId}) by admin ${adminUser.email}`)
@@ -117,10 +120,10 @@ Deno.serve(async (req) => {
     return successResponse({
       deletedUserId: userId,
       email: targetEmail
-    })
+    }, origin)
 
   } catch (error) {
     console.error('Unexpected error in delete-user:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })

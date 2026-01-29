@@ -52,6 +52,9 @@ import { validateRequired, validateEmail } from '../_shared/validation.ts'
  */
 
 Deno.serve(async (req) => {
+  // Get origin for CORS
+  const origin = req.headers.get('origin')
+
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return handleCors(req)
@@ -59,7 +62,7 @@ Deno.serve(async (req) => {
 
   // Only allow POST
   if (req.method !== 'POST') {
-    return errorResponse('Method not allowed', 405)
+    return errorResponse('Method not allowed', 405, origin)
   }
 
   try {
@@ -68,14 +71,14 @@ Deno.serve(async (req) => {
     // Get authenticated user (uses getClaims() for asymmetric JWT support)
     const authResult = await getAuthenticatedUser(req, supabase)
     if (!authResult) {
-      return unauthorizedResponse('Invalid or missing authentication token')
+      return unauthorizedResponse('Invalid or missing authentication token', origin)
     }
     const { user } = authResult
 
     // Verify user is Playze admin
     const isAdmin = await isPlayzeAdmin(user.email, supabase)
     if (!isAdmin) {
-      return forbiddenResponse('Only Playze administrators can create users')
+      return forbiddenResponse('Only Playze administrators can create users', origin)
     }
 
     // Parse and validate request body
@@ -88,12 +91,12 @@ Deno.serve(async (req) => {
 
     const validationError = validateRequired({ email }, ['email'])
     if (validationError) {
-      return errorResponse(validationError)
+      return errorResponse(validationError, 400, origin)
     }
 
     // Validate email format
     if (!validateEmail(email)) {
-      return errorResponse('Invalid email format')
+      return errorResponse('Invalid email format', 400, origin)
     }
 
     console.log(`Admin ${user.email} creating user: ${email}`)
@@ -103,7 +106,7 @@ Deno.serve(async (req) => {
     const userExists = existingUser?.users?.some(u => u.email?.toLowerCase() === email.toLowerCase())
 
     if (userExists) {
-      return conflictResponse(`User with email '${email}' already exists`)
+      return conflictResponse(`User with email '${email}' already exists`, origin)
     }
 
     // Two flows based on whether password is provided
@@ -123,10 +126,10 @@ Deno.serve(async (req) => {
 
         // Handle specific error cases
         if (createError.message?.includes('already registered')) {
-          return conflictResponse('User already exists')
+          return conflictResponse('User already exists', origin)
         }
 
-        return errorResponse(`Failed to create user: ${createError.message}`, 500)
+        return errorResponse(`Failed to create user: ${createError.message}`, 500, origin)
       }
 
       console.log(`User created successfully: ${userData.user?.id}`)
@@ -135,14 +138,14 @@ Deno.serve(async (req) => {
         user: userData.user,
         method: 'direct',
         message: 'User created successfully. User can login immediately with provided password.'
-      })
+      }, origin)
 
     } else {
       // Flow 2: Send invitation email
       console.log('Sending invitation email (no password provided)')
 
       if (!send_email) {
-        return errorResponse('Password is required when send_email is false')
+        return errorResponse('Password is required when send_email is false', 400, origin)
       }
 
       const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
@@ -157,10 +160,10 @@ Deno.serve(async (req) => {
         console.error('Error sending invitation:', inviteError)
 
         if (inviteError.message?.includes('already registered')) {
-          return conflictResponse('User already exists')
+          return conflictResponse('User already exists', origin)
         }
 
-        return errorResponse(`Failed to send invitation: ${inviteError.message}`, 500)
+        return errorResponse(`Failed to send invitation: ${inviteError.message}`, 500, origin)
       }
 
       console.log(`Invitation sent successfully to: ${email}`)
@@ -169,11 +172,11 @@ Deno.serve(async (req) => {
         user: inviteData.user,
         method: 'invitation',
         message: 'Invitation email sent successfully. User will set password during invitation acceptance.'
-      })
+      }, origin)
     }
 
   } catch (error) {
     console.error('Unexpected error in create-user:', error)
-    return errorResponse('Internal server error', 500)
+    return errorResponse('Internal server error', 500, req.headers.get('origin'))
   }
 })
